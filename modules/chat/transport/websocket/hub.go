@@ -1,16 +1,18 @@
 package websocket
 
+import "my-app/modules/chat/models"
+
 type Hub struct {
-	Clients    map[*Client]bool
-	Broadcast  chan []byte
+	Clients    map[string]*Client
+	Broadcast  chan models.Message
 	Register   chan *Client
 	Unregister chan *Client
 }
 
 func NewHub() *Hub {
 	return &Hub{
-		Clients:    make(map[*Client]bool),
-		Broadcast:  make(chan []byte),
+		Clients:    make(map[string]*Client),
+		Broadcast:  make(chan models.Message),
 		Register:   make(chan *Client),
 		Unregister: make(chan *Client),
 	}
@@ -20,19 +22,19 @@ func (h *Hub) Run() {
 	for {
 		select {
 		case client := <-h.Register:
-			h.Clients[client] = true
+			h.Clients[client.UserID] = client
 		case client := <-h.Unregister:
-			if _, ok := h.Clients[client]; ok {
-				delete(h.Clients, client)
+			if _, ok := h.Clients[client.UserID]; ok {
+				delete(h.Clients, client.UserID)
 				close(client.Send)
 			}
 		case message := <-h.Broadcast:
-			for client := range h.Clients {
+			if receiver, ok := h.Clients[message.ReceiverID]; ok {
 				select {
-				case client.Send <- message:
+				case receiver.Send <- []byte(message.Content):
 				default:
-					close(client.Send)
-					delete(h.Clients, client)
+					close(receiver.Send)
+					delete(h.Clients, receiver.UserID)
 				}
 			}
 		}

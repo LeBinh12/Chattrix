@@ -18,7 +18,7 @@ func ProfileHandler(db *mongo.Database) gin.HandlerFunc {
 			return
 		}
 
-		store := storage.NewUserStore(db)
+		store := storage.NewMongoStore(db)
 
 		user, err := store.FindByID(ctx.Request.Context(), userID.(string))
 

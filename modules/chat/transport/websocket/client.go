@@ -14,9 +14,10 @@ import (
 // Đây là nơi xử lý Struct client, các method gửi/nhận tin
 
 type Client struct {
-	Hub  *Hub
-	Conn *websocket.Conn
-	Send chan []byte
+	Hub    *Hub
+	Conn   *websocket.Conn
+	Send   chan []byte
+	UserID string
 }
 
 // ĐỌc dữ liệu lưu và DB và trả về cho client là đã gửi vào hub và hub sẽ xử lý gửi đi cho client
@@ -41,7 +42,7 @@ func (c *Client) ReadPump(db *mongo.Database) {
 		// Lưu DB
 
 		// Gửi broadcast ra hub
-		c.Hub.Broadcast <- []byte(msg.Content) // có thể serialize JSON thay vì chỉ Content
+		c.Hub.Broadcast <- msg // có thể serialize JSON thay vì chỉ Content
 		// Broadcast Gửi một tin nhắn tới tất cả người nhận cùng lúc
 		// Unicast là Gửi tin nhắn tới một người nhận riêng
 		// 	Multicast là Gửi tin nhắn tới một nhóm người nhận
