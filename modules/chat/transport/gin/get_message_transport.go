@@ -1,0 +1,40 @@
+package ginMessage
+
+import (
+	"my-app/common"
+	"my-app/modules/chat/biz"
+	"my-app/modules/chat/storage"
+	"net/http"
+	"strconv"
+
+	"github.com/gin-gonic/gin"
+	"go.mongodb.org/mongo-driver/mongo"
+)
+
+func GetMessages(db *mongo.Database) gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		senderID := ctx.Query("sender_id")
+		receiverID := ctx.Query("receiver_id")
+
+		limit, _ := strconv.ParseInt(ctx.DefaultQuery("limit", "20"), 10, 64)
+		skip, _ := strconv.ParseInt(ctx.DefaultQuery("skip", "0"), 10, 64)
+
+		store := storage.NewMongoGetMessageStore(db)
+		business := biz.NewGetMessageBiz(store)
+
+		messages, err := business.GetMessage(ctx.Request.Context(), senderID, receiverID, limit, skip)
+
+		if err != nil {
+			ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		ctx.JSON(http.StatusOK, common.NewResponse(http.StatusOK, "Đã gửi lời mời kết bạn",
+			map[string]interface{}{
+				"data":  messages,
+				"limit": limit,
+				"skip":  skip,
+				"count": len(messages),
+			}))
+	}
+}
