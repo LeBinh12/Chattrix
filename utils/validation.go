@@ -40,6 +40,15 @@ func ValidationRegex(fieldName, value string, regex *regexp.Regexp, errMessage s
 	return nil
 }
 
+func ValidateStruct(s interface{}) error {
+	v, ok := binding.Validator.Engine().(*validator.Validate)
+	if !ok {
+		return fmt.Errorf("validator chưa được khởi tạo")
+	}
+
+	return v.Struct(s)
+}
+
 func ValidationPositiveInt(fieldName, value string) (int, error) {
 	v, err := strconv.Atoi(value)
 
@@ -150,7 +159,6 @@ func HandleValidationErrors(err error) gin.H {
 	return gin.H{"error": "Yêu cầu không hợp lệ" + err.Error()}
 
 }
-
 
 func RegisterValidator() error {
 	v, ok := binding.Validator.Engine().(*validator.Validate)

@@ -1,6 +1,7 @@
 package ginUser
 
 import (
+	"fmt"
 	"my-app/common"
 	"my-app/modules/user/biz"
 	"my-app/modules/user/models"
@@ -14,13 +15,44 @@ import (
 
 func RegisterHandler(db *mongo.Database) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		var req models.RegisterRequest
+		username := c.PostForm("username")
+		password := c.PostForm("password")
+		email := c.PostForm("email")
+		phone := c.PostForm("phone")
+		displayName := c.PostForm("display_name")
 
-		if err := c.ShouldBindJSON(&req); err != nil {
+		avatarFile, _ := c.FormFile("avatar")
+		var avatarURL string
+
+		if avatarFile != nil {
+			if err := utils.ValidateAndSaveFile(avatarFile); err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+				return
+			}
+			url, err := utils.UploadFileToCloudinary(c.Request.Context(), avatarFile)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, common.ErrDB(err))
+				return
+			}
+			avatarURL = url
+		} else {
+			avatarURL = "null"
+		}
+
+		req := models.RegisterRequest{
+			Username:    username,
+			Password:    password,
+			Email:       email,
+			Phone:       phone,
+			DisplayName: displayName,
+			Avatar:      avatarURL,
+		}
+
+		if err := utils.ValidateStruct(&req); err != nil {
 			c.JSON(http.StatusBadRequest, utils.HandleValidationErrors(err))
 			return
 		}
-
+		fmt.Println(req)
 		store := storage.NewMongoStore(db)
 		business := biz.NewRegisterBiz(store)
 

@@ -1,18 +1,26 @@
 package models
 
-import "go.mongodb.org/mongo-driver/bson/primitive"
+import (
+	"my-app/common"
+)
 
 type User struct {
-	ID       primitive.ObjectID `bson:"_id,omitempty" json:"id"`
-	Username string             `bson:"username" json:"username"`
-	Password string             `bson:"password,omitempty" json:"password,omitempty"`
-	Email    string             `bson:"email" json:"email"`
+	common.MongoModel `bson:",inline"`
+	Username          string `bson:"username" json:"username" binding:"required"`
+	Password          string `bson:"password,omitempty" json:"password,omitempty" binding:"required"`
+	Email             string `bson:"email" json:"email" binding:"required"`
+	Avatar            string `bson:"avatar" json:"avatar"`
+	Phone             string `bson:"phone" json:"phone" binding:"required"`
+	DisplayName       string `bson:"display_name" json:"display_name"`
 }
 
 type RegisterRequest struct {
-	Username string `json:"username" binding:"required"`
-	Password string `json:"password" binding:"required"`
-	Email    string `json:"email" binding:"required,email"`
+	Username    string `json:"username" binding:"required"`
+	Password    string `json:"password" binding:"required"`
+	Email       string `json:"email" binding:"required,email"`
+	Avatar      string `bson:"avatar" json:"avatar"`
+	Phone       string `bson:"phone" json:"phone" binding:"required"`
+	DisplayName string `bson:"display_name" json:"display_name"`
 }
 
 type LoginRequest struct {
