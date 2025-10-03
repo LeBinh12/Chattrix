@@ -1,11 +1,10 @@
 package websocket
 
 import (
-	"context"
+	"encoding/json"
 	"log"
-	"my-app/modules/chat/biz"
+	"my-app/common/kafka"
 	"my-app/modules/chat/models"
-	"my-app/modules/chat/storage"
 
 	"github.com/gorilla/websocket"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -27,9 +26,6 @@ func (c *Client) ReadPump(db *mongo.Database) {
 		c.Conn.Close()
 	}()
 
-	chatStore := storage.NewMongoStore(db)
-	chatBiz := biz.NewChatBiz(chatStore)
-
 	for {
 		var msg models.Message
 
@@ -49,9 +45,15 @@ func (c *Client) ReadPump(db *mongo.Database) {
 
 		msgCopy := msg
 		go func() {
-			if _, err := chatBiz.HandleMessage(context.Background(),
-				msgCopy.SenderID, msgCopy.ReceiverID, msgCopy.Content); err != nil {
-				log.Println("DB save error:", err)
+			data, err := json.Marshal(msg)
+
+			if err != nil {
+				log.Println("JSON marshal error:", err)
+				return
+			}
+
+			if err := kafka.SendMessage("chat-topic", msgCopy.SenderID, string(data)); err != nil {
+				log.Println("Kafka send error:", err)
 			}
 		}()
 	}

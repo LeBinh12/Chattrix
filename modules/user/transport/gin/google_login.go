@@ -2,7 +2,6 @@ package ginUser
 
 import (
 	"context"
-	"fmt"
 	"my-app/common"
 	"my-app/modules/user/models"
 	"my-app/modules/user/storage"
@@ -11,6 +10,7 @@ import (
 	"os"
 
 	"github.com/gin-gonic/gin"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"google.golang.org/api/idtoken"
 )
@@ -37,7 +37,6 @@ func GoogleLoginHandler(db *mongo.Database) gin.HandlerFunc {
 
 		// Verify Google ID token
 		payload, err := idtoken.Validate(context.Background(), req.IDToken, os.Getenv("GOOGLE_CLIENT_ID"))
-
 		if err != nil {
 			ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid Google token"})
 			return
@@ -46,20 +45,22 @@ func GoogleLoginHandler(db *mongo.Database) gin.HandlerFunc {
 		email := payload.Claims["email"].(string)
 		name := payload.Claims["name"].(string)
 		picture := payload.Claims["picture"].(string)
-		fmt.Println(picture)
 
 		store := storage.NewMongoStore(db)
 
 		user, err := store.FindByEmail(ctx.Request.Context(), email)
-		fmt.Println(user)
 
 		// Nếu chưa có thì tạo mới
 		if err == mongo.ErrNoDocuments {
 
 			newUser := &models.User{
-				Email:    email,
-				Username: name,
+				Email:       email,
+				Username:    name,
+				Avatar:      picture,
+				DisplayName: name,
 			}
+
+			newUser.ID = primitive.NewObjectID()
 
 			if err := store.Create(ctx.Request.Context(), newUser); err != nil {
 				ctx.JSON(http.StatusInternalServerError, appErrorToJSON(common.ErrDB(err)))
@@ -79,10 +80,7 @@ func GoogleLoginHandler(db *mongo.Database) gin.HandlerFunc {
 			return
 		}
 
-		ctx.JSON(http.StatusOK, gin.H{
-			"message": "Login thành công",
-			"token":   token,
-			"user":    user,
-		})
+		ctx.JSON(http.StatusOK, common.NewResponse(http.StatusOK, "Đăng nhập thành công", token))
+
 	}
 }
