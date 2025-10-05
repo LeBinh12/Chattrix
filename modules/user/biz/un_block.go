@@ -2,8 +2,8 @@ package biz
 
 import (
 	"context"
-	"my-app/modules/user/models"
-	"my-app/modules/user/storage"
+	"my-app/modules/friend/models"
+	"my-app/modules/friend/storage"
 
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
