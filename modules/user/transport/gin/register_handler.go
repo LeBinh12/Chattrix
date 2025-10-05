@@ -8,6 +8,7 @@ import (
 	"my-app/modules/user/storage"
 	"my-app/utils"
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -20,6 +21,13 @@ func RegisterHandler(db *mongo.Database) gin.HandlerFunc {
 		email := c.PostForm("email")
 		phone := c.PostForm("phone")
 		displayName := c.PostForm("display_name")
+		gender := c.PostForm("gender")
+		birthdayStr := c.PostForm("birthday")
+		birthday, err := time.Parse("2006-01-02", birthdayStr) // layout phải đúng
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Ngày sinh không hợp lệ"})
+			return
+		}
 
 		avatarFile, _ := c.FormFile("avatar")
 		var avatarURL string
@@ -46,6 +54,8 @@ func RegisterHandler(db *mongo.Database) gin.HandlerFunc {
 			Phone:       phone,
 			DisplayName: displayName,
 			Avatar:      avatarURL,
+			Gender:      gender,
+			Birthday:    birthday,
 		}
 
 		if err := utils.ValidateStruct(&req); err != nil {

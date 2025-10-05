@@ -33,6 +33,8 @@ func (biz *RegisterBiz) Register(ctx context.Context, data *models.RegisterReque
 		Phone:       data.Phone,
 		DisplayName: data.DisplayName,
 		Password:    string(hash),
+		Gender:      data.Gender,
+		Birthday:    data.Birthday,
 	}
 
 	user.ID = primitive.NewObjectID()

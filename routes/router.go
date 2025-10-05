@@ -17,8 +17,17 @@ func InitRouter(r *gin.Engine, todoColl *mongo.Database) {
 		middleware.RateLimitingMiddleware(),
 	)
 	{
-		api.MessageRoutes(v1, todoColl)
 		api.RegisterUserRoutes(v1, todoColl)
+	}
+
+	v1.Use(
+		middleware.LoggerMiddleware(),
+		middleware.ApiKeyMiddleware(),
+		middleware.RateLimitingMiddleware(),
+		middleware.AuthMiddleware(),
+	)
+	{
+		api.MessageRoutes(v1, todoColl)
 		api.RegisterFriendRoutes(v1, todoColl)
 	}
 
