@@ -1,6 +1,8 @@
 package websocket
 
-import "my-app/modules/chat/models"
+import (
+	"my-app/modules/chat/models"
+)
 
 type Hub struct {
 	Clients    map[string]*Client
@@ -29,7 +31,8 @@ func (h *Hub) Run() {
 				close(client.Send)
 			}
 		case message := <-h.Broadcast:
-			if receiver, ok := h.Clients[message.ReceiverID]; ok {
+
+			if receiver, ok := h.Clients[message.ReceiverID.Hex()]; ok {
 				select {
 				case receiver.Send <- []byte(message.Content):
 				default:

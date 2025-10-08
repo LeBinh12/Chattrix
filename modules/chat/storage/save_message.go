@@ -39,3 +39,4 @@ func (s *mongoStore) CheckUserExists(ctx context.Context, userID string) (bool, 
 
 	return true, nil
 }
+

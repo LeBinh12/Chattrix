@@ -26,15 +26,21 @@ func (biz *RegisterBiz) Register(ctx context.Context, data *models.RegisterReque
 
 	now := time.Now()
 
+	displayName := data.DisplayName
+
+	if displayName == "" {
+		displayName = data.Username
+	}
 	user := &models.User{
-		Username:    data.Username,
-		Email:       data.Email,
-		Avatar:      data.Avatar,
-		Phone:       data.Phone,
-		DisplayName: data.DisplayName,
-		Password:    string(hash),
-		Gender:      data.Gender,
-		Birthday:    data.Birthday,
+		Username:               data.Username,
+		Email:                  data.Email,
+		Avatar:                 data.Avatar,
+		Phone:                  data.Phone,
+		DisplayName:            displayName,
+		Password:               string(hash),
+		Gender:                 data.Gender,
+		Birthday:               data.Birthday,
+		IsCompletedFriendSetup: false,
 	}
 
 	user.ID = primitive.NewObjectID()

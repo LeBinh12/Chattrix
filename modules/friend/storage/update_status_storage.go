@@ -29,6 +29,7 @@ func NewMongoStoreUpdateFriend(db *mongo.Database) *MongoStoreUpdateFriend {
 
 func (s *mongoStoreFriend) UpdateStatusWithAction(ctx context.Context, id primitive.ObjectID, newStatus FriendStatus, lastActionBy string) error {
 	filter := bson.M{"_id": id}
+	// các dữ liệu cần cập nhật
 	update := bson.M{
 		"$set": bson.M{
 			"status":         newStatus,

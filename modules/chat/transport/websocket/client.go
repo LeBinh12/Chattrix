@@ -35,7 +35,10 @@ func (c *Client) ReadPump(db *mongo.Database) {
 			break
 		}
 
-		// Lưu DB
+		if msg.SenderID == msg.ReceiverID {
+			log.Println("Error: Không được gửi tin nhắn cho chính mình")
+			break
+		}
 
 		// Gửi broadcast ra hub
 		c.Hub.Broadcast <- msg // có thể serialize JSON thay vì chỉ Content
@@ -52,7 +55,7 @@ func (c *Client) ReadPump(db *mongo.Database) {
 				return
 			}
 
-			if err := kafka.SendMessage("chat-topic", msgCopy.SenderID, string(data)); err != nil {
+			if err := kafka.SendMessage("chat-topic", msgCopy.SenderID.Hex(), string(data)); err != nil {
 				log.Println("Kafka send error:", err)
 			}
 		}()
