@@ -40,3 +40,21 @@ func (s *mongoStore) CheckUserExists(ctx context.Context, userID string) (bool, 
 	return true, nil
 }
 
+func (s *mongoStore) UpdateStatusSeen(ctx context.Context, sender_id, receiver_id, lastSeenMsgID primitive.ObjectID) error {
+	filter := bson.M{
+		"sender_id":   sender_id,
+		"receiver_id": receiver_id,
+		"is_read":     false,
+		"_id":         bson.M{"$lte": lastSeenMsgID}, // tất cả tin nhắn trước hoặc bằng ID cuối cùng
+	}
+
+	update := bson.M{
+		"$set": bson.M{
+			"status":  models.StatusSeen,
+			"is_read": true,
+		},
+	}
+
+	_, err := s.db.Collection("messages").UpdateMany(ctx, filter, update)
+	return err
+}

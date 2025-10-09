@@ -2,12 +2,13 @@ package biz
 
 import (
 	"context"
-	"errors"
 	"my-app/modules/chat/models"
+
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 type GetMessageStorage interface {
-	GetMessage(ctx context.Context, SenderID, ReceiverID string, limit, skip int64) ([]models.Message, error)
+	GetMessage(ctx context.Context, SenderID, ReceiverID primitive.ObjectID, limit, skip int64) ([]models.Message, error)
 }
 
 type getMessageBiz struct {
@@ -18,10 +19,7 @@ func NewGetMessageBiz(store GetMessageStorage) *getMessageBiz {
 	return &getMessageBiz{store: store}
 }
 
-func (biz *getMessageBiz) GetMessage(ctx context.Context, SenderID, ReceiverID string, limit, skip int64) ([]models.Message, error) {
-	if SenderID == "" || ReceiverID == "" {
-		return nil, errors.New("senderID and receiverID must not be empty")
-	}
+func (biz *getMessageBiz) GetMessage(ctx context.Context, SenderID, ReceiverID primitive.ObjectID, limit, skip int64) ([]models.Message, error) {
 
 	if limit <= 0 {
 		limit = 20

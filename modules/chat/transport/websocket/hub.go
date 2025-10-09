@@ -1,25 +1,30 @@
 package websocket
 
 import (
+	"encoding/json"
 	"my-app/modules/chat/models"
 )
 
 type Hub struct {
 	Clients    map[string]*Client
-	Broadcast  chan models.Message
+	Broadcast  chan HubEvent
 	Register   chan *Client
 	Unregister chan *Client
+}
+
+type HubEvent struct {
+	Type    string
+	Payload interface{}
 }
 
 func NewHub() *Hub {
 	return &Hub{
 		Clients:    make(map[string]*Client),
-		Broadcast:  make(chan models.Message),
+		Broadcast:  make(chan HubEvent),
 		Register:   make(chan *Client),
 		Unregister: make(chan *Client),
 	}
 }
-
 func (h *Hub) Run() {
 	for {
 		select {
@@ -30,16 +35,22 @@ func (h *Hub) Run() {
 				delete(h.Clients, client.UserID)
 				close(client.Send)
 			}
-		case message := <-h.Broadcast:
-
-			if receiver, ok := h.Clients[message.ReceiverID.Hex()]; ok {
-				select {
-				case receiver.Send <- []byte(message.Content):
-				default:
-					close(receiver.Send)
-					delete(h.Clients, receiver.UserID)
+		case event := <-h.Broadcast:
+			switch event.Type {
+			case "chat":
+				msg := event.Payload.(*models.Message)
+				if receiver, ok := h.Clients[msg.ReceiverID.Hex()]; ok {
+					data, _ := json.Marshal(msg)
+					receiver.Send <- data
+				}
+			case "update_seen":
+				data, _ := json.Marshal(event.Payload)
+				// Gửi cho tất cả client (hoặc lọc theo conversation_id)
+				for _, c := range h.Clients {
+					c.Send <- data
 				}
 			}
+
 		}
 	}
 }
