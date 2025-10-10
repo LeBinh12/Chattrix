@@ -39,9 +39,20 @@ func (h *Hub) Run() {
 			switch event.Type {
 			case "chat":
 				msg := event.Payload.(*models.Message)
+				data, _ := json.Marshal(map[string]interface{}{
+					"type":    "chat",
+					"message": msg,
+					"status":  msg.Status,
+				})
+
+				// Gửi cho người nhận nếu online
 				if receiver, ok := h.Clients[msg.ReceiverID.Hex()]; ok {
-					data, _ := json.Marshal(msg)
 					receiver.Send <- data
+				}
+
+				// Gửi lại cho người gửi (để đồng bộ trạng thái hoặc confirm gửi thành công)
+				if sender, ok := h.Clients[msg.SenderID.Hex()]; ok {
+					sender.Send <- data
 				}
 			case "update_seen":
 				data, _ := json.Marshal(event.Payload)

@@ -40,7 +40,7 @@ func getRateLimiter(ip string) *rate.Limiter {
 
 	//nếu chưa có ip thì tạo mới
 	if !exists {
-		limiter := rate.NewLimiter(5, 10) // bucket nghĩa là nhận 5 request / s , tức là mỗi giây sẽ cấp thêm 5 request
+		limiter := rate.NewLimiter(50, 100) // bucket nghĩa là nhận 5 request / s , tức là mỗi giây sẽ cấp thêm 5 request
 		// 	 brust là số lượng request tối đa có thể xử lý ngay cùng 1 lúc
 		// có nghĩa là nếu mà cùng lúc có 11 request thì request sẽ phải đợi bucket sinh ra token mớisẽ là khoản 200ms
 
