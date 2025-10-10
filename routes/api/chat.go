@@ -10,4 +10,5 @@ import (
 func RegisterChatRoutes(rg *gin.RouterGroup, db *mongo.Database, hub *websocket.Hub) {
 	chat := rg.Group("/chat")
 	chat.GET("/ws", websocket.WebSocketHandler(db, hub))
+
 }

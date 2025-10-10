@@ -58,8 +58,8 @@ func (c *chatConsumer) ConsumeClaim(sess sarama.ConsumerGroupSession, claim sara
 			chatBiz := biz.NewChatBiz(chatStore)
 
 			// Lưu xuống database
-			if _, err := chatBiz.HandleMessage(context.Background(), chatMsg.SenderID,
-				chatMsg.ReceiverID, chatMsg.Content); err != nil {
+			if _, err := chatBiz.HandleMessage(context.Background(), chatMsg.SenderID.Hex(),
+				chatMsg.ReceiverID.Hex(), chatMsg.Content, chatMsg.Status); err != nil {
 				log.Println("DB save error:", err)
 			}
 

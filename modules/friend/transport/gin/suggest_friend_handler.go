@@ -16,13 +16,13 @@ func SuggestFriendHandler(db *mongo.Database) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var query models.SuggestFriendQuery
 
-		// ✅ Validate cơ bản
+		// Validate cơ bản
 		if err := c.ShouldBindQuery(&query); err != nil {
 			c.JSON(http.StatusBadRequest, utils.HandleValidationErrors(err))
 			return
 		}
 
-		// ✅ Gọi business layer
+		// Gọi business layer
 		store := storage.NewMongoStore(db)
 		business := biz.NewSuggestFriendBiz(store)
 
@@ -34,7 +34,6 @@ func SuggestFriendHandler(db *mongo.Database) gin.HandlerFunc {
 			return
 		}
 
-		// ✅ Trả về kết quả
 		c.JSON(http.StatusOK, common.NewResponse(http.StatusOK, "Gợi ý bạn bè thành công", gin.H{
 			"total": total,
 			"page":  query.Page,

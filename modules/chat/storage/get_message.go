@@ -5,6 +5,7 @@ import (
 	"my-app/modules/chat/models"
 
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
@@ -17,7 +18,7 @@ func NewMongoGetMessageStore(db *mongo.Database) *MongoGetMessage {
 	return &MongoGetMessage{db: db}
 }
 
-func (s *MongoGetMessage) GetMessage(ctx context.Context, SenderID, ReceiverID string, limit, skip int64) ([]models.Message, error) {
+func (s *MongoGetMessage) GetMessage(ctx context.Context, SenderID, ReceiverID primitive.ObjectID, limit, skip int64) ([]models.Message, error) {
 	filter := bson.M{
 		"$or": []bson.M{
 			{"sender_id": SenderID, "receiver_id": ReceiverID},
@@ -25,7 +26,7 @@ func (s *MongoGetMessage) GetMessage(ctx context.Context, SenderID, ReceiverID s
 		},
 	}
 
-	opst := options.Find().SetSort(bson.M{"create_at": -1}).
+	opst := options.Find().SetSort(bson.M{"created_at": -1}).
 		SetLimit(limit).
 		SetSkip(skip)
 

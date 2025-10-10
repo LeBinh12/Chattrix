@@ -5,6 +5,8 @@ import (
 	"errors"
 	"my-app/modules/chat/models"
 	"time"
+
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 type ChatStorage interface {
@@ -20,12 +22,16 @@ func NewChatBiz(store ChatStorage) *ChatBiz {
 	return &ChatBiz{store: store}
 }
 
-func (biz *ChatBiz) HandleMessage(ctx context.Context, sender string, receiver string, content string) (*models.Message, error) {
+func (biz *ChatBiz) HandleMessage(ctx context.Context, sender string, receiver string, content string, status models.MessageStatus) (*models.Message, error) {
+	senderID, _ := primitive.ObjectIDFromHex(sender)
+	receiverID, _ := primitive.ObjectIDFromHex(receiver)
 	msg := &models.Message{
-		SenderID:   sender,
-		ReceiverID: receiver,
+		SenderID:   senderID,
+		ReceiverID: receiverID,
 		Content:    content,
 		CreatedAt:  time.Now(),
+		Status:     status,
+		IsRead:     false,
 	}
 	senderExists, err := biz.store.CheckUserExists(ctx, sender)
 
@@ -33,7 +39,7 @@ func (biz *ChatBiz) HandleMessage(ctx context.Context, sender string, receiver s
 		return nil, err
 	}
 	if !senderExists {
-		return nil, errors.New("sender not found")
+		return nil, errors.New("không tìm thấy người gửi")
 	}
 
 	receiverExists, err := biz.store.CheckUserExists(ctx, receiver)
@@ -41,7 +47,7 @@ func (biz *ChatBiz) HandleMessage(ctx context.Context, sender string, receiver s
 		return nil, err
 	}
 	if !receiverExists {
-		return nil, errors.New("receiver not found")
+		return nil, errors.New("không tìm thấy người nhận")
 	}
 
 	if err := biz.store.SaveMessage(ctx, msg); err != nil {
