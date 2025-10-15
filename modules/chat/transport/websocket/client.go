@@ -7,6 +7,7 @@ import (
 	"my-app/common/kafka"
 	"my-app/modules/chat/models"
 	"my-app/modules/chat/storage"
+	"time"
 
 	"github.com/gorilla/websocket"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -18,7 +19,7 @@ import (
 type Client struct {
 	Hub    *Hub
 	Conn   *websocket.Conn
-	Send   chan []byte
+	Send   chan []byte // để mặc định thì kích thước là 256 nên khi nhiều tin nhắn quá sẽ bị tràn làm mất dữ liệu
 	UserID string
 }
 
@@ -32,18 +33,26 @@ type WSMessage struct {
 }
 
 // ĐỌc dữ liệu lưu và DB và trả về cho client là đã gửi vào hub và hub sẽ xử lý gửi đi cho client
-func (c *Client) ReadPump(db *mongo.Database) {
+func (c *Client) WritePump(db *mongo.Database) {
 	defer func() {
 		c.Hub.Unregister <- c
 		c.Conn.Close()
 	}()
+
+	// setup Ping-Pong
+	c.Conn.SetReadLimit(512) // limit message size
+	c.Conn.SetReadDeadline(time.Now().Add(60 * time.Second))
+	c.Conn.SetPongHandler(func(string) error {
+		c.Conn.SetReadDeadline(time.Now().Add(60 * time.Second))
+		return nil
+	})
 
 	ctx := context.Background()
 
 	for {
 		var incoming WSMessage
 		if err := c.Conn.ReadJSON(&incoming); err != nil {
-			log.Println("❌ Read error:", err)
+			log.Println(" Read error:", err)
 			break
 		}
 
@@ -53,27 +62,38 @@ func (c *Client) ReadPump(db *mongo.Database) {
 			if msg == nil {
 				continue
 			}
-			if msg.SenderID == msg.ReceiverID {
-				log.Println("Error: Không được gửi tin nhắn cho chính mình")
-				break
-			}
 
-			// kiểm tra xem người dùng có ở trong soket không, nếu có thì là đang online
-			_, ok := c.Hub.Clients[msg.ReceiverID.Hex()]
-
-			if ok {
+			// xủ lý nếu là nhắn tin Group
+			if msg.GroupID != primitive.NilObjectID {
+				c.Hub.Broadcast <- HubEvent{
+					Type:    "chat",
+					Payload: msg,
+				}
 				msg.Status = models.StatusDelivered
+
 			} else {
-				msg.Status = models.StatusSent
+				if msg.SenderID == msg.ReceiverID {
+					log.Println("Error: Không được gửi tin nhắn cho chính mình")
+					break
+				}
+
+				// kiểm tra xem người dùng có ở trong soket không, nếu có thì là đang online
+				_, ok := c.Hub.Clients[msg.ReceiverID.Hex()]
+
+				if ok {
+					msg.Status = models.StatusDelivered
+				} else {
+					msg.Status = models.StatusSent
+				}
+				// Gửi broadcast ra hub
+				c.Hub.Broadcast <- HubEvent{
+					Type:    "chat",
+					Payload: msg,
+				} // có thể serialize JSON thay vì chỉ Content
+				// Broadcast Gửi một tin nhắn tới tất cả người nhận cùng lúc
+				// Unicast là Gửi tin nhắn tới một người nhận riêng
+				// 	Multicast là Gửi tin nhắn tới một nhóm người nhận
 			}
-			// Gửi broadcast ra hub
-			c.Hub.Broadcast <- HubEvent{
-				Type:    "chat",
-				Payload: msg,
-			} // có thể serialize JSON thay vì chỉ Content
-			// Broadcast Gửi một tin nhắn tới tất cả người nhận cùng lúc
-			// Unicast là Gửi tin nhắn tới một người nhận riêng
-			// 	Multicast là Gửi tin nhắn tới một nhóm người nhận
 
 			msgCopy := msg
 			go func() {
@@ -107,17 +127,17 @@ func (c *Client) ReadPump(db *mongo.Database) {
 
 			conversationID := storage.GetConversationID(senderID, receiverID)
 
-			seenStore := storage.NewMongoChatSeenStatusStore(db)
+			seenStore := storage.NewMongoChatStore(db)
 			// Cập nhật con trỏ đã xem trong bảng chat_seen_status
 			if err := seenStore.CreateOrUpdate(ctx, userID, conversationID, lastSeenMsgID); err != nil {
-				log.Println("❌ Lỗi update ChatSeenStatus:", err)
+				log.Println(" Lỗi update ChatSeenStatus:", err)
 				continue
 			}
 
 			// Update message status = seen
-			msgStore := storage.NewMongoStore(db)
+			msgStore := storage.NewMongoChatStore(db)
 			if err := msgStore.UpdateStatusSeen(ctx, senderID, receiverID, lastSeenMsgID); err != nil {
-				log.Println("❌ Lỗi update Message seen:", err)
+				log.Println(" Lỗi update Message seen:", err)
 				continue
 			}
 
@@ -135,8 +155,10 @@ func (c *Client) ReadPump(db *mongo.Database) {
 }
 
 // Lắng nghe xem có ai gửi tin nhắn xuống không nếu có trả về cho client đoạn tinh nhắn đó
-func (c *Client) WritePump() {
+func (c *Client) ReadPump() {
+	ticker := time.NewTicker(50 * time.Second)
 	defer func() {
+		ticker.Stop()
 		c.Conn.Close()
 	}()
 

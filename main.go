@@ -4,6 +4,7 @@ import (
 	"my-app/common/kafka"
 	"my-app/config"
 	"my-app/database"
+	"my-app/modules/chat/transport/websocket"
 	"my-app/routes"
 	"my-app/utils"
 	"time"
@@ -44,7 +45,10 @@ func main() {
 		panic(err)
 	}
 
-	routes.InitRouter(r, todoColl)
+	hub := websocket.NewHub(todoColl)
+	go hub.Run()
+
+	routes.InitRouter(r, todoColl, hub)
 
 	r.Run("0.0.0.0:3000")
 }
