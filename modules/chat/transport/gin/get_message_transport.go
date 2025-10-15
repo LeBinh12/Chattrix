@@ -48,7 +48,7 @@ func GetMessages(db *mongo.Database) gin.HandlerFunc {
 		limit, _ := strconv.ParseInt(ctx.DefaultQuery("limit", "20"), 10, 64)
 		skip, _ := strconv.ParseInt(ctx.DefaultQuery("skip", "0"), 10, 64)
 
-		store := storage.NewMongoGetMessageStore(db)
+		store := storage.NewMongoChatStore(db)
 		business := biz.NewGetMessageBiz(store)
 
 		messages, err := business.GetMessage(ctx.Request.Context(), senderObjectID, receiverObjectID, limit, skip)

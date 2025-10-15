@@ -4,6 +4,9 @@ import (
 	"context"
 	"fmt"
 	"my-app/modules/group/models"
+	"time"
+
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 type CreateGroupMemberStorage interface {
@@ -23,6 +26,10 @@ func (biz *createGroupMemberBiz) CreateGroupNumber(ctx context.Context, data *mo
 	if data.GroupID.IsZero() || data.UserID.IsZero() {
 		return fmt.Errorf("Lỗi dữ liệu không hợp lệ")
 	}
+
+	data.ID = primitive.NewObjectID()
+	data.CreatedAt = time.Now()
+	data.UpdatedAt = time.Now()
 
 	if err := biz.store.CreateGroupNumber(ctx, data); err != nil {
 		return err

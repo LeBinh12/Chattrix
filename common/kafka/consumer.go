@@ -54,12 +54,12 @@ func (c *chatConsumer) ConsumeClaim(sess sarama.ConsumerGroupSession, claim sara
 				log.Println("Unmarshal error:", err)
 				continue
 			}
-			chatStore := storage.NewMongoStore(c.db)
+			chatStore := storage.NewMongoChatStore(c.db)
 			chatBiz := biz.NewChatBiz(chatStore)
 
 			// Lưu xuống database
 			if _, err := chatBiz.HandleMessage(context.Background(), chatMsg.SenderID.Hex(),
-				chatMsg.ReceiverID.Hex(), chatMsg.Content, chatMsg.Status); err != nil {
+				chatMsg.ReceiverID.Hex(), chatMsg.Content, chatMsg.Status, chatMsg.GroupID.Hex()); err != nil {
 				log.Println("DB save error:", err)
 			}
 

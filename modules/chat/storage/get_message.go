@@ -6,19 +6,10 @@ import (
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-type MongoGetMessage struct {
-	db *mongo.Database
-}
-
-func NewMongoGetMessageStore(db *mongo.Database) *MongoGetMessage {
-	return &MongoGetMessage{db: db}
-}
-
-func (s *MongoGetMessage) GetMessage(ctx context.Context, SenderID, ReceiverID primitive.ObjectID, limit, skip int64) ([]models.Message, error) {
+func (s *MongoChatStore) GetMessage(ctx context.Context, SenderID, ReceiverID primitive.ObjectID, limit, skip int64) ([]models.Message, error) {
 	filter := bson.M{
 		"$or": []bson.M{
 			{"sender_id": SenderID, "receiver_id": ReceiverID},

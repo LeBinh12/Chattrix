@@ -16,10 +16,10 @@ type Group struct {
 }
 
 type GroupMember struct {
-	ID       primitive.ObjectID `json:"id" bson:"_id,omitempty"`
-	GroupID  primitive.ObjectID `json:"group_id" bson:"group_id" binding:"required"`
-	UserID   primitive.ObjectID `json:"user_id" bson:"user_id" binding:"required"`
-	Role     string             `json:"role" bson:"role"`
-	Status   string             `json:"status" bson:"status"`
-	JoinedAt time.Time          `json:"joined_at" bson:"joined_at"`
+	common.MongoModel `bson:",inline"`   // chứa ID, CreatedAt, UpdatedAt
+	GroupID           primitive.ObjectID `json:"group_id" bson:"group_id" binding:"required"`
+	UserID            primitive.ObjectID `json:"user_id" bson:"user_id" binding:"required"`
+	Role              string             `json:"role" bson:"role"`
+	Status            string             `json:"status" bson:"status"`
+	JoinedAt          time.Time          `json:"joined_at" bson:"joined_at"`
 }

@@ -1,11 +1,18 @@
 package websocket
 
 import (
+	"context"
 	"encoding/json"
+	"log"
 	"my-app/modules/chat/models"
+	"my-app/modules/chat/storage"
+
+	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 type Hub struct {
+	DB         *mongo.Database
 	Clients    map[string]*Client
 	Broadcast  chan HubEvent
 	Register   chan *Client
@@ -17,8 +24,10 @@ type HubEvent struct {
 	Payload interface{}
 }
 
-func NewHub() *Hub {
+func NewHub(db *mongo.Database) *Hub {
 	return &Hub{
+		DB: db,
+
 		Clients:    make(map[string]*Client),
 		Broadcast:  make(chan HubEvent),
 		Register:   make(chan *Client),
@@ -35,6 +44,7 @@ func (h *Hub) Run() {
 				delete(h.Clients, client.UserID)
 				close(client.Send)
 			}
+
 		case event := <-h.Broadcast:
 			switch event.Type {
 			case "chat":
@@ -45,23 +55,43 @@ func (h *Hub) Run() {
 					"status":  msg.Status,
 				})
 
-				// Gửi cho người nhận nếu online
+				// Nếu là nhắn nhóm
+				if msg.GroupID != primitive.NilObjectID {
+					members, err := storage.NewMongoChatStore(h.DB).GetGroupMembers(context.Background(), msg.GroupID)
+					if err != nil {
+						log.Println(" Lỗi GetGroupMembers:", err)
+						break
+					}
+
+					for _, memberID := range members {
+						if memberID.Hex() == msg.SenderID.Hex() {
+							continue
+						}
+						if c, ok := h.Clients[memberID.Hex()]; ok {
+							c.Send <- data
+						}
+					}
+					// gửi lại cho người gửi xác nhận
+					if sender, ok := h.Clients[msg.SenderID.Hex()]; ok {
+						sender.Send <- data
+					}
+					break
+				}
+
+				// Nếu là nhắn 1-1
 				if receiver, ok := h.Clients[msg.ReceiverID.Hex()]; ok {
 					receiver.Send <- data
 				}
-
-				// Gửi lại cho người gửi (để đồng bộ trạng thái hoặc confirm gửi thành công)
 				if sender, ok := h.Clients[msg.SenderID.Hex()]; ok {
 					sender.Send <- data
 				}
+
 			case "update_seen":
 				data, _ := json.Marshal(event.Payload)
-				// Gửi cho tất cả client (hoặc lọc theo conversation_id)
 				for _, c := range h.Clients {
 					c.Send <- data
 				}
 			}
-
 		}
 	}
 }

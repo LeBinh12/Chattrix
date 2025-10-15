@@ -4,14 +4,17 @@ import "time"
 
 type ConversationPreview struct {
 	UserID      string    `json:"user_id"`
+	GroupID     string    `json:group_id`
 	DisplayName string    `json:"display_name"`
 	Avatar      string    `json:"avatar"`
 	LastMessage string    `json:"last_message"`
 	LastDate    time.Time `json:"last_date"`
 	UnreadCount int       `json:"unread_count"`
+	Type        string    `json:"type"`
 }
 
 type ConversationRequest struct {
-	Page  int `form:"page,default=1" binding:"min=1"`
-	Limit int `form:"limit,default=10" binding:"min=1,max=100"`
+	Page    int    `form:"page,default=1" binding:"min=1"`
+	Limit   int    `form:"limit,default=10" binding:"min=1,max=100"`
+	Keyword string `form:"keyword"`
 }

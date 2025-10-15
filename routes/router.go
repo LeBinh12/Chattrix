@@ -9,7 +9,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
-func InitRouter(r *gin.Engine, todoColl *mongo.Database) {
+func InitRouter(r *gin.Engine, todoColl *mongo.Database, hub *websocket.Hub) {
 	v1 := r.Group("/v1")
 	v1.Use(
 		middleware.LoggerMiddleware(),
@@ -23,7 +23,7 @@ func InitRouter(r *gin.Engine, todoColl *mongo.Database) {
 	v1.Use(
 		middleware.LoggerMiddleware(),
 		middleware.ApiKeyMiddleware(),
-		middleware.RateLimitingMiddleware(),
+		// middleware.RateLimitingMiddleware(),
 		middleware.AuthMiddleware(),
 	)
 	{
@@ -36,8 +36,7 @@ func InitRouter(r *gin.Engine, todoColl *mongo.Database) {
 	// Nhóm không có middleware (chat)
 	v1NoMiddleware := r.Group("/v1")
 	{
-		hub := websocket.NewHub()
-		go hub.Run()
+
 		api.RegisterChatRoutes(v1NoMiddleware, todoColl, hub)
 	}
 

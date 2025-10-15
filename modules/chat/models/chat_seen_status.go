@@ -13,3 +13,4 @@ type ChatSeenStatus struct {
 	LastSeenMessageID primitive.ObjectID `bson:"last_seen_message_id" json:"last_seen_message_id"` // Tin nhắn cuối cùng mà người này đã xem
 	UpdatedAt         time.Time          `bson:"updated_at" json:"updated_at"`
 }
+

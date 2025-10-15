@@ -34,20 +34,21 @@ func ConversationsHandler(db *mongo.Database) gin.HandlerFunc {
 			return
 		}
 
-		store := storage.NewMongoStore(db)
+		store := storage.NewMongoChatStore(db)
 		business := biz.NewListConversationBiz(store)
 
-		convs, total, err := business.ListConversations(c.Request.Context(), userID, query.Page, query.Limit)
+		convs, total, err := business.ListConversations(c.Request.Context(), userID, query.Page, query.Limit, query.Keyword)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
 
 		c.JSON(http.StatusOK, common.NewResponse(http.StatusOK, "Lấy dữ liệu thành công", gin.H{
-			"data":  convs,
-			"total": total,
-			"page":  query.Page,
-			"limit": query.Limit,
+			"data":    convs,
+			"total":   total,
+			"page":    query.Page,
+			"limit":   query.Limit,
+			"keyword": query.Keyword,
 		}))
 
 	}
