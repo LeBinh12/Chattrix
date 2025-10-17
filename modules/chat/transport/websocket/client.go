@@ -33,17 +33,20 @@ type WSMessage struct {
 }
 
 // ĐỌc dữ liệu lưu và DB và trả về cho client là đã gửi vào hub và hub sẽ xử lý gửi đi cho client
-func (c *Client) WritePump(db *mongo.Database) {
+func (c *Client) ReadPump(db *mongo.Database) {
 	defer func() {
+		log.Println(" ReadPump đóng cho user:", c.UserID)
 		c.Hub.Unregister <- c
+		time.Sleep(200 * time.Millisecond)
 		c.Conn.Close()
 	}()
 
 	// setup Ping-Pong
-	c.Conn.SetReadLimit(512) // limit message size
+	c.Conn.SetReadLimit(512)
 	c.Conn.SetReadDeadline(time.Now().Add(60 * time.Second))
 	c.Conn.SetPongHandler(func(string) error {
 		c.Conn.SetReadDeadline(time.Now().Add(60 * time.Second))
+		log.Println(" Nhận được pong từ client:", c.UserID)
 		return nil
 	})
 
@@ -155,10 +158,13 @@ func (c *Client) WritePump(db *mongo.Database) {
 }
 
 // Lắng nghe xem có ai gửi tin nhắn xuống không nếu có trả về cho client đoạn tinh nhắn đó
-func (c *Client) ReadPump() {
-	ticker := time.NewTicker(50 * time.Second)
+func (c *Client) WritePump() {
+	// Thêm ticker để gửi ping định kỳ (ví dụ: 30 giây)
+	pingTicker := time.NewTicker(40 * time.Second)
+
 	defer func() {
-		ticker.Stop()
+		pingTicker.Stop()
+		c.Hub.Unregister <- c
 		c.Conn.Close()
 	}()
 
@@ -175,6 +181,15 @@ func (c *Client) ReadPump() {
 			if err := c.Conn.WriteMessage(1, msg); err != nil {
 				log.Println("Write error:", err)
 				return
+			}
+		case <-pingTicker.C:
+			if err := c.Conn.WriteMessage(websocket.PingMessage, nil); err != nil {
+				log.Printf(" Ping lỗi cho user %s: %v", c.UserID, err)
+				// Nếu là lỗi tạm thì bỏ qua, đừng đóng liền
+				if websocket.IsUnexpectedCloseError(err) {
+					log.Printf(" Kết nối %s bị đóng, thoát WritePump", c.UserID)
+					return
+				}
 			}
 		}
 	}

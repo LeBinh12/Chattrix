@@ -30,3 +30,16 @@ type MessagePreview struct {
 	Content   string    `bson:"content"`
 	CreatedAt time.Time `bson:"created_at"`
 }
+
+type MessageResponse struct {
+	ID           primitive.ObjectID `json:"id"`
+	SenderID     primitive.ObjectID `json:"sender_id"`
+	SenderName   string             `json:"sender_name"`
+	SenderAvatar string             `json:"sender_avatar"`
+	ReceiverID   primitive.ObjectID `json:"receiver_id,omitempty"`
+	GroupID      primitive.ObjectID `json:"group_id,omitempty"`
+	Content      string             `json:"content"`
+	CreatedAt    time.Time          `json:"created_at"`
+	Status       MessageStatus      `json:"status"`
+	IsRead       bool               `json:"is_read"`
+}

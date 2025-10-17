@@ -38,7 +38,16 @@ func (h *Hub) Run() {
 	for {
 		select {
 		case client := <-h.Register:
+			// Nếu user đã có kết nối cũ => đóng kết nối cũ
+			if oldClient, ok := h.Clients[client.UserID]; ok {
+				log.Printf(" User %s đã có kết nối cũ, đóng kết nối cũ...", client.UserID)
+				oldClient.Conn.Close()
+				delete(h.Clients, client.UserID)
+			}
+
 			h.Clients[client.UserID] = client
+			log.Printf(" User %s kết nối thành công", client.UserID)
+
 		case client := <-h.Unregister:
 			if _, ok := h.Clients[client.UserID]; ok {
 				delete(h.Clients, client.UserID)
@@ -52,7 +61,6 @@ func (h *Hub) Run() {
 				data, _ := json.Marshal(map[string]interface{}{
 					"type":    "chat",
 					"message": msg,
-					"status":  msg.Status,
 				})
 
 				// Nếu là nhắn nhóm
@@ -68,28 +76,48 @@ func (h *Hub) Run() {
 							continue
 						}
 						if c, ok := h.Clients[memberID.Hex()]; ok {
-							c.Send <- data
+							select {
+							case c.Send <- data:
+							default:
+								log.Printf("⚠️ Buffer full — dropping group message for %s\n", memberID.Hex())
+							}
 						}
 					}
 					// gửi lại cho người gửi xác nhận
 					if sender, ok := h.Clients[msg.SenderID.Hex()]; ok {
-						sender.Send <- data
+						select {
+						case sender.Send <- data:
+						default:
+							log.Printf("⚠️ Buffer full — dropping sender echo for %s\n", msg.SenderID.Hex())
+						}
 					}
 					break
 				}
 
 				// Nếu là nhắn 1-1
 				if receiver, ok := h.Clients[msg.ReceiverID.Hex()]; ok {
-					receiver.Send <- data
+					select {
+					case receiver.Send <- data:
+					default:
+						log.Printf("⚠️ Buffer full — dropping message for receiver %s\n", msg.ReceiverID.Hex())
+					}
 				}
 				if sender, ok := h.Clients[msg.SenderID.Hex()]; ok {
-					sender.Send <- data
+					select {
+					case sender.Send <- data:
+					default:
+						log.Printf("⚠️ Buffer full — dropping message for sender %s\n", msg.SenderID.Hex())
+					}
 				}
 
 			case "update_seen":
 				data, _ := json.Marshal(event.Payload)
 				for _, c := range h.Clients {
-					c.Send <- data
+					select {
+					case c.Send <- data:
+					default:
+						log.Printf("⚠️ Buffer full — dropping update_seen for %s\n", c.UserID)
+					}
 				}
 			}
 		}
