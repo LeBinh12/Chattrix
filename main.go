@@ -16,6 +16,7 @@ import (
 func main() {
 
 	config.InitCloudinary()
+	config.InitMinio()
 	todoColl := database.ConnectMongo()
 
 	// setup producer

@@ -49,7 +49,7 @@ func (c *chatConsumer) ConsumeClaim(sess sarama.ConsumerGroupSession, claim sara
 	for msg := range claim.Messages() {
 		switch msg.Topic {
 		case "chat-topic":
-			var chatMsg models.Message
+			var chatMsg models.MessageResponse
 			if err := json.Unmarshal(msg.Value, &chatMsg); err != nil {
 				log.Println("Unmarshal error:", err)
 				continue
@@ -59,7 +59,7 @@ func (c *chatConsumer) ConsumeClaim(sess sarama.ConsumerGroupSession, claim sara
 
 			// Lưu xuống database
 			if _, err := chatBiz.HandleMessage(context.Background(), chatMsg.SenderID.Hex(),
-				chatMsg.ReceiverID.Hex(), chatMsg.Content, chatMsg.Status, chatMsg.GroupID.Hex()); err != nil {
+				chatMsg.ReceiverID.Hex(), chatMsg.Content, chatMsg.Status, chatMsg.GroupID.Hex(), chatMsg.Type, chatMsg.MediaIDs); err != nil {
 				log.Println("DB save error:", err)
 			}
 

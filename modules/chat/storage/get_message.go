@@ -85,19 +85,18 @@ func (s *MongoChatStore) GetMessage(ctx context.Context, SenderID, ReceiverID, G
 			IsRead:     msg.IsRead,
 		}
 
-		if msg.GroupID != primitive.NilObjectID {
-			if user, ok := userMap[msg.SenderID]; ok {
-				res.SenderName = user.DisplayName
-				res.SenderAvatar = user.Avatar
-			} else {
-				res.SenderName = "Unknown"
-				res.SenderAvatar = "/assets/logo.png"
-			}
+		if user, ok := userMap[msg.SenderID]; ok {
+			res.SenderName = user.DisplayName
+			res.SenderAvatar = user.Avatar
+		} else {
+			res.SenderName = "Unknown"
+			res.SenderAvatar = "/assets/logo.png"
 		}
 
 		messageResponses = append(messageResponses, res)
 
 	}
+
 	return messageResponses, nil
 
 }

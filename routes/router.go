@@ -22,7 +22,7 @@ func InitRouter(r *gin.Engine, todoColl *mongo.Database, hub *websocket.Hub) {
 
 	v1.Use(
 		middleware.LoggerMiddleware(),
-		middleware.ApiKeyMiddleware(),
+		// middleware.ApiKeyMiddleware(),
 		// middleware.RateLimitingMiddleware(),
 		middleware.AuthMiddleware(),
 	)
@@ -31,6 +31,7 @@ func InitRouter(r *gin.Engine, todoColl *mongo.Database, hub *websocket.Hub) {
 		api.RegisterFriendRoutes(v1, todoColl)
 		api.RegisterConversation(v1, todoColl)
 		api.GroupRoutes(v1, todoColl)
+		api.UploadRoutes(v1)
 	}
 
 	// Nhóm không có middleware (chat)

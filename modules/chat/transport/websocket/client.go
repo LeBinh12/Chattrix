@@ -7,6 +7,7 @@ import (
 	"my-app/common/kafka"
 	"my-app/modules/chat/models"
 	"my-app/modules/chat/storage"
+	"sync"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -21,13 +22,15 @@ type Client struct {
 	Conn   *websocket.Conn
 	Send   chan []byte // để mặc định thì kích thước là 256 nên khi nhiều tin nhắn quá sẽ bị tràn làm mất dữ liệu
 	UserID string
+	mu     sync.Mutex
+	closed bool
 }
 
 type WSMessage struct {
-	Type       string          `json:"type"` // "chat" | "update_seen"
-	Message    *models.Message `json:"message,omitempty"`
-	SenderID   string          `json:"sender_id,omitempty"`
-	ReceiverID string          `json:"receiver_id,omitempty"`
+	Type       string                  `json:"type"` // "chat" | "update_seen"
+	Message    *models.MessageResponse `json:"message,omitempty"`
+	SenderID   string                  `json:"sender_id,omitempty"`
+	ReceiverID string                  `json:"receiver_id,omitempty"`
 
 	LastSeenMsgID string `json:"last_seen_message_id,omitempty"`
 }
@@ -184,13 +187,20 @@ func (c *Client) WritePump() {
 			}
 		case <-pingTicker.C:
 			if err := c.Conn.WriteMessage(websocket.PingMessage, nil); err != nil {
-				log.Printf(" Ping lỗi cho user %s: %v", c.UserID, err)
 				// Nếu là lỗi tạm thì bỏ qua, đừng đóng liền
 				if websocket.IsUnexpectedCloseError(err) {
-					log.Printf(" Kết nối %s bị đóng, thoát WritePump", c.UserID)
 					return
 				}
 			}
 		}
+	}
+}
+
+func (c *Client) SafeClose() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if !c.closed {
+		close(c.Send)
+		c.closed = true
 	}
 }

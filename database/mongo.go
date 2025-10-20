@@ -20,7 +20,7 @@ func ConnectMongo() *mongo.Database {
 
 	uri := os.Getenv("MONGO_URI")
 	if uri == "" {
-		log.Fatalln("⚠️ Missing MONGO_URI environment variable")
+		log.Fatalln("Missing MONGO_URI environment variable")
 	}
 
 	dbName := os.Getenv("MONGO_DB")
@@ -30,7 +30,7 @@ func ConnectMongo() *mongo.Database {
 
 	client, err := mongo.NewClient(options.Client().ApplyURI(uri))
 	if err != nil {
-		log.Fatalln("❌ Cannot create Mongo client:", err)
+		log.Fatalln("Cannot create Mongo client:", err)
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -38,15 +38,15 @@ func ConnectMongo() *mongo.Database {
 
 	err = client.Connect(ctx)
 	if err != nil {
-		log.Fatalln("❌ Cannot connect MongoDB:", err)
+		log.Fatalln("Cannot connect MongoDB:", err)
 	}
 
 	err = client.Ping(ctx, nil)
 	if err != nil {
-		log.Fatalln("❌ MongoDB not responding:", err)
+		log.Fatalln("MongoDB not responding:", err)
 	}
 
-	fmt.Println("✅ Connected to MongoDB")
+	fmt.Println("Connected to MongoDB")
 
 	return client.Database(dbName)
 }

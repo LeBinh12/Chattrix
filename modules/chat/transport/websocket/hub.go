@@ -6,6 +6,7 @@ import (
 	"log"
 	"my-app/modules/chat/models"
 	"my-app/modules/chat/storage"
+	StorageUser "my-app/modules/user/storage"
 
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -51,13 +52,16 @@ func (h *Hub) Run() {
 		case client := <-h.Unregister:
 			if _, ok := h.Clients[client.UserID]; ok {
 				delete(h.Clients, client.UserID)
-				close(client.Send)
+				client.SafeClose()
 			}
 
 		case event := <-h.Broadcast:
 			switch event.Type {
 			case "chat":
-				msg := event.Payload.(*models.Message)
+				msg := event.Payload.(*models.MessageResponse)
+				user, _ := StorageUser.NewMongoStore(h.DB).FindByID(context.Background(), msg.SenderID.Hex())
+				msg.SenderAvatar = user.Avatar
+				msg.SenderName = user.DisplayName
 				data, _ := json.Marshal(map[string]interface{}{
 					"type":    "chat",
 					"message": msg,
