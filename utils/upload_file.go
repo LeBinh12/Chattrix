@@ -46,7 +46,7 @@ func UploadFileToMinio(file multipart.File, fileHeader *multipart.FileHeader) (s
 		return "", err
 	}
 
-	fileURL := fmt.Sprintf(objectName)
+	fileURL := fmt.Sprintf("%s", objectName)
 	return fileURL, nil
 
 }
