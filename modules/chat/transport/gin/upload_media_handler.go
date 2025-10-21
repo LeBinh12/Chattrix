@@ -2,13 +2,18 @@ package ginMessage
 
 import (
 	"fmt"
+	"my-app/common"
+	"my-app/modules/chat/biz"
+	"my-app/modules/chat/models"
+	"my-app/modules/chat/storage"
 	"my-app/utils"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
-func UploadMediaHandler() gin.HandlerFunc {
+func UploadMediaHandler(db *mongo.Database) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		form, err := ctx.MultipartForm()
 		fmt.Println("form", form)
@@ -19,12 +24,21 @@ func UploadMediaHandler() gin.HandlerFunc {
 		}
 		files := form.File["files"] // nhận danh sách file (key phải trùng ở client)
 		fmt.Println("files", files)
+
 		if len(files) == 0 {
 			ctx.JSON(http.StatusBadRequest, gin.H{"error": "Không tìm thấy file nào"})
 			return
 		}
 
-		var urls []string
+		if len(files) > 9 {
+			ctx.JSON(http.StatusBadRequest, gin.H{"error": "Tối đa 9 file"})
+			return
+		}
+
+		var mediaList []models.Media
+		store := storage.NewMongoChatStore(db)
+		business := biz.NewCreateMediaBiz(store)
+
 		for _, fileHeader := range files {
 			// Validate từng file
 			if err := utils.ValidateAndSaveFile(fileHeader); err != nil {
@@ -38,8 +52,6 @@ func UploadMediaHandler() gin.HandlerFunc {
 				ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Không thể mở file"})
 				return
 			}
-			defer file.Close()
-
 			// Upload lên MinIO
 			url, err := utils.UploadFileToMinio(file, fileHeader)
 			if err != nil {
@@ -47,13 +59,23 @@ func UploadMediaHandler() gin.HandlerFunc {
 				return
 			}
 
-			urls = append(urls, url)
+			mediaType := utils.DetectMediaType(fileHeader.Header.Get("Content-Type"))
+			media := models.Media{
+				Type:     mediaType,
+				Filename: fileHeader.Filename,
+				Size:     fileHeader.Size,
+				URL:      url,
+			}
+
+			createdMedia, err := business.UploadMedia(ctx.Request.Context(), &media)
+			if err != nil {
+				ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Không thể lưu media vào DB"})
+				return
+			}
+			mediaList = append(mediaList, *createdMedia)
 		}
 
-		ctx.JSON(http.StatusOK, gin.H{
-			"message": "Upload thành công",
-			"urls":    urls,
-		})
+		ctx.JSON(http.StatusOK, common.NewResponse(http.StatusOK, "Upload dữ liệu thành công", mediaList))
 	}
 
 }

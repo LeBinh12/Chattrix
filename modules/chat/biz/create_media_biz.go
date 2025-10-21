@@ -18,5 +18,5 @@ func NewCreateMediaBiz(store CreateMediaStorage) *CreateMediaStorageBiz {
 }
 
 func (biz *CreateMediaStorageBiz) UploadMedia(ctx context.Context, media *models.Media) (*models.Media, error) {
-	return biz.UploadMedia(ctx, &models.Media{})
+	return biz.store.UploadMedia(ctx, media)
 }

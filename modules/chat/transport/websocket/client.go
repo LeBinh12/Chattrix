@@ -45,7 +45,7 @@ func (c *Client) ReadPump(db *mongo.Database) {
 	}()
 
 	// setup Ping-Pong
-	c.Conn.SetReadLimit(512)
+	c.Conn.SetReadLimit(1024 * 1024) // 1MB
 	c.Conn.SetReadDeadline(time.Now().Add(60 * time.Second))
 	c.Conn.SetPongHandler(func(string) error {
 		c.Conn.SetReadDeadline(time.Now().Add(60 * time.Second))

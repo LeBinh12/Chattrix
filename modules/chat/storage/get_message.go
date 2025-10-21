@@ -70,6 +70,33 @@ func (s *MongoChatStore) GetMessage(ctx context.Context, SenderID, ReceiverID, G
 		userMap[u.ID] = u
 	}
 
+	// Thu thập tất cả mediaIDs
+	allMediaIDsMap := map[string]struct{}{}
+	for _, msg := range messages {
+		for _, mID := range msg.MediaIDs {
+			allMediaIDsMap[mID] = struct{}{}
+		}
+	}
+
+	var allMediaIDs []string
+	for id := range allMediaIDsMap {
+		allMediaIDs = append(allMediaIDs, id)
+	}
+
+	// Query tất cả media 1 lần
+	mediaMap := map[string]models.Media{}
+	if len(allMediaIDs) > 0 {
+		mediaCursor, err := s.db.Collection("medias").Find(ctx, bson.M{"url": bson.M{"$in": allMediaIDs}})
+		if err == nil {
+			var medias []models.Media
+			if err := mediaCursor.All(ctx, &medias); err == nil {
+				for _, m := range medias {
+					mediaMap[m.URL] = m // hoặc m.ID nếu lưu ObjectID
+				}
+			}
+		}
+	}
+
 	//Gán vào messages
 	var messageResponses []models.MessageResponse
 
@@ -83,6 +110,7 @@ func (s *MongoChatStore) GetMessage(ctx context.Context, SenderID, ReceiverID, G
 			CreatedAt:  msg.CreatedAt,
 			Status:     msg.Status,
 			IsRead:     msg.IsRead,
+			Type:       msg.Type,
 		}
 
 		if user, ok := userMap[msg.SenderID]; ok {
@@ -91,6 +119,13 @@ func (s *MongoChatStore) GetMessage(ctx context.Context, SenderID, ReceiverID, G
 		} else {
 			res.SenderName = "Unknown"
 			res.SenderAvatar = "/assets/logo.png"
+		}
+
+		// media
+		for _, mID := range msg.MediaIDs {
+			if m, ok := mediaMap[mID]; ok {
+				res.MediaIDs = append(res.MediaIDs, m)
+			}
 		}
 
 		messageResponses = append(messageResponses, res)
