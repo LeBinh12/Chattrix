@@ -1,3 +1,4 @@
 lệnh docker để vào Kafka: docker exec -it kafka bash
 
 lệnh để hiển thị danh sách  Kafka: kafka-topics --list --bootstrap-server localhost:9092
+

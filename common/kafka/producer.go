@@ -6,6 +6,12 @@ import (
 	"github.com/IBM/sarama"
 )
 
+// Nếu dùng AsyncProducer thì có thể nhận 1 lần nhiều tin gửi xuống nhưng không bảo toàn dữ liệu
+
+// var Producer sarama.AsyncProducer
+
+// Nếu dùng SyncProducer thì có thể chậm hơn, dễ nghẽn nếu tốc độ gửi message cao nhưng bảo toàn dữ liệu
+
 var Producer sarama.SyncProducer
 
 func InitProducer(brokers []string) {

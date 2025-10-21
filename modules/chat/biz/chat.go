@@ -24,10 +24,19 @@ func NewChatBiz(store ChatStorage) *ChatBiz {
 	return &ChatBiz{store: store}
 }
 
-func (biz *ChatBiz) HandleMessage(ctx context.Context, sender string, receiver string, content string, status models.MessageStatus, group string) (*models.Message, error) {
+func (biz *ChatBiz) HandleMessage(ctx context.Context,
+	sender string, receiver string,
+	content string, status models.MessageStatus,
+	group string, types models.MediaType, mediaList []models.Media) (*models.Message, error) {
+
 	senderID, _ := primitive.ObjectIDFromHex(sender)
 	receiverID, _ := primitive.ObjectIDFromHex(receiver)
 	groupID, _ := primitive.ObjectIDFromHex(group)
+
+	var mediaURLs []string
+	for _, m := range mediaList {
+		mediaURLs = append(mediaURLs, m.URL)
+	}
 
 	msg := &models.Message{
 		SenderID:   senderID,
@@ -37,6 +46,8 @@ func (biz *ChatBiz) HandleMessage(ctx context.Context, sender string, receiver s
 		Status:     status,
 		IsRead:     false,
 		GroupID:    groupID,
+		Type:       types,
+		MediaIDs:   mediaURLs,
 	}
 
 	senderExists, err := biz.store.CheckUserExists(ctx, sender)

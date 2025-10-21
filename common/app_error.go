@@ -141,3 +141,4 @@ func ErrEntityDeleted(entity string, err error) *AppError {
 }
 
 var RecordNotFound = errors.New("Không tìm thấy dữ liệu")
+

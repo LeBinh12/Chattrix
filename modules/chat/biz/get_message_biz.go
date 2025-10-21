@@ -8,7 +8,7 @@ import (
 )
 
 type GetMessageStorage interface {
-	GetMessage(ctx context.Context, SenderID, ReceiverID primitive.ObjectID, limit, skip int64) ([]models.Message, error)
+	GetMessage(ctx context.Context, SenderID, ReceiverID, GroupID primitive.ObjectID, limit, skip int64) ([]models.MessageResponse, error)
 }
 
 type getMessageBiz struct {
@@ -19,7 +19,7 @@ func NewGetMessageBiz(store GetMessageStorage) *getMessageBiz {
 	return &getMessageBiz{store: store}
 }
 
-func (biz *getMessageBiz) GetMessage(ctx context.Context, SenderID, ReceiverID primitive.ObjectID, limit, skip int64) ([]models.Message, error) {
+func (biz *getMessageBiz) GetMessage(ctx context.Context, SenderID, ReceiverID, GroupID primitive.ObjectID, limit, skip int64) ([]models.MessageResponse, error) {
 
 	if limit <= 0 {
 		limit = 20
@@ -28,7 +28,7 @@ func (biz *getMessageBiz) GetMessage(ctx context.Context, SenderID, ReceiverID p
 		skip = 0
 	}
 
-	messages, err := biz.store.GetMessage(ctx, SenderID, ReceiverID, limit, skip)
+	messages, err := biz.store.GetMessage(ctx, SenderID, ReceiverID, GroupID, limit, skip)
 
 	if err != nil {
 		return nil, err

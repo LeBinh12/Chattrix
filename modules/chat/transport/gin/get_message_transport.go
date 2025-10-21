@@ -14,6 +14,7 @@ import (
 
 func GetMessages(db *mongo.Database) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
+		var receiverObjectID, groupObjectID primitive.ObjectID
 		senderID, exists := ctx.Get("userID")
 		if !exists {
 			ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Không tìm thấy userID trong context"})
@@ -33,16 +34,22 @@ func GetMessages(db *mongo.Database) gin.HandlerFunc {
 		}
 
 		receiverIDStr := ctx.Query("receiver_id")
+		groupIDStr := ctx.Query("group_id")
 
-		if receiverIDStr == "" {
-			ctx.JSON(http.StatusBadRequest, gin.H{"error": "Thiếu receiver_id"})
-			return
+		if receiverIDStr != "" {
+			receiverObjectID, err = primitive.ObjectIDFromHex(receiverIDStr)
+			if err != nil {
+				ctx.JSON(http.StatusBadRequest, gin.H{"error": "receiver_id không phải ObjectID hợp lệ"})
+				return
+			}
 		}
 
-		receiverObjectID, err := primitive.ObjectIDFromHex(receiverIDStr)
-		if err != nil {
-			ctx.JSON(http.StatusBadRequest, gin.H{"error": "receiver_id không phải ObjectID hợp lệ"})
-			return
+		if groupIDStr != "" {
+			groupObjectID, err = primitive.ObjectIDFromHex(groupIDStr)
+			if err != nil {
+				ctx.JSON(http.StatusBadRequest, gin.H{"error": "group_id không phải ObjectID hợp lệ"})
+				return
+			}
 		}
 
 		limit, _ := strconv.ParseInt(ctx.DefaultQuery("limit", "20"), 10, 64)
@@ -51,7 +58,7 @@ func GetMessages(db *mongo.Database) gin.HandlerFunc {
 		store := storage.NewMongoChatStore(db)
 		business := biz.NewGetMessageBiz(store)
 
-		messages, err := business.GetMessage(ctx.Request.Context(), senderObjectID, receiverObjectID, limit, skip)
+		messages, err := business.GetMessage(ctx.Request.Context(), senderObjectID, receiverObjectID, groupObjectID, limit, skip)
 
 		if err != nil {
 			ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})

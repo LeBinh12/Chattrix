@@ -7,6 +7,7 @@ import (
 	"my-app/common/kafka"
 	"my-app/modules/chat/models"
 	"my-app/modules/chat/storage"
+	"sync"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -21,29 +22,34 @@ type Client struct {
 	Conn   *websocket.Conn
 	Send   chan []byte // để mặc định thì kích thước là 256 nên khi nhiều tin nhắn quá sẽ bị tràn làm mất dữ liệu
 	UserID string
+	mu     sync.Mutex
+	closed bool
 }
 
 type WSMessage struct {
-	Type       string          `json:"type"` // "chat" | "update_seen"
-	Message    *models.Message `json:"message,omitempty"`
-	SenderID   string          `json:"sender_id,omitempty"`
-	ReceiverID string          `json:"receiver_id,omitempty"`
+	Type       string                  `json:"type"` // "chat" | "update_seen"
+	Message    *models.MessageResponse `json:"message,omitempty"`
+	SenderID   string                  `json:"sender_id,omitempty"`
+	ReceiverID string                  `json:"receiver_id,omitempty"`
 
 	LastSeenMsgID string `json:"last_seen_message_id,omitempty"`
 }
 
 // ĐỌc dữ liệu lưu và DB và trả về cho client là đã gửi vào hub và hub sẽ xử lý gửi đi cho client
-func (c *Client) WritePump(db *mongo.Database) {
+func (c *Client) ReadPump(db *mongo.Database) {
 	defer func() {
+		log.Println(" ReadPump đóng cho user:", c.UserID)
 		c.Hub.Unregister <- c
+		time.Sleep(200 * time.Millisecond)
 		c.Conn.Close()
 	}()
 
 	// setup Ping-Pong
-	c.Conn.SetReadLimit(512) // limit message size
+	c.Conn.SetReadLimit(1024 * 1024) // 1MB
 	c.Conn.SetReadDeadline(time.Now().Add(60 * time.Second))
 	c.Conn.SetPongHandler(func(string) error {
 		c.Conn.SetReadDeadline(time.Now().Add(60 * time.Second))
+		log.Println(" Nhận được pong từ client:", c.UserID)
 		return nil
 	})
 
@@ -155,10 +161,13 @@ func (c *Client) WritePump(db *mongo.Database) {
 }
 
 // Lắng nghe xem có ai gửi tin nhắn xuống không nếu có trả về cho client đoạn tinh nhắn đó
-func (c *Client) ReadPump() {
-	ticker := time.NewTicker(50 * time.Second)
+func (c *Client) WritePump() {
+	// Thêm ticker để gửi ping định kỳ (ví dụ: 30 giây)
+	pingTicker := time.NewTicker(40 * time.Second)
+
 	defer func() {
-		ticker.Stop()
+		pingTicker.Stop()
+		c.Hub.Unregister <- c
 		c.Conn.Close()
 	}()
 
@@ -176,6 +185,22 @@ func (c *Client) ReadPump() {
 				log.Println("Write error:", err)
 				return
 			}
+		case <-pingTicker.C:
+			if err := c.Conn.WriteMessage(websocket.PingMessage, nil); err != nil {
+				// Nếu là lỗi tạm thì bỏ qua, đừng đóng liền
+				if websocket.IsUnexpectedCloseError(err) {
+					return
+				}
+			}
 		}
+	}
+}
+
+func (c *Client) SafeClose() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if !c.closed {
+		close(c.Send)
+		c.closed = true
 	}
 }

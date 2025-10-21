@@ -31,7 +31,7 @@ func WebSocketHandler(db *mongo.Database, hub *Hub) gin.HandlerFunc {
 		hub.Register <- client
 
 		// goroutine xử lý đọc / ghi
-		go client.WritePump(db)
-		go client.ReadPump()
+		go client.ReadPump(db)
+		go client.WritePump()
 	}
 }

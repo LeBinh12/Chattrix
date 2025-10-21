@@ -11,6 +11,7 @@ import (
 
 func InitRouter(r *gin.Engine, todoColl *mongo.Database, hub *websocket.Hub) {
 	v1 := r.Group("/v1")
+
 	v1.Use(
 		middleware.LoggerMiddleware(),
 		middleware.ApiKeyMiddleware(),
@@ -22,7 +23,7 @@ func InitRouter(r *gin.Engine, todoColl *mongo.Database, hub *websocket.Hub) {
 
 	v1.Use(
 		middleware.LoggerMiddleware(),
-		middleware.ApiKeyMiddleware(),
+		// middleware.ApiKeyMiddleware(),
 		// middleware.RateLimitingMiddleware(),
 		middleware.AuthMiddleware(),
 	)
@@ -38,6 +39,12 @@ func InitRouter(r *gin.Engine, todoColl *mongo.Database, hub *websocket.Hub) {
 	{
 
 		api.RegisterChatRoutes(v1NoMiddleware, todoColl, hub)
+	}
+
+	// Upload không có middleware
+	v1Upload := r.Group("v1")
+	{
+		api.UploadRoutes(v1Upload, todoColl)
 	}
 
 }
