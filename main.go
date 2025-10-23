@@ -26,7 +26,7 @@ func main() {
 	go kafka.StartConsumer(
 		[]string{"localhost:9092"},
 		"chat-group",
-		"chat-topic",
+		[]string{"chat-topic", "user-status-topic"},
 		todoColl,
 	)
 

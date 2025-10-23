@@ -18,12 +18,14 @@ import (
 // Đây là nơi xử lý Struct client, các method gửi/nhận tin
 
 type Client struct {
-	Hub    *Hub
-	Conn   *websocket.Conn
-	Send   chan []byte // để mặc định thì kích thước là 256 nên khi nhiều tin nhắn quá sẽ bị tràn làm mất dữ liệu
-	UserID string
-	mu     sync.Mutex
-	closed bool
+	Hub       *Hub
+	Conn      *websocket.Conn
+	Send      chan []byte
+	UserID    string
+	SessionID string
+	LastSeen  time.Time
+	mu        sync.Mutex
+	closed    bool
 }
 
 type WSMessage struct {
@@ -48,6 +50,7 @@ func (c *Client) ReadPump(db *mongo.Database) {
 	c.Conn.SetReadLimit(1024 * 1024) // 1MB
 	c.Conn.SetReadDeadline(time.Now().Add(60 * time.Second))
 	c.Conn.SetPongHandler(func(string) error {
+		c.LastSeen = time.Now()
 		c.Conn.SetReadDeadline(time.Now().Add(60 * time.Second))
 		log.Println(" Nhận được pong từ client:", c.UserID)
 		return nil
