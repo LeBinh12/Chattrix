@@ -65,6 +65,24 @@ func (s *MongoChatStore) getUserConversations(ctx context.Context, userObjectID 
 		},
 	}}
 
+	lookupStatus := bson.D{{
+		"$lookup", bson.M{
+			"from":         "user_status",
+			"localField":   "_id",
+			"foreignField": "user_id",
+			"as":           "status_info",
+		},
+	}}
+
+	unwindStatus := bson.D{{"$unwind", bson.M{"path": "$status_info", "preserveNullAndEmptyArrays": true}}}
+
+	addStatusFields := bson.D{{
+		"$addFields", bson.M{
+			"status":     "$status_info.status",
+			"updated_at": "$status_info.updated_at",
+		},
+	}}
+
 	addUnreadCount := bson.D{{
 		"$addFields", bson.M{
 			"unread_count": bson.M{"$size": "$unread_messages"},
@@ -84,6 +102,9 @@ func (s *MongoChatStore) getUserConversations(ctx context.Context, userObjectID 
 		unwindMsg,
 		addUnread,
 		addUnreadCount,
+		lookupStatus,
+		unwindStatus,
+		addStatusFields,
 		sortByLastMessage,
 		skipLimit[0],
 		skipLimit[1],

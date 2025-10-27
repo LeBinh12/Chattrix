@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"my-app/modules/chat/models"
+	"time"
 
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
@@ -15,6 +16,8 @@ type temp struct {
 	Avatar      string                 `bson:"avatar"`
 	LastMessage *models.MessagePreview `bson:"last_message,omitempty"`
 	UnreadCount *int                   `bson:"unread_count,omitempty"`
+	Status      string                 `bson:"status,omitempty"`
+	UpdatedAt   *time.Time             `bson:"updated_at,omitempty"`
 }
 
 type groupInfo struct {
@@ -61,6 +64,14 @@ func (s *MongoChatStore) GetConversations(ctx context.Context, userID string, pa
 		if u.UnreadCount != nil {
 			preview.UnreadCount = *u.UnreadCount
 		}
+
+		if u.Status != "" {
+			preview.Status = u.Status
+		}
+		if u.UpdatedAt != nil {
+			preview.UpdatedAt = *u.UpdatedAt
+		}
+
 		results = append(results, preview)
 	}
 

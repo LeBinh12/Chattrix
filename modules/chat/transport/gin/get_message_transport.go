@@ -65,6 +65,16 @@ func GetMessages(db *mongo.Database) gin.HandlerFunc {
 			return
 		}
 
+		if len(messages) == 0 {
+			ctx.JSON(http.StatusOK, common.NewResponse(http.StatusOK, "Bạn chưa có tin nhắn nào", gin.H{
+				"data":  []interface{}{},
+				"limit": limit,
+				"skip":  skip,
+				"count": 0,
+			}))
+			return
+		}
+
 		ctx.JSON(http.StatusOK, common.NewResponse(http.StatusOK, "Đã gửi lời mời kết bạn",
 			map[string]interface{}{
 				"data":  messages,

@@ -52,6 +52,10 @@ func (s *MongoChatStore) GetMessage(ctx context.Context, SenderID, ReceiverID, G
 		senderIDs = append(senderIDs, id)
 	}
 
+	if len(messages) == 0 {
+		return []models.MessageResponse{}, nil
+	}
+
 	//  Query tất cả users một lần
 
 	userCursor, err := s.db.Collection("users").Find(ctx, bson.M{"_id": bson.M{"$in": senderIDs}})
