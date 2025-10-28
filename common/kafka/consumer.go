@@ -12,6 +12,9 @@ import (
 	ModelsUser "my-app/modules/user/models"
 	StorageUser "my-app/modules/user/storage"
 
+	BizGroup "my-app/modules/group/biz"
+	StorageGroup "my-app/modules/group/storage"
+
 	"github.com/IBM/sarama"
 	"go.mongodb.org/mongo-driver/mongo"
 )
@@ -78,6 +81,22 @@ func (c *chatConsumer) ConsumeClaim(sess sarama.ConsumerGroupSession, claim sara
 			userStatusBiz := BizUser.NewUserStatusBiz(userStatusStore)
 
 			if err := userStatusBiz.Upsert(context.Background(), &userStatus); err != nil {
+				log.Println("Update user_status error:", err)
+			}
+
+			sess.MarkMessage(msg, "")
+
+		case "group-out":
+			var groupOut models.MessageResponse
+			if err := json.Unmarshal(msg.Value, &groupOut); err != nil {
+				log.Println("Unmarshal error:", err)
+				continue
+			}
+
+			GroupStore := StorageGroup.NewMongoStoreGroup(c.db)
+			GroupBiz := BizGroup.NewRemoveGroupMemberBiz(GroupStore)
+
+			if err := GroupBiz.RemoveMember(context.Background(), groupOut.GroupID.Hex(), groupOut.SenderID.Hex()); err != nil {
 				log.Println("Update user_status error:", err)
 			}
 
