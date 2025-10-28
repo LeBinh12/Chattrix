@@ -7,6 +7,7 @@ import (
 	"my-app/modules/group/storage"
 	"my-app/utils"
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -27,7 +28,10 @@ func CreateGroupHandler(db *mongo.Database) gin.HandlerFunc {
 				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 				return
 			}
-			url, err := utils.UploadFileToCloudinary(c.Request.Context(), avatarGroup)
+
+			file, _ := avatarGroup.Open()
+
+			url, err := utils.UploadFileToMinio(file, avatarGroup)
 			if err != nil {
 				c.JSON(http.StatusInternalServerError, common.ErrDB(err))
 				return
@@ -62,7 +66,6 @@ func CreateGroupHandler(db *mongo.Database) gin.HandlerFunc {
 			Status:    status,
 			CreatorID: objID,
 		}
-
 		store := storage.NewMongoStoreGroup(db)
 		business := biz.NewCreateGroupBiz(store)
 
@@ -71,6 +74,19 @@ func CreateGroupHandler(db *mongo.Database) gin.HandlerFunc {
 			return
 		}
 
-		c.JSON(http.StatusOK, common.NewResponse(http.StatusOK, "Thêm nhóm thành công", data.Name))
+		member := models.GroupMember{
+			GroupID:  data.ID,
+			UserID:   objID,
+			Role:     "owner", // hoặc "admin"
+			Status:   "active",
+			JoinedAt: time.Now(),
+		}
+
+		if err := store.CreateGroupNumber(c, &member); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Tạo nhóm thành công nhưng không thể thêm creator vào group_members: " + err.Error()})
+			return
+		}
+
+		c.JSON(http.StatusOK, common.NewResponse(http.StatusOK, "Thêm nhóm thành công", data.ID.Hex()))
 	}
 }

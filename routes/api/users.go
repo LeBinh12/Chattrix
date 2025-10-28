@@ -15,6 +15,6 @@ func RegisterUserRoutes(rg *gin.RouterGroup, db *mongo.Database) {
 		users.POST("/register", ginUser.RegisterHandler(db))
 		users.POST("/login", ginUser.LoginHandler(db))
 		users.POST("/google-login", ginUser.GoogleLoginHandler(db))
-
+		users.GET("/status", ginUser.GetUserStatusHandler(db))
 	}
 }

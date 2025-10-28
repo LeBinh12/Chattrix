@@ -32,6 +32,8 @@ func InitRouter(r *gin.Engine, todoColl *mongo.Database, hub *websocket.Hub) {
 		api.RegisterFriendRoutes(v1, todoColl)
 		api.RegisterConversation(v1, todoColl)
 		api.GroupRoutes(v1, todoColl)
+		api.RegisterUserStatusRoutes(v1, todoColl)
+
 	}
 
 	// Nhóm không có middleware (chat)

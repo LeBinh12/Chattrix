@@ -8,7 +8,7 @@ import (
 )
 
 type Group struct {
-	common.MongoModel `bson:",inline"`   
+	common.MongoModel `bson:",inline"`
 	Name              string             `json:"name" bson:"name"`
 	Image             string             `json:"image" bson:"image"`
 	CreatorID         primitive.ObjectID `json:"creator_id" bson:"creator_id"`

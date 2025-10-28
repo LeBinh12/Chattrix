@@ -11,6 +11,8 @@ type ConversationPreview struct {
 	LastDate    time.Time `json:"last_date"`
 	UnreadCount int       `json:"unread_count"`
 	Type        string    `json:"type"`
+	Status      string    `json:"status,omitempty"`     // online/offline
+	UpdatedAt   time.Time `json:"updated_at,omitempty"` // thời gian offline
 }
 
 type ConversationRequest struct {

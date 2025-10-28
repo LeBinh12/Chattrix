@@ -3,6 +3,7 @@ package websocket
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 	"my-app/common/kafka"
 	"my-app/modules/chat/models"
@@ -18,12 +19,14 @@ import (
 // Đây là nơi xử lý Struct client, các method gửi/nhận tin
 
 type Client struct {
-	Hub    *Hub
-	Conn   *websocket.Conn
-	Send   chan []byte // để mặc định thì kích thước là 256 nên khi nhiều tin nhắn quá sẽ bị tràn làm mất dữ liệu
-	UserID string
-	mu     sync.Mutex
-	closed bool
+	Hub       *Hub
+	Conn      *websocket.Conn
+	Send      chan []byte
+	UserID    string
+	SessionID string
+	LastSeen  time.Time
+	mu        sync.Mutex
+	closed    bool
 }
 
 type WSMessage struct {
@@ -48,6 +51,7 @@ func (c *Client) ReadPump(db *mongo.Database) {
 	c.Conn.SetReadLimit(1024 * 1024) // 1MB
 	c.Conn.SetReadDeadline(time.Now().Add(60 * time.Second))
 	c.Conn.SetPongHandler(func(string) error {
+		c.LastSeen = time.Now()
 		c.Conn.SetReadDeadline(time.Now().Add(60 * time.Second))
 		log.Println(" Nhận được pong từ client:", c.UserID)
 		return nil
@@ -117,7 +121,7 @@ func (c *Client) ReadPump(db *mongo.Database) {
 
 		case "update_seen":
 			if incoming.ReceiverID == "" || incoming.LastSeenMsgID == "" {
-				log.Println("⚠️ Thiếu dữ liệu update_seen")
+				log.Println(" Thiếu dữ liệu update_seen")
 				continue
 			}
 
@@ -127,7 +131,7 @@ func (c *Client) ReadPump(db *mongo.Database) {
 			lastSeenMsgID, err3 := primitive.ObjectIDFromHex(incoming.LastSeenMsgID)
 
 			if err1 != nil || err2 != nil || err3 != nil {
-				log.Println("⚠️ ObjectID không hợp lệ:", err1, err2, err3)
+				log.Println(" ObjectID không hợp lệ:", err1, err2, err3)
 				continue
 			}
 
@@ -156,6 +160,59 @@ func (c *Client) ReadPump(db *mongo.Database) {
 			}
 			data, _ := json.Marshal(seenEvent)
 			c.Hub.Broadcast <- HubEvent{Type: "update_seen", Payload: data}
+
+		case "member_left":
+			msg := incoming.Message
+			if msg == nil {
+				continue
+			}
+
+			// 		các dữ liệu cần lấy về
+			// 		{
+			// 			"type":"member_left",
+			// "message":{
+			// 	"sender_id": "68ff98ada26dd8b5a9071920",
+			// 	"group_id": "6900afa51b3786292fb358da",
+			// 	"avatar":"...."
+			// 	"content": "Người dùng 68ff98ada26dd8b5a9071920 đã thoát nhóm"
+			//	"type": "out_group"
+			// 			}
+			// 		 			}
+
+			fmt.Println("Thoát nhóm", msg)
+
+			c.Hub.Broadcast <- HubEvent{
+				Type:    "chat",
+				Payload: msg,
+			}
+
+			msgCopy := msg
+			go func() {
+				data, err := json.Marshal(msg)
+
+				if err != nil {
+					log.Println("JSON marshal error:", err)
+					return
+				}
+
+				if err := kafka.SendMessage("chat-topic", msgCopy.SenderID.Hex(), string(data)); err != nil {
+					log.Println("Kafka send error:", err)
+				}
+			}()
+
+			go func() {
+				data, err := json.Marshal(msg)
+
+				if err != nil {
+					log.Println("JSON marshal error:", err)
+					return
+				}
+				fmt.Println("Group:", string(data))
+				if err := kafka.SendMessage("group-out", msgCopy.SenderID.Hex(), string(data)); err != nil {
+					log.Println("Kafka send error:", err)
+				}
+			}()
+
 		}
 	}
 }

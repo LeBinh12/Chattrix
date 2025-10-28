@@ -37,7 +37,9 @@ func RegisterHandler(db *mongo.Database) gin.HandlerFunc {
 				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 				return
 			}
-			url, err := utils.UploadFileToCloudinary(c.Request.Context(), avatarFile)
+			file, _ := avatarFile.Open()
+
+			url, err := utils.UploadFileToMinio(file, avatarFile)
 			if err != nil {
 				c.JSON(http.StatusInternalServerError, common.ErrDB(err))
 				return
