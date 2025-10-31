@@ -31,6 +31,7 @@ type Message struct {
 type MessagePreview struct {
 	Content   string    `bson:"content"`
 	CreatedAt time.Time `bson:"created_at"`
+	Type      string    `bson:"type"`
 }
 
 type MessageRequest struct {
@@ -56,4 +57,15 @@ type MessageResponse struct {
 	IsRead       bool               `json:"is_read"`
 	MediaIDs     []Media            `json:"media_ids,omitempty"`
 	Type         MediaType          `bson:"type" json:"type"` // "image", "video", "file"
+
+	DisplayName     string    `json:"display_name"`
+	Avatar          string    `json:"avatar"`
+	LastMessageType string    `json:"last_message_type"`
+	LastDate        time.Time `json:"last_date"`
+
+	UnreadCount int       `json:"unread_count"`
+	UpdatedAt   time.Time `json:"updated_at,omitempty"`
+
+	IsMuted bool `bson:"is_muted" json:"is_muted"` // đã tắt thông báo chưa
+
 }

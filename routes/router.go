@@ -37,6 +37,7 @@ func InitRouter(r *gin.Engine, todoColl *mongo.Database, hub *websocket.Hub) {
 	}
 
 	// Nhóm không có middleware (chat)
+	// websocket
 	v1NoMiddleware := r.Group("/v1")
 	{
 

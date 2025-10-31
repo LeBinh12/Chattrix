@@ -93,7 +93,7 @@ func (h *Hub) Run() {
 								select {
 								case c.Send <- data:
 								default:
-									log.Printf("⚠️ Buffer full — dropping message for %s", memberID.Hex())
+									log.Printf(" Buffer full — dropping message for %s", memberID.Hex())
 								}
 							}
 						}
@@ -105,7 +105,7 @@ func (h *Hub) Run() {
 							select {
 							case sender.Send <- data:
 							default:
-								log.Printf("⚠️ Buffer full — dropping message for sender %s", msg.SenderID.Hex())
+								log.Printf(" Buffer full — dropping message for sender %s", msg.SenderID.Hex())
 							}
 						}
 					}
@@ -119,7 +119,7 @@ func (h *Hub) Run() {
 						select {
 						case receiver.Send <- data:
 						default:
-							log.Printf("⚠️ Buffer full — dropping message for receiver %s", msg.ReceiverID.Hex())
+							log.Printf(" Buffer full — dropping message for receiver %s", msg.ReceiverID.Hex())
 						}
 					}
 				}
@@ -129,8 +129,53 @@ func (h *Hub) Run() {
 						select {
 						case sender.Send <- data:
 						default:
-							log.Printf("⚠️ Buffer full — dropping message for sender %s", msg.SenderID.Hex())
+							log.Printf(" Buffer full — dropping message for sender %s", msg.SenderID.Hex())
 						}
+					}
+				}
+
+				// Sau khi gửi xong message...
+				senderPreview := &models.ConversationPreview{
+					SenderID:        msg.SenderID.Hex(),
+					UserID:          msg.ReceiverID.Hex(), // Người nhận
+					LastMessage:     msg.Content,
+					LastMessageType: string(msg.Type),
+					Avatar:          msg.Avatar,     // avatar của người nhận
+					DisplayName:     msg.SenderName, // tên người nhận
+					LastDate:        msg.CreatedAt,
+					IsMuted:         msg.IsMuted,
+				}
+
+				receiverPreview := &models.ConversationPreview{
+					SenderID:        msg.SenderID.Hex(),
+					UserID:          msg.SenderID.Hex(), // Người gửi
+					LastMessage:     msg.Content,
+					LastMessageType: string(msg.Type),
+					Avatar:          msg.SenderAvatar, // avatar của người gửi
+					DisplayName:     msg.SenderName,   // tên người gửi
+					LastDate:        msg.CreatedAt,
+				}
+
+				// Serialize JSON
+				senderDataConv, _ := json.Marshal(map[string]interface{}{
+					"type":    "conversations",
+					"message": senderPreview,
+				})
+
+				receiverDataConv, _ := json.Marshal(map[string]interface{}{
+					"type":    "conversations",
+					"message": receiverPreview,
+				})
+
+				// Gửi realtime riêng biệt
+				if sessions, ok := h.Clients[msg.SenderID.Hex()]; ok {
+					for _, c := range sessions {
+						c.Send <- senderDataConv
+					}
+				}
+				if sessions, ok := h.Clients[msg.ReceiverID.Hex()]; ok {
+					for _, c := range sessions {
+						c.Send <- receiverDataConv
 					}
 				}
 
@@ -141,11 +186,10 @@ func (h *Hub) Run() {
 						select {
 						case c.Send <- data:
 						default:
-							log.Printf("⚠️ Buffer full — dropping update_seen for %s\n", c.UserID)
+							log.Printf(" Buffer full — dropping update_seen for %s\n", c.UserID)
 						}
 					}
 				}
-
 			}
 		}
 	}
@@ -166,7 +210,7 @@ func (h *Hub) BroadcastUserStatus(userID, status string) {
 			select {
 			case c.Send <- data:
 			default:
-				log.Printf("⚠️ Buffer full — dropping status for %s", c.UserID)
+				log.Printf(" Buffer full — dropping status for %s", c.UserID)
 			}
 		}
 	}

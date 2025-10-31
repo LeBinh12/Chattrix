@@ -16,5 +16,10 @@ func RegisterUserRoutes(rg *gin.RouterGroup, db *mongo.Database) {
 		users.POST("/login", ginUser.LoginHandler(db))
 		users.POST("/google-login", ginUser.GoogleLoginHandler(db))
 		users.GET("/status", ginUser.GetUserStatusHandler(db))
+		users.POST("/upsert-setting", middleware.AuthMiddleware(),
+			middleware.ApiKeyMiddleware(), ginUser.UpsertSettingHandler(db))
+		users.GET("/get-setting", middleware.AuthMiddleware(),
+			middleware.ApiKeyMiddleware(), ginUser.GetSettingHandler(db))
+
 	}
 }

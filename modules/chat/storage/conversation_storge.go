@@ -57,6 +57,7 @@ func (s *MongoChatStore) GetConversations(ctx context.Context, userID string, pa
 		}
 		if u.LastMessage != nil {
 			preview.LastMessage = u.LastMessage.Content
+			preview.LastMessageType = u.LastMessage.Type
 			if !u.LastMessage.CreatedAt.IsZero() {
 				preview.LastDate = u.LastMessage.CreatedAt
 			}
@@ -86,6 +87,7 @@ func (s *MongoChatStore) GetConversations(ctx context.Context, userID string, pa
 
 		if g.LastMessage != nil {
 			preview.LastMessage = g.LastMessage.Content
+			preview.LastMessageType = g.LastMessage.Type
 			if !g.LastMessage.CreatedAt.IsZero() {
 				preview.LastDate = g.LastMessage.CreatedAt
 			}

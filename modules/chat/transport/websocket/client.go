@@ -95,11 +95,33 @@ func (c *Client) ReadPump(db *mongo.Database) {
 				} else {
 					msg.Status = models.StatusSent
 				}
-				// Gửi broadcast ra hub
+
+				msg.ID = primitive.NewObjectID()
+				// Gửi broadcast chat ra hub
 				c.Hub.Broadcast <- HubEvent{
 					Type:    "chat",
 					Payload: msg,
-				} // có thể serialize JSON thay vì chỉ Content
+				}
+
+				var conversations = models.ConversationPreview{
+					UserID:          msg.ReceiverID.Hex(),
+					GroupID:         msg.GroupID.Hex(),
+					LastMessage:     msg.Content,
+					LastMessageType: string(msg.Type),
+					Avatar:          msg.Avatar,
+					DisplayName:     msg.DisplayName,
+					LastDate:        msg.CreatedAt,
+					SenderID:        msg.SenderID.Hex(),
+				}
+
+				// gửi broadcast conversation ra hub
+
+				c.Hub.Broadcast <- HubEvent{
+					Type:    "conversations",
+					Payload: &conversations,
+				}
+
+				// có thể serialize JSON thay vì chỉ Content
 				// Broadcast Gửi một tin nhắn tới tất cả người nhận cùng lúc
 				// Unicast là Gửi tin nhắn tới một người nhận riêng
 				// 	Multicast là Gửi tin nhắn tới một nhóm người nhận
@@ -207,7 +229,6 @@ func (c *Client) ReadPump(db *mongo.Database) {
 					log.Println("JSON marshal error:", err)
 					return
 				}
-				fmt.Println("Group:", string(data))
 				if err := kafka.SendMessage("group-out", msgCopy.SenderID.Hex(), string(data)); err != nil {
 					log.Println("Kafka send error:", err)
 				}
