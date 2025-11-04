@@ -1,6 +1,7 @@
 package kafka
 
 import (
+	"fmt"
 	"log"
 
 	"github.com/IBM/sarama"
@@ -36,6 +37,7 @@ func SendMessage(topic, key, value string) error {
 		Key:   sarama.StringEncoder(key),
 		Value: sarama.StringEncoder(value),
 	}
+	fmt.Println("msg:", topic)
 
 	_, _, err := Producer.SendMessage(msg)
 	return err

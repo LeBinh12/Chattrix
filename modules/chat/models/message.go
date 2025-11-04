@@ -69,3 +69,10 @@ type MessageResponse struct {
 	IsMuted bool `bson:"is_muted" json:"is_muted"` // đã tắt thông báo chưa
 
 }
+
+type MessageStatusRequest struct {
+	SenderID   string `json:"sender_id,omitempty"`
+	ReceiverID string `json:"receiver_id,omitempty"`
+
+	LastSeenMsgID string `json:"last_seen_message_id,omitempty"`
+}

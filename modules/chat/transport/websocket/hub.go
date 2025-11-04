@@ -180,16 +180,22 @@ func (h *Hub) Run() {
 				}
 
 			case "update_seen":
-				data, _ := json.Marshal(event.Payload)
-				for _, sessions := range h.Clients { // sessions: map[sessionID]*Client
+				msg := event.Payload.(*models.MessageStatusRequest)
+				data, _ := json.Marshal(map[string]interface{}{
+					"type":    "update_seen",
+					"message": msg,
+				})
+				// Chỉ gửi cho receiver
+				if sessions, ok := h.Clients[msg.ReceiverID]; ok {
 					for _, c := range sessions {
 						select {
 						case c.Send <- data:
 						default:
-							log.Printf(" Buffer full — dropping update_seen for %s\n", c.UserID)
+							log.Printf("Buffer full — dropping update_seen for %s\n", c.UserID)
 						}
 					}
 				}
+
 			}
 		}
 	}
