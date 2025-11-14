@@ -1,11 +1,13 @@
 package ginMessage
 
 import (
+	"log"
 	"my-app/common"
 	"my-app/modules/chat/biz"
 	"my-app/modules/chat/storage"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -35,6 +37,20 @@ func GetMessages(db *mongo.Database) gin.HandlerFunc {
 
 		receiverIDStr := ctx.Query("receiver_id")
 		groupIDStr := ctx.Query("group_id")
+		beforeTimeStr := ctx.Query("beforeTime")
+
+		var beforeTimePtr *time.Time
+
+		if beforeTimeStr != "" {
+			parsedTime, err := time.Parse(time.RFC3339, beforeTimeStr)
+			if err == nil {
+				beforeTimePtr = &parsedTime
+			} else {
+				log.Printf(" invalid beforeTime format: %v", err)
+			}
+		}
+
+		// Gọi hàm GetMessage
 
 		if receiverIDStr != "" {
 			receiverObjectID, err = primitive.ObjectIDFromHex(receiverIDStr)
@@ -53,12 +69,11 @@ func GetMessages(db *mongo.Database) gin.HandlerFunc {
 		}
 
 		limit, _ := strconv.ParseInt(ctx.DefaultQuery("limit", "20"), 10, 64)
-		skip, _ := strconv.ParseInt(ctx.DefaultQuery("skip", "0"), 10, 64)
 
 		store := storage.NewMongoChatStore(db)
 		business := biz.NewGetMessageBiz(store)
 
-		messages, err := business.GetMessage(ctx.Request.Context(), senderObjectID, receiverObjectID, groupObjectID, limit, skip)
+		messages, err := business.GetMessage(ctx.Request.Context(), senderObjectID, receiverObjectID, groupObjectID, limit, beforeTimePtr)
 
 		if err != nil {
 			ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -69,7 +84,6 @@ func GetMessages(db *mongo.Database) gin.HandlerFunc {
 			ctx.JSON(http.StatusOK, common.NewResponse(http.StatusOK, "Bạn chưa có tin nhắn nào", gin.H{
 				"data":  []interface{}{},
 				"limit": limit,
-				"skip":  skip,
 				"count": 0,
 			}))
 			return
@@ -79,7 +93,6 @@ func GetMessages(db *mongo.Database) gin.HandlerFunc {
 			map[string]interface{}{
 				"data":  messages,
 				"limit": limit,
-				"skip":  skip,
 				"count": len(messages),
 			}))
 	}

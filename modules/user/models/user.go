@@ -16,6 +16,7 @@ type User struct {
 	Birthday               time.Time `bson:"birthday" json:"birthday"`
 	Gender                 string    `bson:"gender" json:"gender"`
 	IsCompletedFriendSetup bool      `bson:"is_completed_friend_setup" json:"is_completed_friend_setup"` // đã kết bạn ≥5 người chưa
+	IsProfileComplete      bool      `bson:"is_profile_complete" json:"is_profile_complete"`             // đã điền đầy đủ thông tin
 
 }
 
@@ -23,6 +24,14 @@ type RegisterRequest struct {
 	Username    string    `json:"username" binding:"required"`
 	Password    string    `json:"password" binding:"required"`
 	Email       string    `json:"email" binding:"required,email"`
+	Avatar      string    `json:"avatar"`
+	Phone       string    `json:"phone" binding:"required"`
+	DisplayName string    `json:"display_name"`
+	Birthday    time.Time `json:"birthday" binding:"required"`
+	Gender      string    `json:"gender" binding:"required"`
+}
+
+type UpdateRequest struct {
 	Avatar      string    `json:"avatar"`
 	Phone       string    `json:"phone" binding:"required"`
 	DisplayName string    `json:"display_name"`

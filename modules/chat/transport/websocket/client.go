@@ -68,12 +68,15 @@ func (c *Client) ReadPump(db *mongo.Database) {
 
 			// xủ lý nếu là nhắn tin Group
 			if msg.GroupID != primitive.NilObjectID {
+				msg.CreatedAt = time.Now()
+				msg.UpdatedAt = time.Now()
+				msg.ID = primitive.NewObjectID()
+
 				c.Hub.Broadcast <- HubEvent{
 					Type:    "chat",
 					Payload: msg,
 				}
 				msg.Status = models.StatusDelivered
-
 			} else {
 				if msg.SenderID == msg.ReceiverID {
 					log.Println("Error: Không được gửi tin nhắn cho chính mình")
@@ -90,34 +93,33 @@ func (c *Client) ReadPump(db *mongo.Database) {
 				}
 
 				msg.ID = primitive.NewObjectID()
+				msg.CreatedAt = time.Now()
 				// Gửi broadcast chat ra hub
 				c.Hub.Broadcast <- HubEvent{
 					Type:    "chat",
 					Payload: msg,
 				}
-
-				var conversations = models.ConversationPreview{
-					UserID:          msg.ReceiverID.Hex(),
-					GroupID:         msg.GroupID.Hex(),
-					LastMessage:     msg.Content,
-					LastMessageType: string(msg.Type),
-					Avatar:          msg.Avatar,
-					DisplayName:     msg.DisplayName,
-					LastDate:        msg.CreatedAt,
-					SenderID:        msg.SenderID.Hex(),
-				}
-
-				// gửi broadcast conversation ra hub
-
-				c.Hub.Broadcast <- HubEvent{
-					Type:    "conversations",
-					Payload: &conversations,
-				}
-
 				// có thể serialize JSON thay vì chỉ Content
 				// Broadcast Gửi một tin nhắn tới tất cả người nhận cùng lúc
 				// Unicast là Gửi tin nhắn tới một người nhận riêng
 				// 	Multicast là Gửi tin nhắn tới một nhóm người nhận
+			}
+			var conversations = models.ConversationPreview{
+				UserID:          msg.ReceiverID.Hex(),
+				GroupID:         msg.GroupID.Hex(),
+				LastMessage:     msg.Content,
+				LastMessageType: string(msg.Type),
+				Avatar:          msg.Avatar,
+				DisplayName:     msg.DisplayName,
+				LastDate:        msg.CreatedAt,
+				SenderID:        msg.SenderID.Hex(),
+			}
+
+			// gửi broadcast conversation ra hub
+
+			c.Hub.Broadcast <- HubEvent{
+				Type:    "conversations",
+				Payload: &conversations,
 			}
 
 			msgCopy := msg

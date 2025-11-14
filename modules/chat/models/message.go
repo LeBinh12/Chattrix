@@ -16,16 +16,23 @@ const (
 )
 
 type Message struct {
-	ID         primitive.ObjectID `bson:"_id,omitempty" json:"id"`
-	SenderID   primitive.ObjectID `bson:"sender_id" json:"sender_id"`
-	ReceiverID primitive.ObjectID `bson:"receiver_id,omitempty" json:"receiver_id,omitempty"`
-	GroupID    primitive.ObjectID `bson:"group_id,omitempty" json:"group_id,omitempty"`
-	MediaIDs   []string           `bson:"media_ids,omitempty" json:"media_ids,omitempty"`
-	Type       MediaType          `bson:"type" json:"type"` // "image", "video", "file"
-	Content    string             `bson:"content" json:"content"`
-	CreatedAt  time.Time          `bson:"created_at" json:"created_at"`
-	Status     MessageStatus      `bson:"status" json:status`
-	IsRead     bool               `bson:"is_read" json:"is_read"`
+	ID         primitive.ObjectID   `bson:"_id,omitempty" json:"id"`
+	SenderID   primitive.ObjectID   `bson:"sender_id" json:"sender_id"`
+	ReceiverID primitive.ObjectID   `bson:"receiver_id,omitempty" json:"receiver_id,omitempty"`
+	GroupID    primitive.ObjectID   `bson:"group_id,omitempty" json:"group_id,omitempty"`
+	MediaIDs   []primitive.ObjectID `bson:"media_ids,omitempty" json:"media_ids,omitempty"` // tham chiếu media
+	Type       MediaType            `bson:"type" json:"type"`                               // "image", "video", "file"
+	Content    string               `bson:"content" json:"content"`
+	CreatedAt  time.Time            `bson:"created_at" json:"created_at"`
+	Status     MessageStatus        `bson:"status" json:status`
+	IsRead     bool                 `bson:"is_read" json:"is_read"`
+}
+
+type MessageReaction struct {
+	
+	MessageID primitive.ObjectID `bson:"message_id" json:"message_id"`
+	UserID    primitive.ObjectID `bson:"user_id" json:"user_id"`
+	Type      string             `bson:"type" json:"type"` // giữ icon 
 }
 
 type MessagePreview struct {

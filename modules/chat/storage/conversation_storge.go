@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"my-app/modules/chat/models"
+	"sort"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -35,19 +36,20 @@ type groupTemp struct {
 func (s *MongoChatStore) GetConversations(ctx context.Context, userID string, page, limit int, keyword string) ([]models.ConversationPreview, int64, error) {
 	userObjectID := convertToObjectID(userID)
 
-	userResults, total, err := s.getUserConversations(ctx, userObjectID, page, limit, keyword)
+	// Bỏ phân trang ở đây, lấy hết để merge
+	userResults, _, err := s.getUserConversations(ctx, userObjectID, 1, 1000, keyword)
 	if err != nil {
 		return nil, 0, err
 	}
 
-	groupResults, err := s.getGroupConversations(ctx, userObjectID, page, limit, keyword)
+	groupResults, err := s.getGroupConversations(ctx, userObjectID, 1, 1000, keyword)
 	if err != nil {
 		fmt.Println("Lỗi khi lấy group:", err)
 	}
 
-	// Gộp dữ liệu user vào kết quả
 	results := make([]models.ConversationPreview, 0)
-	// cá nhân
+
+	// Gộp user conversations
 	for _, u := range userResults {
 		preview := models.ConversationPreview{
 			UserID:      u.ID.Hex(),
@@ -65,18 +67,16 @@ func (s *MongoChatStore) GetConversations(ctx context.Context, userID string, pa
 		if u.UnreadCount != nil {
 			preview.UnreadCount = *u.UnreadCount
 		}
-
 		if u.Status != "" {
 			preview.Status = u.Status
 		}
 		if u.UpdatedAt != nil {
 			preview.UpdatedAt = *u.UpdatedAt
 		}
-
 		results = append(results, preview)
 	}
 
-	// group
+	// Gộp group conversations
 	for _, g := range groupResults {
 		preview := models.ConversationPreview{
 			GroupID:     g.GroupID.Hex(),
@@ -84,7 +84,6 @@ func (s *MongoChatStore) GetConversations(ctx context.Context, userID string, pa
 			Avatar:      g.GroupInfo.Image,
 			Type:        "group",
 		}
-
 		if g.LastMessage != nil {
 			preview.LastMessage = g.LastMessage.Content
 			preview.LastMessageType = g.LastMessage.Type
@@ -95,8 +94,30 @@ func (s *MongoChatStore) GetConversations(ctx context.Context, userID string, pa
 		results = append(results, preview)
 	}
 
-	return results, total, nil
+	// 🔹 SẮP XẾP THEO THỜI GIAN TIN NHẮN CUỐI
+	sort.Slice(results, func(i, j int) bool {
+		// Nếu không có LastDate, đẩy xuống cuối
+		if results[i].LastDate.IsZero() {
+			return false
+		}
+		if results[j].LastDate.IsZero() {
+			return true
+		}
+		return results[i].LastDate.After(results[j].LastDate)
+	})
 
+	// 🔹 PHÂN TRANG SAU KHI SẮP XẾP
+	start := (page - 1) * limit
+	end := start + limit
+
+	if start > len(results) {
+		return []models.ConversationPreview{}, int64(len(results)), nil
+	}
+	if end > len(results) {
+		end = len(results)
+	}
+
+	return results[start:end], int64(len(results)), nil
 }
 
 func convertToObjectID(id string) primitive.ObjectID {

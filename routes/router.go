@@ -48,6 +48,7 @@ func InitRouter(r *gin.Engine, todoColl *mongo.Database, hub *websocket.Hub) {
 	v1Upload := r.Group("v1")
 	{
 		api.UploadRoutes(v1Upload, todoColl)
+		api.RegisterStatisticalRoutes(v1Upload, todoColl)
 	}
 
 }

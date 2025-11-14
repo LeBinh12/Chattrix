@@ -12,8 +12,8 @@ var MinioClient *minio.Client
 
 func InitMinio() {
 	endpoint := "localhost:9000"
-	accessKey := "admin"
-	secretKey := "admin123"
+	accessKey := "dthuadmin"
+	secretKey := "SuperStrongPwd123!"
 	useSSL := false
 
 	minioClient, err := minio.New(endpoint, &minio.Options{

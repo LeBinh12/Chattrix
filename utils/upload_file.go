@@ -1,10 +1,13 @@
 package utils
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"mime/multipart"
 	"my-app/config"
+	"net/http"
 
 	"github.com/cloudinary/cloudinary-go/v2/api/uploader"
 	"github.com/google/uuid"
@@ -49,4 +52,47 @@ func UploadFileToMinio(file multipart.File, fileHeader *multipart.FileHeader) (s
 	fileURL := fmt.Sprintf("%s", objectName)
 	return fileURL, nil
 
+}
+
+func UploadImageFromURLToMinio(imageURL string) (string, error) {
+	// Gửi request GET tới URL ảnh
+	resp, err := http.Get(imageURL)
+	if err != nil {
+		return "", fmt.Errorf("không tải được ảnh từ URL: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("ảnh trả về mã lỗi: %d", resp.StatusCode)
+	}
+
+	// Đọc dữ liệu ảnh
+	imageData, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("không đọc được dữ liệu ảnh: %v", err)
+	}
+
+	objectName := fmt.Sprintf("%s.jpg", uuid.New().String())
+	bucketName := "chat-media"
+	contentType := resp.Header.Get("Content-Type")
+	if contentType == "" {
+		contentType = "image/jpeg"
+	}
+
+	// Upload lên MinIO
+	_, err = config.MinioClient.PutObject(
+		context.Background(),
+		bucketName,
+		objectName,
+		bytes.NewReader(imageData),
+		int64(len(imageData)),
+		minio.PutObjectOptions{ContentType: contentType},
+	)
+	if err != nil {
+		return "", fmt.Errorf("không upload được ảnh lên MinIO: %v", err)
+	}
+
+	// Trả về URL hoặc objectName
+	fileURL := fmt.Sprintf("%s", objectName)
+	return fileURL, nil
 }
