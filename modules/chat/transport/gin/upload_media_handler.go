@@ -67,6 +67,7 @@ func UploadMediaHandler(db *mongo.Database) gin.HandlerFunc {
 				URL:      url,
 			}
 
+			fmt.Println("media", media)
 			createdMedia, err := business.UploadMedia(ctx.Request.Context(), &media)
 			if err != nil {
 				ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Không thể lưu media vào DB"})

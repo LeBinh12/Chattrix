@@ -41,6 +41,7 @@ func (biz *RegisterBiz) Register(ctx context.Context, data *models.RegisterReque
 		Gender:                 data.Gender,
 		Birthday:               data.Birthday,
 		IsCompletedFriendSetup: false,
+		IsProfileComplete:      true,
 	}
 
 	user.ID = primitive.NewObjectID()

@@ -1,13 +1,11 @@
 package websocket
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"log"
 	"my-app/common/kafka"
 	"my-app/modules/chat/models"
-	"my-app/modules/chat/storage"
 	"sync"
 	"time"
 
@@ -30,12 +28,9 @@ type Client struct {
 }
 
 type WSMessage struct {
-	Type       string                  `json:"type"` // "chat" | "update_seen"
-	Message    *models.MessageResponse `json:"message,omitempty"`
-	SenderID   string                  `json:"sender_id,omitempty"`
-	ReceiverID string                  `json:"receiver_id,omitempty"`
-
-	LastSeenMsgID string `json:"last_seen_message_id,omitempty"`
+	Type          string                       `json:"type"` // "chat" | "update_seen"
+	Message       *models.MessageResponse      `json:"message,omitempty"`
+	MessageStatus *models.MessageStatusRequest `json:"message_status,omitempty"`
 }
 
 // ĐỌc dữ liệu lưu và DB và trả về cho client là đã gửi vào hub và hub sẽ xử lý gửi đi cho client
@@ -57,8 +52,6 @@ func (c *Client) ReadPump(db *mongo.Database) {
 		return nil
 	})
 
-	ctx := context.Background()
-
 	for {
 		var incoming WSMessage
 		if err := c.Conn.ReadJSON(&incoming); err != nil {
@@ -75,12 +68,15 @@ func (c *Client) ReadPump(db *mongo.Database) {
 
 			// xủ lý nếu là nhắn tin Group
 			if msg.GroupID != primitive.NilObjectID {
+				msg.CreatedAt = time.Now()
+				msg.UpdatedAt = time.Now()
+				msg.ID = primitive.NewObjectID()
+
 				c.Hub.Broadcast <- HubEvent{
 					Type:    "chat",
 					Payload: msg,
 				}
 				msg.Status = models.StatusDelivered
-
 			} else {
 				if msg.SenderID == msg.ReceiverID {
 					log.Println("Error: Không được gửi tin nhắn cho chính mình")
@@ -95,14 +91,35 @@ func (c *Client) ReadPump(db *mongo.Database) {
 				} else {
 					msg.Status = models.StatusSent
 				}
-				// Gửi broadcast ra hub
+
+				msg.ID = primitive.NewObjectID()
+				msg.CreatedAt = time.Now()
+				// Gửi broadcast chat ra hub
 				c.Hub.Broadcast <- HubEvent{
 					Type:    "chat",
 					Payload: msg,
-				} // có thể serialize JSON thay vì chỉ Content
+				}
+				// có thể serialize JSON thay vì chỉ Content
 				// Broadcast Gửi một tin nhắn tới tất cả người nhận cùng lúc
 				// Unicast là Gửi tin nhắn tới một người nhận riêng
 				// 	Multicast là Gửi tin nhắn tới một nhóm người nhận
+			}
+			var conversations = models.ConversationPreview{
+				UserID:          msg.ReceiverID.Hex(),
+				GroupID:         msg.GroupID.Hex(),
+				LastMessage:     msg.Content,
+				LastMessageType: string(msg.Type),
+				Avatar:          msg.Avatar,
+				DisplayName:     msg.DisplayName,
+				LastDate:        msg.CreatedAt,
+				SenderID:        msg.SenderID.Hex(),
+			}
+
+			// gửi broadcast conversation ra hub
+
+			c.Hub.Broadcast <- HubEvent{
+				Type:    "conversations",
+				Payload: &conversations,
 			}
 
 			msgCopy := msg
@@ -120,66 +137,42 @@ func (c *Client) ReadPump(db *mongo.Database) {
 			}()
 
 		case "update_seen":
-			if incoming.ReceiverID == "" || incoming.LastSeenMsgID == "" {
+
+			msg := incoming.MessageStatus
+			if msg == nil {
+				continue
+			}
+			fmt.Println("duwx lieuj tra ve:", msg)
+
+			if msg.ReceiverID == "" || msg.LastSeenMsgID == "" {
 				log.Println(" Thiếu dữ liệu update_seen")
 				continue
 			}
 
-			senderID, err1 := primitive.ObjectIDFromHex(incoming.SenderID)     // người gửi
-			receiverID, err2 := primitive.ObjectIDFromHex(incoming.ReceiverID) // người nhận
-			userID := senderID                                                 // ai là người đọc
-			lastSeenMsgID, err3 := primitive.ObjectIDFromHex(incoming.LastSeenMsgID)
-
-			if err1 != nil || err2 != nil || err3 != nil {
-				log.Println(" ObjectID không hợp lệ:", err1, err2, err3)
-				continue
-			}
-
-			conversationID := storage.GetConversationID(senderID, receiverID)
-
-			seenStore := storage.NewMongoChatStore(db)
-			// Cập nhật con trỏ đã xem trong bảng chat_seen_status
-			if err := seenStore.CreateOrUpdate(ctx, userID, conversationID, lastSeenMsgID); err != nil {
-				log.Println(" Lỗi update ChatSeenStatus:", err)
-				continue
-			}
-
-			// Update message status = seen
-			msgStore := storage.NewMongoChatStore(db)
-			if err := msgStore.UpdateStatusSeen(ctx, senderID, receiverID, lastSeenMsgID); err != nil {
-				log.Println(" Lỗi update Message seen:", err)
-				continue
-			}
-
 			// Gửi broadcast lại cho những client khác
-			seenEvent := map[string]interface{}{
-				"type":                 "update_seen",
-				"conversation_id":      conversationID,
-				"last_seen_message_id": incoming.LastSeenMsgID,
-				"user_id":              c.UserID,
-			}
-			data, _ := json.Marshal(seenEvent)
-			c.Hub.Broadcast <- HubEvent{Type: "update_seen", Payload: data}
 
+			c.Hub.Broadcast <- HubEvent{Type: "update_seen", Payload: msg}
+
+			msgCopy := msg
+			go func() {
+				data, err := json.Marshal(msg)
+				fmt.Println("duwx lieuj tra ve:", data)
+				if err != nil {
+					log.Println("JSON marshal error:", err)
+					return
+				}
+
+				if err := kafka.SendMessage("update-status-message", msgCopy.SenderID, string(data)); err != nil {
+					log.Println("Kafka send error:", err)
+				}
+			}()
+
+			/// Xử lý thoát nhóm
 		case "member_left":
 			msg := incoming.Message
 			if msg == nil {
 				continue
 			}
-
-			// 		các dữ liệu cần lấy về
-			// 		{
-			// 			"type":"member_left",
-			// "message":{
-			// 	"sender_id": "68ff98ada26dd8b5a9071920",
-			// 	"group_id": "6900afa51b3786292fb358da",
-			// 	"avatar":"...."
-			// 	"content": "Người dùng 68ff98ada26dd8b5a9071920 đã thoát nhóm"
-			//	"type": "out_group"
-			// 			}
-			// 		 			}
-
-			fmt.Println("Thoát nhóm", msg)
 
 			c.Hub.Broadcast <- HubEvent{
 				Type:    "chat",
@@ -207,7 +200,6 @@ func (c *Client) ReadPump(db *mongo.Database) {
 					log.Println("JSON marshal error:", err)
 					return
 				}
-				fmt.Println("Group:", string(data))
 				if err := kafka.SendMessage("group-out", msgCopy.SenderID.Hex(), string(data)); err != nil {
 					log.Println("Kafka send error:", err)
 				}

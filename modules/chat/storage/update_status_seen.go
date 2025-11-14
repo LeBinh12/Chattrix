@@ -8,12 +8,15 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-func (s *MongoChatStore) UpdateStatusSeen(ctx context.Context, sender_id, receiver_id, lastSeenMsgID primitive.ObjectID) error {
+func (s *MongoChatStore) UpdateStatusSeen(ctx context.Context, sender_id, receiver_id, lastSeenMsgID, oldLastSeenMsgID primitive.ObjectID) error {
 	filter := bson.M{
-		"sender_id":   sender_id,
-		"receiver_id": receiver_id,
+		"sender_id":   receiver_id,
+		"receiver_id": sender_id,
 		"is_read":     false,
-		"_id":         bson.M{"$lte": lastSeenMsgID}, // tất cả tin nhắn trước hoặc bằng ID cuối cùng
+		"_id": bson.M{
+			"$gt":  oldLastSeenMsgID,
+			"$lte": lastSeenMsgID,
+		}, // tất cả tin nhắn trước hoặc bằng ID cuối cùng
 	}
 
 	update := bson.M{

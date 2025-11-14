@@ -23,15 +23,14 @@ func (s *MongoChatStore) getGroupConversations(ctx context.Context, userObjectID
 
 	unwindGroup := bson.D{{"$unwind", "$group_info"}}
 
-	matchKeyword := bson.D{}
-
+	var matchKeyword bson.D
 	if keyword != "" {
 		matchKeyword = bson.D{{"$match", bson.M{
 			"group_info.name": bson.M{"$regex": keyword, "$options": "i"},
 		}}}
 	}
 
-	// Lookup tin nhắn mới nhất trong group
+	// 🔹 Lookup tin nhắn mới nhất - GIỮ NGUYÊN AS ARRAY
 	lookupLastMessage := bson.D{{
 		"$lookup", bson.M{
 			"from": "messages",
@@ -41,23 +40,35 @@ func (s *MongoChatStore) getGroupConversations(ctx context.Context, userObjectID
 				{"$sort": bson.M{"created_at": -1}},
 				{"$limit": 1},
 			},
-			"as": "last_message",
+			"as": "last_message_array", //  Đổi tên để tránh nhầm lẫn
 		},
 	}}
 
-	unwindMessage := bson.D{{"$unwind", bson.M{"path": "$last_message", "preserveNullAndEmptyArrays": true}}}
+	// 🔹 THÊM $addFields ĐỂ TRANSFORM ARRAY -> OBJECT
+	addLastMessageField := bson.D{{
+		"$addFields", bson.M{
+			"last_message": bson.M{
+				"$cond": bson.A{
+					bson.M{"$gt": bson.A{bson.M{"$size": "$last_message_array"}, 0}},
+					bson.M{"$arrayElemAt": bson.A{"$last_message_array", 0}},
+					nil, // Nếu không có tin nhắn thì set nil
+				},
+			},
+		},
+	}}
 
 	pipeline := mongo.Pipeline{matchGroups, lookupGroup, unwindGroup}
 	if keyword != "" {
 		pipeline = append(pipeline, matchKeyword)
 	}
-	pipeline = append(pipeline, lookupLastMessage, unwindMessage,
+	pipeline = append(pipeline,
+		lookupLastMessage,
+		addLastMessageField, // ✅ Thêm stage này
 		bson.D{{"$skip", int64((page - 1) * limit)}},
 		bson.D{{"$limit", int64(limit)}},
 	)
 
 	cursor, err := groupMemberCollection.Aggregate(ctx, pipeline)
-
 	if err != nil {
 		return nil, err
 	}
