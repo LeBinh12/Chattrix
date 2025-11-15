@@ -3,6 +3,7 @@ package storage
 import (
 	"context"
 	"my-app/modules/chat/models"
+	ModelGroup "my-app/modules/group/models"
 	ModelUser "my-app/modules/user/models"
 	"time"
 
@@ -16,7 +17,20 @@ func (s *MongoChatStore) GetMessage(ctx context.Context, SenderID, ReceiverID, G
 
 	// Lọc theo group hoặc chat riêng
 	if GroupID != primitive.NilObjectID {
-		filter = bson.M{"group_id": GroupID}
+		var member ModelGroup.GroupMember
+		err := s.db.Collection("group_members").FindOne(ctx, bson.M{
+			"group_id": GroupID,
+			"user_id":  SenderID,
+		}).Decode(&member)
+		if err != nil {
+			// Nếu không tìm thấy, không cho xem tin nhắn
+			return []models.MessageResponse{}, nil
+		}
+
+		filter = bson.M{
+			"group_id":   GroupID,
+			"created_at": bson.M{"$gte": member.JoinedAt}, // Chỉ lấy từ lúc join
+		}
 	} else {
 		filter = bson.M{
 			"$or": []bson.M{
@@ -27,7 +41,12 @@ func (s *MongoChatStore) GetMessage(ctx context.Context, SenderID, ReceiverID, G
 	}
 
 	if beforeTime != nil {
-		filter["created_at"] = bson.M{"$lt": *beforeTime}
+		if groupCreatedAt, ok := filter["created_at"].(bson.M); ok {
+			groupCreatedAt["$lt"] = *beforeTime
+			filter["created_at"] = groupCreatedAt
+		} else {
+			filter["created_at"] = bson.M{"$lt": *beforeTime}
+		}
 	}
 
 	opst := options.Find().
@@ -49,7 +68,7 @@ func (s *MongoChatStore) GetMessage(ctx context.Context, SenderID, ReceiverID, G
 		return []models.MessageResponse{}, nil
 	}
 
-	// 3️⃣ Lấy danh sách sender_id duy nhất
+	//  Lấy danh sách sender_id duy nhất
 	senderIDsMap := map[primitive.ObjectID]struct{}{}
 	for _, msg := range messages {
 		senderIDsMap[msg.SenderID] = struct{}{}
@@ -60,7 +79,7 @@ func (s *MongoChatStore) GetMessage(ctx context.Context, SenderID, ReceiverID, G
 		senderIDs = append(senderIDs, id)
 	}
 
-	// 4️⃣ Query tất cả users
+	//  Query tất cả users
 	userCursor, err := s.db.Collection("users").Find(ctx, bson.M{"_id": bson.M{"$in": senderIDs}})
 	if err != nil {
 		return nil, err
@@ -74,7 +93,7 @@ func (s *MongoChatStore) GetMessage(ctx context.Context, SenderID, ReceiverID, G
 		userMap[u.ID] = u
 	}
 
-	// 5️⃣ Thu thập tất cả mediaIDs
+	//  Thu thập tất cả mediaIDs
 	allMediaIDsMap := map[primitive.ObjectID]struct{}{}
 	for _, msg := range messages {
 		for _, mID := range msg.MediaIDs {
@@ -87,7 +106,7 @@ func (s *MongoChatStore) GetMessage(ctx context.Context, SenderID, ReceiverID, G
 		allMediaIDs = append(allMediaIDs, id)
 	}
 
-	// 6️⃣ Query tất cả medias dựa trên _id
+	//  Query tất cả medias dựa trên _id
 	mediaMap := map[primitive.ObjectID]models.Media{}
 	if len(allMediaIDs) > 0 {
 		mediaCursor, err := s.db.Collection("medias").Find(ctx, bson.M{"_id": bson.M{"$in": allMediaIDs}})
@@ -101,7 +120,7 @@ func (s *MongoChatStore) GetMessage(ctx context.Context, SenderID, ReceiverID, G
 		}
 	}
 
-	// 7️⃣ Ghép dữ liệu thành MessageResponse
+	//  Ghép dữ liệu thành MessageResponse
 	var messageResponses []models.MessageResponse
 	for _, msg := range messages {
 		res := models.MessageResponse{

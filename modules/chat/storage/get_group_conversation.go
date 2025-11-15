@@ -63,7 +63,7 @@ func (s *MongoChatStore) getGroupConversations(ctx context.Context, userObjectID
 	}
 	pipeline = append(pipeline,
 		lookupLastMessage,
-		addLastMessageField, // ✅ Thêm stage này
+		addLastMessageField, //  Thêm stage này
 		bson.D{{"$skip", int64((page - 1) * limit)}},
 		bson.D{{"$limit", int64(limit)}},
 	)

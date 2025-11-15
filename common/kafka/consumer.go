@@ -146,6 +146,44 @@ func (c *chatConsumer) ConsumeClaim(sess sarama.ConsumerGroupSession, claim sara
 			}
 
 			sess.MarkMessage(msg, "")
+
+		case "delete-message-for-me-topic":
+			var delMsg models.DeleteMessageForMe
+			if err := json.Unmarshal(msg.Value, &delMsg); err != nil {
+				log.Println("Unmarshal error:", err)
+				continue
+			}
+
+			// Convert UserID
+			userID, err := primitive.ObjectIDFromHex(delMsg.UserID)
+			if err != nil {
+				log.Println("UserID không hợp lệ:", err)
+				continue
+			}
+
+			// Convert MessageIDs
+			var messageIDs []primitive.ObjectID
+			for _, m := range delMsg.MessageIDs {
+				id, err := primitive.ObjectIDFromHex(m)
+				if err != nil {
+					log.Println("MessageID không hợp lệ:", m, err)
+					continue
+				}
+				messageIDs = append(messageIDs, id)
+			}
+
+			// Xử lý xóa qua Biz
+			chatStore := storage.NewMongoChatStore(c.db)
+			chatBiz := biz.NewDeleteMessageForMeBiz(chatStore)
+
+			if err := chatBiz.DeleteMessageForMe(context.Background(), userID, messageIDs); err != nil {
+				log.Println("Lỗi xóa message cho riêng mình:", err)
+				continue
+			}
+
+			log.Printf("User %s đã xóa %d tin nhắn cho riêng mình\n", delMsg.UserID, len(messageIDs))
+			sess.MarkMessage(msg, "")
+
 		}
 	}
 

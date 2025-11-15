@@ -26,13 +26,14 @@ type Message struct {
 	CreatedAt  time.Time            `bson:"created_at" json:"created_at"`
 	Status     MessageStatus        `bson:"status" json:status`
 	IsRead     bool                 `bson:"is_read" json:"is_read"`
+	DeletedFor []primitive.ObjectID `bson:"deleted_for,omitempty" json:"deleted_for"` // lưu user nào đã xóa
+
 }
 
 type MessageReaction struct {
-	
 	MessageID primitive.ObjectID `bson:"message_id" json:"message_id"`
 	UserID    primitive.ObjectID `bson:"user_id" json:"user_id"`
-	Type      string             `bson:"type" json:"type"` // giữ icon 
+	Type      string             `bson:"type" json:"type"` // giữ icon
 }
 
 type MessagePreview struct {
@@ -82,4 +83,9 @@ type MessageStatusRequest struct {
 	ReceiverID string `json:"receiver_id,omitempty"`
 
 	LastSeenMsgID string `json:"last_seen_message_id,omitempty"`
+}
+
+type DeleteMessageForMe struct {
+	UserID     string   `json:"user_id"`     // Người xóa
+	MessageIDs []string `json:"message_ids"` // Danh sách message cần xóa
 }

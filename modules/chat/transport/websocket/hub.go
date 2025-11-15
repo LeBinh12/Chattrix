@@ -221,6 +221,28 @@ func (h *Hub) Run() {
 					}
 				}
 
+				// xử lý gửi về client chính mình khi xóa tin nhắn
+			case "delete_for_me":
+				payload := event.Payload.(struct {
+					UserID     string
+					MessageIDs []string
+				})
+
+				if sessions, ok := h.Clients[payload.UserID]; ok {
+					data, _ := json.Marshal(map[string]interface{}{
+						"type":    "delete_for_me",
+						"message": payload,
+					})
+
+					for _, c := range sessions {
+						select {
+						case c.Send <- data:
+						default:
+							log.Printf("Buffer full — dropping delete_for_me for %s", payload.UserID)
+						}
+					}
+				}
+
 			}
 		}
 	}
