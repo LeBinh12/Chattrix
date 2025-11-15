@@ -31,6 +31,7 @@ type WSMessage struct {
 	Type          string                       `json:"type"` // "chat" | "update_seen"
 	Message       *models.MessageResponse      `json:"message,omitempty"`
 	MessageStatus *models.MessageStatusRequest `json:"message_status,omitempty"`
+	DeleteMsg     *models.DeleteMessageForMe   `json:"delete_msg,omitempty"`
 }
 
 // ĐỌc dữ liệu lưu và DB và trả về cho client là đã gửi vào hub và hub sẽ xử lý gửi đi cho client
@@ -205,7 +206,59 @@ func (c *Client) ReadPump(db *mongo.Database) {
 				}
 			}()
 
+		// xử lý xóa tin nhắn chỉ mình mình không thấy tin nhắn đó
+
+		case "delete_for_me":
+			delMsg := incoming.DeleteMsg
+			if delMsg == nil {
+				continue
+			}
+
+			// Convert UserID
+			userID, err := primitive.ObjectIDFromHex(delMsg.UserID)
+			if err != nil {
+				log.Println("UserID không hợp lệ:", err)
+				continue
+			}
+
+			// Convert MessageIDs
+			var messageIDs []primitive.ObjectID
+			for _, m := range delMsg.MessageIDs {
+				id, err := primitive.ObjectIDFromHex(m)
+				if err != nil {
+					log.Println("MessageID không hợp lệ:", m, err)
+					continue
+				}
+				messageIDs = append(messageIDs, id)
+			}
+
+			// Gửi lên Kafka để consumer xử lý lưu vào DB
+			go func() {
+				data, err := json.Marshal(delMsg)
+				if err != nil {
+					log.Println("JSON marshal error:", err)
+					return
+				}
+
+				if err := kafka.SendMessage("delete-message-for-me-topic", userID.Hex(), string(data)); err != nil {
+					log.Println("Kafka send error:", err)
+				}
+			}()
+
+			// Realtime: gửi event này về chính user (ẩn tin nhắn đó)
+			c.Hub.Broadcast <- HubEvent{
+				Type: "delete_for_me",
+				Payload: struct {
+					UserID     string   `json:"user_id"`
+					MessageIDs []string `json:"message_ids"`
+				}{
+					UserID:     delMsg.UserID,
+					MessageIDs: delMsg.MessageIDs,
+				},
+			}
+
 		}
+
 	}
 }
 
