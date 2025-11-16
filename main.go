@@ -4,6 +4,7 @@ import (
 	"my-app/common/kafka"
 	"my-app/config"
 	"my-app/database"
+	"my-app/middleware"
 	"my-app/modules/chat/transport/websocket"
 	"my-app/routes"
 	"my-app/utils"
@@ -26,6 +27,7 @@ func main() {
 	)
 
 	r := gin.Default()
+	r.Use(middleware.CORSMiddleware())
 
 	if err := utils.RegisterValidator(); err != nil {
 		panic(err)

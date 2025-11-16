@@ -12,7 +12,25 @@ Lần đầu cần chạy chương trình sẽ chạy
 - docker-compose up --build (Để sinh ra môi trường minio)
 - chạy container minio mới sinh
 
-Cuối cùng chỉ cần chạy câu lệnh go run main.go
+ Cuối cùng chỉ cần chạy câu lệnh go run main.go. Trước khi chạy nhớ cấu hình file `.env` với thông tin MongoDB, ví dụ:
+
+```
+MONGO_URI=mongodb://root:19006292@localhost:27018/?authSource=admin
+MONGO_DB=chattrix
+CORS_ALLOWED_ORIGINS=http://localhost:5173
+```
+
+Trong đó `authSource=admin` là bắt buộc nếu bạn dùng tài khoản mặc định được tạo bởi `docker-compose` để việc xác thực không bị lỗi.
+
+- `CORS_ALLOWED_ORIGINS` (tùy chọn): danh sách origin được phép (phân tách bằng dấu phẩy). Để mở cho tất cả, có thể bỏ trống để mặc định `*`.
+
+### Seed tài khoản mẫu
+
+Chạy seeder để tạo sẵn 2 tài khoản `admin` và `user` (mật khẩu mặc định `123456`):
+
+```
+go run cmd/seeder/main.go
+```
 
 Dưới đây là mô tả về cấu trúc dự án
 
