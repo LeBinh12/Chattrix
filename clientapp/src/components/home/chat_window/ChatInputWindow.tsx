@@ -315,51 +315,59 @@ export default function ChatInputWindow({
       )}
 
       {selectedFiles.length > 0 && !hasLeftGroup && (
-        <div className="flex overflow-x-auto gap-2 mb-2 sm:mb-3 pb-2 px-2 sm:px-6">
+        <div className="flex overflow-x-auto gap-2 mb-2 sm:mb-3 pb-2 px-2 sm:px-6 scrollbar-thin scrollbar-thumb-[#d0d7e9]">
           {selectedFiles.map((file, index) => {
             const isImage = file.type.startsWith("image/");
             const isVideo = file.type.startsWith("video/");
             return (
               <div
                 key={index}
-                className="relative w-16 h-16 border border-[#c8d5ff] rounded-xl overflow-hidden flex-shrink-0 bg-[#f0f4ff]"
+                className="flex flex-col gap-1 flex-shrink-0"
               >
-                {isImage || isVideo ? (
-                  <div className="w-full h-full">
-                    {isImage ? (
-                      <img
-                        src={URL.createObjectURL(file)}
-                        alt=""
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <video
-                        src={URL.createObjectURL(file)}
-                        className="w-full h-full object-cover"
-                      />
-                    )}
-                  </div>
-                ) : (
-                  <div className="flex items-center justify-center h-full bg-brand-100">
-                    <FileText size={24} className="text-brand-600" />
-                  </div>
-                )}
-                {!uploading && (
-                  <button
-                    onClick={() => handleRemoveFile(index)}
-                    className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 transition-colors shadow-md"
-                  >
-                    <X size={14} />
-                  </button>
-                )}
-                {uploading && (
-                  <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 text-white">
-                    <div className="w-8 h-8 border-3 border-t-brand-400 border-brand-200 rounded-full animate-spin mb-1"></div>
-                    <div className="text-xs font-semibold">
-                      {progress[index] ?? 0}%
+                <div className="relative w-20 h-20 sm:w-24 sm:h-24 border border-[#c8d5ff] rounded-xl overflow-hidden bg-[#f0f4ff]">
+                  {isImage || isVideo ? (
+                    <div className="w-full h-full">
+                      {isImage ? (
+                        <img
+                          src={URL.createObjectURL(file)}
+                          alt=""
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <video
+                          src={URL.createObjectURL(file)}
+                          className="w-full h-full object-cover"
+                        />
+                      )}
                     </div>
-                  </div>
-                )}
+                  ) : (
+                    <div className="flex flex-col items-center justify-center h-full bg-brand-100 p-2">
+                      <FileText size={20} className="text-brand-600 mb-1" />
+                    </div>
+                  )}
+                  {!uploading && (
+                    <button
+                      onClick={() => handleRemoveFile(index)}
+                      className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 transition-colors shadow-md z-10"
+                    >
+                      <X size={12} />
+                    </button>
+                  )}
+                  {uploading && (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 text-white">
+                      <div className="w-6 h-6 sm:w-8 sm:h-8 border-2 sm:border-3 border-t-brand-400 border-brand-200 rounded-full animate-spin mb-1"></div>
+                      <div className="text-[10px] sm:text-xs font-semibold">
+                        {progress[index] ?? 0}%
+                      </div>
+                    </div>
+                  )}
+                </div>
+                <p 
+                  className="text-[10px] text-[#5a6b8c] w-20 sm:w-24 truncate text-center px-1" 
+                  title={file.name}
+                >
+                  {file.name}
+                </p>
               </div>
             );
           })}

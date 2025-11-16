@@ -171,20 +171,20 @@ export default function MessageItem({
               key={file.id}
               href={mediaUrl}
               download
-              className="flex items-center gap-3 p-3 rounded-2xl border border-[#dfe3ef] bg-white/70 hover:border-[#bfd1ff] transition"
+              className="flex items-center gap-2 sm:gap-3 p-2.5 sm:p-3 rounded-2xl border border-[#dfe3ef] bg-white/70 hover:border-[#bfd1ff] transition max-w-full"
             >
-              <div className="w-10 h-10 rounded-xl bg-[#e6edff] text-[#4c6fd8] flex items-center justify-center">
-                <FileText className="w-5 h-5" />
+              <div className="w-9 h-9 sm:w-10 sm:h-10 flex-shrink-0 rounded-xl bg-[#e6edff] text-[#4c6fd8] flex items-center justify-center">
+                <FileText className="w-4 h-4 sm:w-5 sm:h-5" />
               </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-[#1f2a44] truncate">
+              <div className="flex-1 min-w-0 overflow-hidden">
+                <p className="text-xs sm:text-sm font-semibold text-[#1f2a44] truncate" title={file.filename}>
                   {file.filename}
                 </p>
-                <p className="text-xs text-[#7e8aac]">
+                <p className="text-[10px] sm:text-xs text-[#7e8aac]">
                   {file.size ? `${Math.round(file.size / 1024)} KB` : ""}
                 </p>
               </div>
-              <Download className="w-4 h-4 text-[#4c6fd8]" />
+              <Download className="w-3.5 h-3.5 sm:w-4 sm:h-4 flex-shrink-0 text-[#4c6fd8]" />
             </a>
           );
         })}
@@ -226,7 +226,7 @@ export default function MessageItem({
         <div
           className={`flex flex-col ${
             isMine ? "items-end" : "items-start"
-          } max-w-[68%] gap-1 relative`}
+          } max-w-[85%] sm:max-w-[75%] md:max-w-[68%] gap-1 relative`}
         >
           {/* Hover actions */}
           {!isMine && isHovered && (
@@ -283,7 +283,7 @@ export default function MessageItem({
           )}
 
           <div
-            className={`px-3 py-2 rounded-[20px] border shadow-sm w-fit leading-5 ${bubbleStyles} ${
+            className={`px-3 py-2 rounded-[20px] border shadow-sm max-w-full leading-5 ${bubbleStyles} ${
               size === "small" ? "text-[12px]" : "text-[13px]"
             }`}
           >
