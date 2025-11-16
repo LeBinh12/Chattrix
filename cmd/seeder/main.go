@@ -5,6 +5,7 @@ import (
 	"log"
 	"time"
 
+	"my-app/config"
 	"my-app/database"
 	"my-app/modules/user/models"
 	"my-app/modules/user/storage"
@@ -32,10 +33,15 @@ type (
 )
 
 func main() {
-	db := database.ConnectMongo()
-	store := storage.NewMongoStore(db)
-
+	cfg := config.LoadAppConfig()
 	ctx := context.Background()
+
+	db, err := database.ConnectMongo(ctx, cfg.Mongo.URI, cfg.Mongo.Name)
+	if err != nil {
+		log.Fatalf("failed to connect mongo: %v", err)
+	}
+
+	store := storage.NewMongoStore(db)
 
 	users := []seedUser{
 		{

@@ -24,23 +24,30 @@ type chatConsumer struct {
 	db *mongo.Database
 }
 
-// Hàm này sẽ chạy Consumer của 1 Topic đã truyền ở trên và nó sẽ liên tục lắng nghe
-func StartConsumer(brokers []string, groupID string, topics []string, db *mongo.Database) {
+// StartConsumer listens to Kafka topics until the provided context is cancelled.
+func StartConsumer(ctx context.Context, brokers []string, groupID string, topics []string, db *mongo.Database) error {
 	config := sarama.NewConfig()
 	config.Version = sarama.V2_1_0_0
 	config.Consumer.Return.Errors = true
 
 	consumerGroup, err := sarama.NewConsumerGroup(brokers, groupID, config)
 	if err != nil {
-		log.Fatalf("Error creating consumer group: %v", err)
+		return fmt.Errorf("create consumer group: %w", err)
 	}
+	defer consumerGroup.Close()
 
 	handler := &chatConsumer{db: db}
-	ctx := context.Background()
 
 	for {
 		if err := consumerGroup.Consume(ctx, topics, handler); err != nil {
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
 			log.Printf("Consumer error: %v", err)
+		}
+
+		if ctx.Err() != nil {
+			return ctx.Err()
 		}
 	}
 }
