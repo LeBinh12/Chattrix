@@ -1,11 +1,10 @@
-import { ChevronLeft, CircleUserRound, Phone, Video } from "lucide-react";
+import { ChevronLeft, CircleUserRound } from "lucide-react";
 import { motion } from "framer-motion";
 import TimeAgo from "react-timeago";
 import vi from "react-timeago/lib/language-strings/vi";
 import buildFormatter from "react-timeago/lib/formatters/buildFormatter";
 import { useRecoilState } from "recoil";
 import { chatInfoPanelVisibleAtom } from "../../../recoil/atoms/uiAtom";
-import type { ReactNode } from "react";
 
 const formatter = buildFormatter(vi);
 
@@ -30,14 +29,14 @@ export default function ChatHeaderWindow({
 
   return (
     <div className="flex items-center justify-between gap-3 px-3 sm:px-5 py-3 bg-white border-b border-[#e4e8f1] shadow-sm">
-      {/* Left: Back button */}
+      {/* Left: Back button (mobile only) */}
       <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
         {onBack && (
           <motion.button
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             onClick={onBack}
-            className="flex items-center justify-center w-9 h-9 rounded-full bg-[#f0f4ff] hover:bg-[#e1e9ff] border border-[#d0deff] text-[#2754d7] transition-all"
+            className="lg:hidden flex items-center justify-center w-9 h-9 rounded-full bg-[#f0f4ff] hover:bg-[#e1e9ff] border border-[#d0deff] text-[#2754d7] transition-all"
             title="Quay lại"
           >
             <ChevronLeft size={20} strokeWidth={2.5} />
@@ -82,8 +81,6 @@ export default function ChatHeaderWindow({
 
       {/* Right: Action buttons */}
       <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
-        <HeaderAction icon={<Phone size={16} />} label="Gọi thoại" className="hidden sm:flex" />
-        <HeaderAction icon={<Video size={16} />} label="Gọi video" className="hidden sm:flex" />
         <motion.button
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
@@ -95,24 +92,5 @@ export default function ChatHeaderWindow({
         </motion.button>
       </div>
     </div>
-  );
-}
-
-type HeaderActionProps = {
-  icon: ReactNode;
-  label: string;
-  className?: string;
-};
-
-function HeaderAction({ icon, label, className = "" }: HeaderActionProps) {
-  return (
-    <motion.button
-      whileHover={{ scale: 1.05 }}
-      whileTap={{ scale: 0.95 }}
-      className={`w-9 h-9 rounded-full border border-[#d0deff] text-[#2754d7] flex items-center justify-center bg-[#f0f4ff] hover:bg-[#e1e9ff] transition-all ${className}`}
-      title={label}
-    >
-      {icon}
-    </motion.button>
   );
 }

@@ -10,7 +10,7 @@ import ChatInfoPanel from "../components/home/ChatInfoPanel";
 import ChannelListWrapper from "../components/home/ChannelListWrapper";
 import { chatInfoPanelVisibleAtom } from "../recoil/atoms/uiAtom";
 import { selectedChatState } from "../recoil/atoms/chatAtom";
-import { AnimatePresence, motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 
 export default function HomeScreen() {
   const user = useRecoilValue(userAtom);
@@ -24,13 +24,19 @@ export default function HomeScreen() {
   useEffect(() => {
     const handleResize = () => {
       if (typeof window === "undefined") return;
-      setViewportWidth(window.innerWidth);
-      setIsCompact(window.innerWidth < 1024);
+      const width = window.innerWidth;
+      setViewportWidth(width);
+      setIsCompact(width < 1024);
+
+      // Tự động đóng panel khi về mobile/tablet
+      if (width < 1024) {
+        setPanelVisible(false);
+      }
     };
     handleResize();
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
-  }, []);
+  }, [setPanelVisible]);
 
   useEffect(() => {
     if (!selectedChat && isPanelVisible) {
@@ -59,7 +65,7 @@ export default function HomeScreen() {
       {!hideSidebar && <Sidebar />}
       <div className="flex flex-1 min-w-0 bg-[#e9edf5] overflow-hidden">
         {isCompact ? (
-          <>
+          <div className="flex-1 flex relative overflow-hidden">
             {!selectedChat && !isPanelVisible && (
               <div className="flex-1 flex bg-white overflow-hidden">
                 <div className="flex-1 overflow-y-auto border-l border-[#dbe2ef]">
@@ -68,18 +74,34 @@ export default function HomeScreen() {
               </div>
             )}
 
-            {selectedChat && !isPanelVisible && (
-              <div className="flex-1 flex bg-[#f5f6fb] border-l border-[#dbe2ef] overflow-hidden">
-                <ChatWindow onBack={() => setSelectedChat(null)} />
-              </div>
-            )}
+            {selectedChat && (
+              <>
+                <div className="flex-1 flex bg-[#f5f6fb] border-l border-[#dbe2ef] overflow-hidden">
+                  <ChatWindow onBack={() => setSelectedChat(null)} />
+                </div>
 
-            {selectedChat && isPanelVisible && (
-              <div className="flex-1 bg-white border-l border-[#dbe2ef] overflow-y-auto">
-                <ChatInfoPanel />
-              </div>
+                <AnimatePresence>
+                  {isPanelVisible && (
+                    <motion.div
+                      key="mobile-panel"
+                      initial={{ x: "100%" }}
+                      animate={{ x: 0 }}
+                      exit={{ x: "100%" }}
+                      transition={{ 
+                        type: "spring", 
+                        stiffness: 300, 
+                        damping: 30,
+                        mass: 0.8
+                      }}
+                      className="absolute inset-0 bg-white overflow-y-auto z-50 shadow-2xl"
+                    >
+                      <ChatInfoPanel />
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </>
             )}
-          </>
+          </div>
         ) : (
           <>
             <div className="hidden lg:block h-full flex-shrink-0 overflow-hidden">
@@ -92,20 +114,22 @@ export default function HomeScreen() {
               <ChatWindow onBack={() => setSelectedChat(null)} />
             </div>
 
-            <AnimatePresence>
-              {isPanelVisible && (
-                <motion.div
-                  key="chat-info-panel"
-                  initial={{ opacity: 0, x: 200 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: 200 }}
-                  transition={{ type: "spring", stiffness: 65, damping: 16 }}
-                  className="hidden lg:block flex-shrink-0 border-l border-[#dbe2ef] bg-white w-80"
-                >
-                  <ChatInfoPanel />
-                </motion.div>
-              )}
-            </AnimatePresence>
+            <motion.div
+              initial={false}
+              animate={{ 
+                x: isPanelVisible ? 0 : 320
+              }}
+              transition={{ 
+                type: "spring", 
+                stiffness: 300, 
+                damping: 30,
+                mass: 0.8
+              }}
+              className="hidden lg:block flex-shrink-0 border-l border-[#dbe2ef] bg-white w-80 overflow-y-auto"
+              style={{ marginRight: isPanelVisible ? 0 : -320 }}
+            >
+              <ChatInfoPanel />
+            </motion.div>
           </>
         )}
       </div>

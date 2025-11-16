@@ -3,7 +3,6 @@ import { useRecoilState, useRecoilValue } from "recoil";
 import ChatHeaderWindow from "./chat_window/ChatHeaderWindow";
 import ChatContentWindow from "./chat_window/ChatContentWindow";
 import ChatInputWindow from "./chat_window/ChatInputWindow";
-import ChatWindowSkeleton from "../../skeleton/ChatWindowSkeleton";
 import EmptyChatWindow from "./EmptyChatWindow";
 import { selectedChatState } from "../../recoil/atoms/chatAtom";
 import { userAtom } from "../../recoil/atoms/userAtom";
@@ -22,15 +21,17 @@ export default function ChatWindow({ onBack }: ChatWindowProps) {
   const user = useRecoilValue(userAtom);
   const [messages, setMessages] = useState<Messages[]>([]);
   const [messagesCache, setMessagesCache] = useRecoilState(messagesCacheAtom);
-  const [loading, setLoading] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [hasLeftGroup, setHasLeftGroup] = useState(false);
   const [bell] = useRecoilState(bellStateAtom);
+  const [isInitialLoading, setIsInitialLoading] = useState(false);
 
   const limit = 30;
   const tingAudioRef = useRef<HTMLAudioElement | null>(null);
   const loadedCountRef = useRef<{ [key: string]: number }>({});
+  const loadingStartRef = useRef<number | null>(null);
+  const loadingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const conversationKey = selectedChat
     ? selectedChat.group_id &&
@@ -38,10 +39,43 @@ export default function ChatWindow({ onBack }: ChatWindowProps) {
       ? `group_${selectedChat.group_id}`
       : `user_${selectedChat.user_id}`
     : "";
+  const cachedMessages = conversationKey
+    ? messagesCache[conversationKey]
+    : undefined;
+
+  const beginInitialLoading = useCallback(() => {
+    if (loadingTimeoutRef.current) {
+      clearTimeout(loadingTimeoutRef.current);
+      loadingTimeoutRef.current = null;
+    }
+    loadingStartRef.current = Date.now();
+    setIsInitialLoading(true);
+  }, []);
+
+  const finishInitialLoading = useCallback(() => {
+    const start = loadingStartRef.current;
+    const elapsed = start ? Date.now() - start : 0;
+    const remaining = Math.max(0, 1000 - elapsed);
+
+    if (loadingTimeoutRef.current) {
+      clearTimeout(loadingTimeoutRef.current);
+    }
+
+    loadingTimeoutRef.current = setTimeout(() => {
+      setIsInitialLoading(false);
+      loadingTimeoutRef.current = null;
+    }, remaining);
+  }, []);
 
   // Preload âm thanh
   useEffect(() => {
     tingAudioRef.current = new Audio("/assets/ting.mp3");
+
+    return () => {
+      if (loadingTimeoutRef.current) {
+        clearTimeout(loadingTimeoutRef.current);
+      }
+    };
   }, []);
 
   const playNotificationSound = useCallback(() => {
@@ -59,11 +93,12 @@ export default function ChatWindow({ onBack }: ChatWindowProps) {
     if (messagesCache[conversationKey]?.length) {
       setMessages(messagesCache[conversationKey]);
       setHasMore(messagesCache[conversationKey].length >= limit);
+      setIsInitialLoading(false);
       return;
     }
 
     try {
-      setLoading(true);
+      beginInitialLoading();
       const res = await messageAPI.getMessage(
         selectedChat?.user_id ?? "",
         selectedChat?.group_id ?? "",
@@ -85,7 +120,7 @@ export default function ChatWindow({ onBack }: ChatWindowProps) {
     } catch (err) {
       console.error("❌ Lỗi khi tải tin nhắn:", err);
     } finally {
-      setLoading(false);
+      finishInitialLoading();
     }
   }, [
     user?.data.id,
@@ -93,14 +128,31 @@ export default function ChatWindow({ onBack }: ChatWindowProps) {
     conversationKey,
     messagesCache,
     setMessagesCache,
+    beginInitialLoading,
+    finishInitialLoading,
   ]);
 
   // Reset messages when selected chat changes
   useEffect(() => {
-    setMessages([]);
+    if (!selectedChat) {
+      setMessages([]);
+      setHasMore(true);
+      setHasLeftGroup(false);
+      setIsInitialLoading(false);
+      return;
+    }
+
+    if (cachedMessages?.length) {
+      setMessages(cachedMessages);
+      setIsInitialLoading(false);
+    } else {
+      setMessages([]);
+      beginInitialLoading();
+    }
+
     setHasMore(true);
     setHasLeftGroup(false);
-  }, [selectedChat]);
+  }, [selectedChat, cachedMessages, beginInitialLoading]);
 
   useEffect(() => {
     fetchMessages();
@@ -280,8 +332,6 @@ export default function ChatWindow({ onBack }: ChatWindowProps) {
   }, [messages, selectedChat, user?.data.id]);
 
   if (!selectedChat) return <EmptyChatWindow />;
-  if (loading && !messagesCache[conversationKey]?.length)
-    return <ChatWindowSkeleton />;
 
   return (
     <div className="flex flex-col w-full h-full max-h-screen bg-[#f5f7fb] text-[#1c2333]">
@@ -298,6 +348,7 @@ export default function ChatWindow({ onBack }: ChatWindowProps) {
         messages={messages}
         loadMoreMessages={loadMoreMessages}
         isLoadingMore={isLoadingMore}
+        isInitialLoading={isInitialLoading}
       />
       <ChatInputWindow
         user_id={user?.data.id || ""}
