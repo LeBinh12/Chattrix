@@ -203,7 +203,7 @@ export default function LoginScreen() {
             <button
               type="button"
               onClick={handleOpenDictLogin}
-              className="w-full rounded-md bg-[#222] text-white py-2 hover:bg-[#444] transition"
+              className="w-full rounded-md bg-brand-600 text-white py-2 hover:bg-brand-700 transition"
             >
               Đăng nhập bằng OpenDict
             </button>
@@ -224,7 +224,7 @@ export default function LoginScreen() {
           Chưa có tài khoản?{" "}
           <button
             type="button"
-            className="text-blue-500 hover:underline"
+            className="text-brand-600 hover:underline"
             onClick={() => navigate("/register")}
           >
             Đăng ký ngay

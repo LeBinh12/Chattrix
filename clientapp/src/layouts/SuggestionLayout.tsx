@@ -7,7 +7,7 @@ export default function SuggestionLayout() {
     <>
       <Header />
 
-      <main className="h-screen w-full relative overflow-hidden bg-gradient-to-br from-[#2665b1] to-blue-400">
+      <main className="h-screen w-full relative overflow-hidden bg-gradient-to-br from-brand-700 to-brand-500">
         {/* Nội dung */}
         <div className="relative flex flex-col items-center justify-center h-full px-4">
           {/* Tiêu đề Chattrix */}

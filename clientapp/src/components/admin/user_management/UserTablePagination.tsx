@@ -27,7 +27,7 @@ export default function UserTablePagination({
         <motion.button
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg font-medium shadow-lg"
+          className="px-4 py-2 bg-brand-600 text-white rounded-lg font-medium shadow-lg"
         >
           1
         </motion.button>

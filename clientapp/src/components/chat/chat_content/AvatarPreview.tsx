@@ -32,6 +32,10 @@ export default function AvatarPreview({
         style={{ width: size, height: size, minWidth: size, minHeight: size }}
         loading="lazy"
         draggable={false}
+        onError={(e) => {
+          e.currentTarget.onerror = null;
+          e.currentTarget.src = "/assets/logo.png";
+        }}
       />
     </button>
   );

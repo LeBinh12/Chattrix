@@ -19,31 +19,31 @@ export default function RecentMediaSection({
 }: RecentMediaSectionProps) {
   return (
     <div>
-      <div className="flex items-center justify-between mb-3">
-        <h4 className="text-sm font-semibold text-blue-100 flex items-center gap-2">
+      <div className="flex items-center justify-between mb-2">
+        <h4 className="text-[13px] font-semibold text-[#1f2a44] flex items-center gap-2">
           <Image size={18} />
           Ảnh/Video ({mediaItems.length})
         </h4>
         {mediaItems.length > 8 && (
-          <button className="text-xs text-blue-300 hover:text-blue-200 hover:underline transition">
+          <button className="text-[11px] text-[#4f6eda] hover:text-[#1f2a44] underline transition">
             Xem tất cả
           </button>
         )}
       </div>
 
       {mediaItems.length > 0 ? (
-        <div className="grid grid-cols-4 gap-2">
+        <div className="grid grid-cols-4 gap-1.5">
           {mediaItems.slice(0, 8).map((media, index) => (
             <div
               key={media.id}
               onClick={() => onMediaClick(index)}
-              className="relative aspect-square rounded-lg overflow-hidden bg-blue-950/50 cursor-pointer hover:opacity-80 hover:ring-2 hover:ring-blue-400/50 transition group flex items-center justify-center border border-gray-600"
+              className="relative aspect-square rounded-2xl overflow-hidden bg-[#f0f3fb] cursor-pointer hover:ring-2 hover:ring-[#94b5ff] transition group flex items-center justify-center border border-transparent"
             >
               {media.type === "video" ? (
                 <>
-                  <div className="absolute inset-0 bg-blue-950/80 backdrop-blur-sm"></div>
-                  <div className="relative z-10 flex items-center justify-center">
-                    <Play size={30} className="text-blue-300" />
+                  <div className="absolute inset-0 bg-black/30"></div>
+                  <div className="relative z-10 flex items-center justify-center text-white">
+                    <Play size={24} />
                   </div>
                 </>
               ) : (
@@ -57,7 +57,7 @@ export default function RecentMediaSection({
           ))}
         </div>
       ) : (
-        <p className="text-xs text-blue-300/60 text-center py-4">
+        <p className="text-xs text-[#9ba6c4] text-center py-4">
           Chưa có ảnh/video nào
         </p>
       )}

@@ -109,7 +109,7 @@ export default function ChatContent({
       <div
         ref={containerRef}
         onScroll={handleScroll}
-        className="relative flex-1 p-3 overflow-y-auto bg-gradient-to-b from-[#2665b1]
+        className="relative flex-1 p-3 overflow-y-auto bg-gradient-to-b from-brand-700
                 scrollbar-thin scrollbar-thumb-purple-400 scrollbar-track-transparent"
       >
         {isLoadingMore && (
@@ -152,7 +152,7 @@ export default function ChatContent({
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 40 }}
             transition={{ duration: 0.3 }}
-            className="absolute left-1/2 -translate-x-1/2 bottom-24 bg-[#2665b1] hover:bg-[#1b4c8a] text-white rounded-full shadow-lg p-3 backdrop-blur-sm transition"
+            className="absolute left-1/2 -translate-x-1/2 bottom-24 bg-brand-600 hover:bg-brand-700 text-white rounded-full shadow-lg p-3 backdrop-blur-sm transition"
           >
             <ChevronDown className="w-5 h-5" />
           </motion.button>

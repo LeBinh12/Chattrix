@@ -109,7 +109,7 @@ export default function UserTable({ users }: Props) {
                     <motion.button
                       whileHover={{ scale: 1.2, rotate: 5 }}
                       whileTap={{ scale: 0.9 }}
-                      className="text-blue-600 hover:text-blue-900 p-2 rounded-lg hover:bg-blue-50 transition-colors"
+                      className="text-brand-600 hover:text-brand-900 p-2 rounded-lg hover:bg-brand-50 transition-colors"
                       title="Xem chi tiết"
                     >
                       <Eye size={18} />

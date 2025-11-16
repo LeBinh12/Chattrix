@@ -36,9 +36,9 @@ export default function DashboardOverview() {
           {
             label: "Tổng người dùng",
             value: "1,234",
-            icon: <Users className="w-8 h-8 text-blue-600" />,
-            bgColor: "bg-blue-50",
-            textColor: "text-blue-600",
+            icon: <Users className="w-8 h-8 text-brand-600" />,
+            bgColor: "bg-brand-50",
+            textColor: "text-brand-600",
           },
           {
             label: "Tin nhắn hôm nay",

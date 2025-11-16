@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useRecoilState, useRecoilValue } from "recoil";
-import { Bell, BellOff, UserPlus } from "lucide-react";
+import { Bell, BellOff, UserPlus, X } from "lucide-react";
 import { bellStateAtom } from "../../../recoil/atoms/bellAtom";
 import { selectedChatState } from "../../../recoil/atoms/chatAtom";
 import { userApi } from "../../../api/userApi";
@@ -8,6 +8,7 @@ import { toast } from "react-toastify";
 import { userAtom } from "../../../recoil/atoms/userAtom";
 import { API_ENDPOINTS } from "../../../config/api";
 import AddMemberModal from "../../group/AddMemberModal";
+import { chatInfoPanelVisibleAtom } from "../../../recoil/atoms/uiAtom";
 
 interface ChatInfoHeaderProps {
   avatar: string;
@@ -28,6 +29,7 @@ export default function ChatInfoHeader({
   const selectedChat = useRecoilValue(selectedChatState);
   const [loading, setLoading] = useState(false);
   const user = useRecoilValue(userAtom);
+  const [isPanelVisible, setPanelVisible] = useRecoilState(chatInfoPanelVisibleAtom);
 
   useEffect(() => {
     (async () => {
@@ -144,51 +146,65 @@ export default function ChatInfoHeader({
   }
   return (
     <>
-      <div className="flex flex-col items-center py-6 px-4 border-b border-blue-700/30 relative z-10">
-        <div className="w-20 h-20 rounded-full overflow-hidden mb-3 border-2 border-blue-400/50 ring-2 ring-blue-500/20">
+      <div className="flex flex-col items-center py-5 px-4 gap-3 bg-white text-sm relative">
+        {/* Nút đóng trên mobile */}
+        <button
+          onClick={() => setPanelVisible(false)}
+          className="absolute top-3 right-3 lg:hidden w-8 h-8 rounded-full border border-[#e1e7fb] text-[#4f5f87] hover:bg-[#f4f6fb] transition flex items-center justify-center"
+          title="Đóng"
+        >
+          <X size={18} />
+        </button>
+
+        <div className="w-20 h-20 rounded-2xl overflow-hidden border-2 border-[#e1e7fb] shadow-inner">
           <img
             src={avatarUrl}
             alt={displayName}
             className="w-full h-full object-cover"
+            onError={(e) => {
+              e.currentTarget.onerror = null;
+              e.currentTarget.src = "/assets/logo.png";
+            }}
           />
         </div>
 
-        <h3 className="font-semibold text-lg text-white">{displayName}</h3>
+        <div className="text-center space-y-1">
+          <h3 className="font-semibold text-sm text-[#1f2a44]">
+            {displayName}
+          </h3>
+          {!isGroup && status && (
+            <span className="text-[11px] text-[#7f89a6]">
+              {status === "online" ? "Đang hoạt động" : "Không hoạt động"}
+            </span>
+          )}
+        </div>
 
-        {!isGroup && status && (
-          <span className="text-xs text-blue-200 mt-1">
-            {status === "online" ? "Đang hoạt động" : "Không hoạt động"}
-          </span>
-        )}
-
-        <div className="mt-4 flex items-center gap-3">
-          {/* Icon chuông */}
+        <div className="flex items-center gap-2">
           <button
-            className="p-2 rounded-full bg-blue-800/40 hover:bg-blue-700/60 transition-colors backdrop-blur-sm"
+            className="w-9 h-9 rounded-full border border-[#e1e7fb] text-[#4f5f87] hover:bg-[#f4f6fb] transition"
             onClick={handleBellClick}
             title={bell?.is_muted ? "Bật thông báo" : "Tắt thông báo"}
           >
             {bell?.is_muted ? (
-              <BellOff className="w-6 h-6 text-blue-300" />
+              <BellOff className="w-4 h-4 mx-auto" />
             ) : (
-              <Bell className="w-6 h-6 text-blue-300" />
+              <Bell className="w-4 h-4 mx-auto" />
             )}
           </button>
 
-          {/* Icon thêm thành viên – chỉ hiện trong group */}
           {isGroup && (
             <button
-              className="p-2 rounded-full bg-blue-800/40 hover:bg-blue-700/60 transition-colors backdrop-blur-sm"
+              className="w-9 h-9 rounded-full border border-[#e1e7fb] text-[#4f5f87] hover:bg-[#f4f6fb] transition"
               onClick={() => setShowAddMemberModal(true)}
               title="Thêm thành viên"
             >
-              <UserPlus className="w-6 h-6 text-blue-300" />
+              <UserPlus className="w-4 h-4 mx-auto" />
             </button>
           )}
         </div>
 
         {bell?.is_muted && (
-          <span className="text-xs text-blue-300 mt-2">Đã tắt thông báo</span>
+          <span className="text-[11px] text-[#7f89a6]">Đã tắt thông báo</span>
         )}
       </div>
 

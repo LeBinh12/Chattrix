@@ -100,7 +100,7 @@ export default function ChatWidget() {
             {/* Body */}
             <div
               className="flex-1 overflow-y-auto 
-                bg-gradient-to-b from-[#2665b1] 
+                bg-gradient-to-b from-brand-600 
                 scrollbar-thin scrollbar-thumb-purple-400 scrollbar-track-transparent"
             >
               {selectedChat ? (

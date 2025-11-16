@@ -28,14 +28,14 @@ export default function UserManagementFilters({
             placeholder="Tìm kiếm theo tên, email..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-blue-500 transition-all"
+            className="w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-brand-500 transition-all"
           />
         </div>
         <motion.select
           whileFocus={{ scale: 1.02 }}
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
-          className="px-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-blue-500 transition-all"
+          className="px-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-brand-500 transition-all"
         >
           <option value="all">Tất cả trạng thái</option>
           <option value="active">Hoạt động</option>

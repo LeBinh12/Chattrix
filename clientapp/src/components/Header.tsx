@@ -26,7 +26,7 @@ export default function Header() {
 
   return (
     <>
-      <header className="fixed top-0 left-0 right-0 bg-white/10 backdrop-blur-md shadow-lg z-50">
+      <header className="fixed top-0 left-0 right-0 bg-white border-b border-line shadow-sm z-50">
         <div className="max-w-7xl mx-auto flex justify-between items-center px-6 py-2">
           {/* Logo */}
           <div className="flex items-center gap-2">
@@ -36,9 +36,7 @@ export default function Header() {
                 alt="Chattrix Logo"
                 className="w-24 h-24 sm:w-20 sm:h-20 object-contain drop-shadow-md"
               />
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-cyan-300 font-bold text-lg">
-                Chattrix
-              </span>
+              <span className="text-gray-900 font-bold text-lg">Chattrix</span>
             </Link>
           </div>
 
@@ -46,7 +44,7 @@ export default function Header() {
           <div className="relative">
             <button
               onClick={() => setOpen(!open)}
-              className="flex items-center gap-2 bg-[#4490f4] px-3 py-2 rounded-full hover:bg-[#005be2] transition shadow-sm"
+              className="flex items-center gap-2 bg-white border border-line px-3 py-2 rounded-full hover:bg-gray-50 transition shadow-sm"
             >
               <img
                 src={
@@ -57,10 +55,10 @@ export default function Header() {
                     : "/assets/logo.png"
                 }
                 alt={user?.data?.username || "User avatar"}
-                className="w-10 h-10 rounded-full border border-white/30 object-cover"
+                className="w-10 h-10 rounded-full border border-line object-cover"
               />
 
-              <span className="text-white font-medium hidden sm:block">
+              <span className="text-gray-900 font-medium hidden sm:block">
                 {user?.data.username}
               </span>
             </button>
@@ -72,7 +70,7 @@ export default function Header() {
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -10 }}
                   transition={{ duration: 0.2 }}
-                  className="absolute right-0 mt-2 w-40 bg-white/90 backdrop-blur-md rounded-xl shadow-lg overflow-hidden"
+                  className="absolute right-0 mt-2 w-40 bg-white rounded-xl shadow-lg border border-line overflow-hidden"
                 >
                   <button
                     onClick={handleLogout}

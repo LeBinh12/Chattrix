@@ -10,7 +10,7 @@ type Props = {
 
 export default function ChatHeader({ onUser, onBack }: Props) {
   return (
-    <div className="flex items-center p-5 bg-[#2665b1] text-white">
+    <div className="flex items-center p-5 bg-brand-600 text-white">
       <motion.div whileHover={{ scale: 1.2 }} whileTap={{ scale: 0.8 }}>
         <button
           onClick={onBack}

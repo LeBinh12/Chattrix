@@ -2,7 +2,7 @@ import { Outlet } from "react-router-dom";
 
 export default function AuthLayout() {
   return (
-    <main className="h-screen w-full relative overflow-hidden bg-gradient-to-br from-[#2665b1] to-blue-400">
+    <main className="h-screen w-full relative overflow-hidden bg-gradient-to-br from-brand-700 to-brand-500">
       <img
         src="/assets/logo.png"
         alt="Chattrix Logo"

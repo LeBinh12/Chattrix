@@ -27,18 +27,22 @@ const UserAvatar: React.FC<UserAvatarProps> = ({
           src={avatarUrl}
           alt="User Avatar"
           className="w-full h-full object-cover"
+          onError={(e) => {
+            e.currentTarget.onerror = null;
+            e.currentTarget.src = "/assets/logo.png";
+          }}
         />
       </div>
 
       {/* Status dot với animation */}
       {isOnline ? (
         <span
-          className="absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full border-2 border-[#2b5dc0] bg-green-500"
+          className="absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full border-2 border-brand-700 bg-green-500"
           title="Đang hoạt động"
         />
       ) : (
         <span
-          className="absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full border-2 border-[#2b5dc0] bg-gray-400"
+          className="absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full border-2 border-brand-700 bg-gray-400"
           title="Đang hoạt động"
         />
       )}

@@ -1,7 +1,7 @@
 import { motion, AnimatePresence } from "framer-motion";
 import type { Messages } from "../../../types/Message";
 import { useEffect, useRef, useState } from "react";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, MessageCircle } from "lucide-react";
 import MessageItem from "../../chat/chat_content/MessageItem";
 import MediaPreview from "../../chat/chat_content/MediaPreview";
 
@@ -130,27 +130,13 @@ export default function ChatContentWindow({
 
   return (
     <>
-      {/* Logo mờ giữa */}
-      <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-1">
-        <img
-          src="/assets/logo.png"
-          alt="logo"
-          className="opacity-10 w-40 h-40 sm:w-52 sm:h-52 object-contain select-none"
-        />
-      </div>
-
       <div
         ref={containerRef}
         onScroll={handleScroll}
-        className="
-                  relative flex-1 p-3 overflow-y-auto 
-                  bg-[#003ea3] to-blue-100/60
-                  scrollbar-thin scrollbar-thumb-blue-400 scrollbar-track-blue-100/50
-                  transition-colors
-                "
+        className="relative flex-1 min-h-0 px-3 sm:px-6 py-3 sm:py-4 overflow-y-auto bg-[#f5f7fb] scrollbar-thin scrollbar-thumb-[#cdd6eb] scrollbar-track-transparent transition-colors"
       >
         {isLoadingMore && (
-          <div className="text-center text-blue-600 py-2">
+          <div className="text-center text-[#5a7de1] py-2">
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -159,9 +145,9 @@ export default function ChatContentWindow({
               <motion.div
                 animate={{ rotate: 360 }}
                 transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full"
+                className="w-4 h-4 border-2 border-brand-500 border-t-transparent rounded-full"
               />
-              <span className="text-blue-700 font-medium">
+              <span className="text-brand-700 font-medium">
                 Đang tải thêm...
               </span>
             </motion.div>
@@ -175,15 +161,17 @@ export default function ChatContentWindow({
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.9 }}
-                className="flex flex-col items-center justify-center h-full space-y-4"
+                className="flex flex-col items-center justify-center h-full space-y-3 text-center py-16"
               >
-                <div className="text-center space-y-2">
-                  <div className="text-blue-900 text-lg font-medium">
-                    Chưa có tin nhắn nào với {display_name}
-                  </div>
-                  <div className="text-blue-600 text-sm">
-                    Hãy bắt đầu cuộc trò chuyện bằng cách gửi tin nhắn đầu tiên
-                  </div>
+                <div className="w-16 h-16 rounded-2xl bg-white border border-[#e4e8f1] shadow-inner flex items-center justify-center text-[#5a7de1]">
+                  <MessageCircle size={24} />
+                </div>
+                <div className="text-gray-700 text-sm font-semibold">
+                  Chưa có tin nhắn nào
+                </div>
+                <div className="text-gray-500 text-xs w-3/4">
+                  Hãy bắt đầu cuộc trò chuyện với {display_name} và những tin
+                  nhắn sẽ xuất hiện tại đây.
                 </div>
               </motion.div>
             ) : (
@@ -204,8 +192,8 @@ export default function ChatContentWindow({
                       transition={{ duration: 2, ease: "easeInOut" }}
                       className={`absolute inset-0 rounded-2xl pointer-events-none z-0 ${
                         msg.sender_id === currentUserId
-                          ? "bg-blue-400"
-                          : "bg-blue-300"
+                          ? "bg-[#bcd5ff]/40"
+                          : "bg-[#d4dded]/50"
                       }`}
                     />
                   )}
@@ -240,13 +228,13 @@ export default function ChatContentWindow({
               stiffness: 400,
               damping: 25,
             }}
-            className="absolute left-1/2 -translate-x-1/2 bottom-40 bg-gradient-to-br from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white rounded-full shadow-lg p-3 backdrop-blur-sm z-20 ring-2 ring-blue-300/50"
+            className="absolute left-1/2 -translate-x-1/2 bottom-16 sm:bottom-24 bg-white text-[#2754d7] rounded-full shadow-xl p-2 sm:p-2.5 z-20 border border-[#c7d5f6]"
           >
             <motion.div
               animate={{ y: [0, 3, 0] }}
               transition={{ duration: 1, repeat: Infinity }}
             >
-              <ChevronDown className="w-5 h-5" />
+              <ChevronDown className="w-4 h-4 sm:w-5 sm:h-5" />
             </motion.div>
           </motion.button>
         )}

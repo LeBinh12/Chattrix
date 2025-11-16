@@ -11,7 +11,7 @@ export default function AuthDateInput({ label }: { label: string }) {
       <DatePicker
         selected={date}
         onChange={(d: Date | null) => setDate(d)}
-        className="border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#2665b1] focus:border-[#2665b1] transition w-full"
+        className="border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-600 focus:border-brand-600 transition w-full"
         dateFormat="dd/MM/yyyy"
         placeholderText="Chọn ngày"
       />

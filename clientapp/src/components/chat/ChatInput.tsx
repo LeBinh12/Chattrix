@@ -141,7 +141,7 @@ export default function ChatInput({ senderID, receiverID }: any) {
                 {/* Loading overlay với % */}
                 {fileUploading && (
                   <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/50 text-white text-xs">
-                    <div className="w-12 h-12 border-4 border-t-blue-500 border-gray-200 rounded-full animate-spin mb-1"></div>
+                    <div className="w-12 h-12 border-4 border-t-brand-500 border-gray-200 rounded-full animate-spin mb-1"></div>
                     <div>{progress[index] ?? 0}%</div>
                   </div>
                 )}

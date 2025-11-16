@@ -1,11 +1,11 @@
 import {
   Check,
   CheckCheck,
+  Download,
   Eye,
   FileText,
-  Download,
-  Play,
   MoreVertical,
+  Play,
   Smile,
   Trash,
 } from "lucide-react";
@@ -14,9 +14,14 @@ import type { Messages } from "../../../types/Message";
 import AvatarPreview from "./AvatarPreview";
 import { EditorContent, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { API_ENDPOINTS } from "../../../config/api";
 import { socketManager } from "../../../api/socket";
+
+type StatusConfig = {
+  icon: typeof Check;
+  label: string;
+};
 
 type Props = {
   msg: Messages;
@@ -28,10 +33,15 @@ type Props = {
   size?: "small" | "large";
 };
 
+const statusMap: Record<string, StatusConfig> = {
+  sent: { icon: Check, label: "Đã gửi" },
+  delivered: { icon: CheckCheck, label: "Đã nhận" },
+  received: { icon: CheckCheck, label: "Đã nhận" },
+  seen: { icon: Eye, label: "Đã xem" },
+};
+
 export default function MessageItem({
   msg,
-  index,
-  messages,
   currentUserId,
   onPreviewMedia,
   display_name,
@@ -47,155 +57,135 @@ export default function MessageItem({
     editable: false,
   });
 
-  // Format thời gian
-  const formatTime = (dateString: string) => {
-    const date = new Date(dateString);
-    const hours = date.getHours().toString().padStart(2, "0");
-    const minutes = date.getMinutes().toString().padStart(2, "0");
-    return `${hours}:${minutes}`;
-  };
+  const mediaItems = useMemo(
+    () =>
+      (msg.media_ids || []).filter(
+        (m) => m.type === "image" || m.type === "video"
+      ),
+    [msg.media_ids]
+  );
 
-  // xóa tin nhắn
+  const fileItems = useMemo(
+    () => (msg.media_ids || []).filter((m) => m.type === "file"),
+    [msg.media_ids]
+  );
+
   const onDeleteMessage = (messageId: string) => {
     socketManager.sendDeleteMessageForMe(currentUserId ?? "", [messageId]);
   };
 
-  // Xử lý báo cáo
+  const formatTime = (dateString: string) => {
+    const date = new Date(dateString);
+    return `${date.getHours().toString().padStart(2, "0")}:${date
+      .getMinutes()
+      .toString()
+      .padStart(2, "0")}`;
+  };
+
   const handleReport = () => {
-    // TODO: Implement report functionality
-    console.log("Báo cáo tin nhắn:", msg.id);
     alert(`Đã báo cáo tin nhắn từ ${display_name}`);
     setShowReportMenu(false);
   };
 
-  // Xử lý react emoji
   const handleReact = () => {
-    // TODO: Implement emoji reaction functionality
     console.log("React tin nhắn:", msg.id);
   };
 
-  // Tin nhắn hệ thống
   if (msg.type === "system") {
     return (
-      <AnimatePresence initial={false}>
-        <motion.div
-          key={msg.id}
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          exit={{ opacity: 0, scale: 0.95 }}
-          transition={{ duration: 0.2 }}
-          className={`flex justify-center ${
-            size === "small" ? "my-2" : "my-3"
-          }`}
-        >
-          <div
-            className={`bg-gray-100 text-gray-600 px-4 py-2 rounded-full text-center shadow-sm ${
-              size === "small" ? "text-xs px-3 py-1" : "text-sm"
-            }`}
-          >
-            <span className="font-medium">{msg.content}</span>
-          </div>
-        </motion.div>
-      </AnimatePresence>
+      <motion.div
+        key={msg.id}
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.95 }}
+        className="flex justify-center my-4"
+      >
+        <div className="px-4 py-2 rounded-full bg-white border border-[#e4e8f1] text-xs text-[#707b97] shadow-sm">
+          {msg.content}
+        </div>
+      </motion.div>
     );
   }
 
-  const renderFiles = () =>
-    msg.media_ids
-      .filter((m) => m.type === "file")
-      .map((media) => {
-        const mediaUrl = `http://localhost:3000/v1/upload/media/${media.url}`;
-        return (
-          <div
-            key={media.url}
-            className={`flex flex-col sm:flex-row sm:items-center justify-between 
-              bg-[#8b5cf6] text-white p-2 rounded-md shadow z-2
-              ${size === "small" ? "text-xs p-1" : "text-sm"} 
-              gap-2 sm:gap-0 w-full max-w-full`}
-          >
-            <div className="flex items-center space-x-2 w-full sm:w-auto flex-1 min-w-0">
-              <FileText className="w-5 h-5 text-white flex-shrink-0" />
-              <div className="flex flex-col flex-1 min-w-0">
-                <span className="font-medium truncate">{media.filename}</span>
-                <span className="text-xs text-purple-100">
-                  {Math.round(media.size / 1024)} KB
-                </span>
-              </div>
-            </div>
+  const bubbleStyles = isMine
+    ? "bg-[#dfe8ff] border-[#c5d6ff] text-[#0f3d8c]"
+    : "bg-white border-[#e4e8f1] text-[#1f2a44]";
 
-            <a
-              href={mediaUrl}
-              download
-              className="flex items-center justify-center bg-purple-700 hover:bg-purple-800 
-               text-white px-2 py-1 rounded-md text-xs sm:text-sm 
-               transition w-full sm:w-auto"
-            >
-              <Download className="w-4 h-4 text-white mr-1" />
-              <span className="hidden sm:inline">Tải</span>
-            </a>
-          </div>
-        );
-      });
+  const statusInfo =
+    statusMap[(msg.status as keyof typeof statusMap) ?? "sent"] ||
+    statusMap.sent;
 
-  const renderImagesAndVideos = () => {
-    const medias = msg.media_ids.filter(
-      (m) => m.type === "image" || m.type === "video"
-    );
-    if (!medias.length) return null;
-
+  const renderMedia = () => {
+    if (!mediaItems.length) return null;
     return (
       <div
-        className={`grid gap-2 ${
-          medias.length === 1 ? "grid-cols-1" : "grid-cols-2"
-        } ${size === "small" ? "gap-1" : ""}`}
+        className={`grid gap-2 mt-3 ${
+          mediaItems.length === 1 ? "grid-cols-1" : "grid-cols-2"
+        }`}
       >
-        {medias.map((media) => {
+        {mediaItems.map((media) => {
           const mediaUrl =
             media.type === "video"
               ? `${API_ENDPOINTS.STREAM_MEDIA}/${media.id}`
               : `${API_ENDPOINTS.UPLOAD_MEDIA}/${media.url}`;
-
           return (
             <div
-              key={media.url}
-              className={`relative rounded-md overflow-hidden cursor-pointer group ${
-                size === "small" ? "h-20" : "h-32"
-              }`}
+              key={media.id}
+              className="relative rounded-2xl overflow-hidden bg-black/10 cursor-pointer group h-32"
               onClick={() => onPreviewMedia(mediaUrl)}
             >
               {media.type === "video" ? (
-                // Video thumbnail với play icon
-                <div className="relative w-full h-full bg-black flex items-center justify-center">
-                  {/* Video element để lấy thumbnail (không play) */}
+                <>
                   <video
                     src={mediaUrl}
-                    className="w-full h-full object-cover"
-                    preload="metadata"
+                    className="w-full h-full object-cover opacity-80"
                     muted
+                    preload="metadata"
                   />
-                  {/* Play overlay */}
-                  <div className="absolute inset-0 bg-black/40 group-hover:bg-black/60 transition-colors flex items-center justify-center">
-                    <motion.div
-                      whileHover={{ scale: 1.2 }}
-                      className="bg-white/90 rounded-full p-3 shadow-lg"
-                    >
-                      <Play className="w-8 h-8 text-gray-900 fill-gray-900" />
-                    </motion.div>
+                  <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
+                    <Play className="w-8 h-8 text-white" />
                   </div>
-                  {/* Video duration badge (optional) */}
-                  <div className="absolute bottom-2 right-2 bg-black/70 text-white text-xs px-2 py-1 rounded">
-                    Video
-                  </div>
-                </div>
+                </>
               ) : (
-                // Image thumbnail
                 <img
                   src={mediaUrl}
                   alt={media.filename}
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform"
                 />
               )}
             </div>
+          );
+        })}
+      </div>
+    );
+  };
+
+  const renderFiles = () => {
+    if (!fileItems.length) return null;
+    return (
+      <div className="mt-3 space-y-2">
+        {fileItems.map((file) => {
+          const mediaUrl = `${API_ENDPOINTS.UPLOAD_MEDIA}/${file.url}`;
+          return (
+            <a
+              key={file.id}
+              href={mediaUrl}
+              download
+              className="flex items-center gap-3 p-3 rounded-2xl border border-[#dfe3ef] bg-white/70 hover:border-[#bfd1ff] transition"
+            >
+              <div className="w-10 h-10 rounded-xl bg-[#e6edff] text-[#4c6fd8] flex items-center justify-center">
+                <FileText className="w-5 h-5" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-[#1f2a44] truncate">
+                  {file.filename}
+                </p>
+                <p className="text-xs text-[#7e8aac]">
+                  {file.size ? `${Math.round(file.size / 1024)} KB` : ""}
+                </p>
+              </div>
+              <Download className="w-4 h-4 text-[#4c6fd8]" />
+            </a>
           );
         })}
       </div>
@@ -206,243 +196,120 @@ export default function MessageItem({
     <AnimatePresence initial={false}>
       <motion.div
         key={msg.id}
-        initial={{
-          opacity: 0,
-          y: 20,
-          scale: 0.9,
-          x: isMine ? 20 : -20,
-        }}
-        animate={{
-          opacity: 1,
-          y: 0,
-          scale: 1,
-          x: 0,
-        }}
-        exit={{
-          opacity: 0,
-          y: 20,
-          scale: 0.9,
-        }}
-        transition={{
-          type: "spring",
-          stiffness: 500,
-          damping: 30,
-          mass: 1,
-        }}
-        className={`flex z-2 ${size === "small" ? "mb-2" : "mb-4"} ${
-          isMine ? "flex-row-reverse" : "flex-row"
-        } group/message relative`}
+        initial={{ opacity: 0, y: 20, scale: 0.95 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: 10, scale: 0.95 }}
+        transition={{ type: "spring", stiffness: 400, damping: 30 }}
+        className={`flex gap-2.5 ${
+          isMine ? "justify-end" : "justify-start"
+        } relative`}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => {
           setIsHovered(false);
           setShowReportMenu(false);
         }}
       >
-        {/* Avatar */}
-        <motion.div
-          className="flex items-end mb-0.5"
-          initial={{ opacity: 0, scale: 0.5 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{
-            delay: 0.05,
-            type: "spring",
-            stiffness: 400,
-            damping: 20,
-          }}
-        >
+        {!isMine ? (
           <AvatarPreview
             src={
-              isMine
-                ? "/assets/logo.png"
-                : msg.sender_avatar && msg.sender_avatar !== "null"
-                ? `http://localhost:3000/v1/upload/media/${msg.sender_avatar}`
+              msg.sender_avatar && msg.sender_avatar !== "null"
+                ? `${API_ENDPOINTS.UPLOAD_MEDIA}/${msg.sender_avatar}`
                 : "/assets/logo.png"
             }
             alt={display_name}
-            size={size === "small" ? 32 : 36}
-            onClick={
-              !isMine && msg.sender_avatar && msg.sender_avatar !== "null"
-                ? () =>
-                    onPreviewMedia(
-                      `http://localhost:3000/v1/upload/media/${msg.sender_avatar}`
-                    )
-                : undefined
-            }
+            size={size === "small" ? 30 : 32}
           />
-        </motion.div>
+        ) : (
+          <div className="w-7" />
+        )}
 
-        {/* Message content */}
         <div
           className={`flex flex-col ${
-            isMine ? "items-end mr-2" : "items-start ml-2"
-          } relative`}
+            isMine ? "items-end" : "items-start"
+          } max-w-[68%] gap-1 relative`}
         >
-          {/* Hover Actions - Tin nhắn đối phương (bên phải tin nhắn) */}
-          <AnimatePresence>
-            {!isMine && isHovered && (
-              <motion.div
-                initial={{ opacity: 0, y: 5 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: 5 }}
-                transition={{ duration: 0.15 }}
-                className={`absolute ${
-                  size === "small" ? "-top-7" : "-top-9"
-                } right-0 flex items-center space-x-1.5 z-30`}
+          {/* Hover actions */}
+          {!isMine && isHovered && (
+            <motion.div
+              initial={{ opacity: 0, y: -5 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -5 }}
+              className="absolute -top-7 left-0 flex items-center gap-1.5 bg-white shadow border border-[#e6ebf5] px-2.5 py-1 rounded-full text-[11px]"
+            >
+              <button
+                onClick={handleReact}
+                className="text-[#5a6da8] hover:text-[#1f2a44] transition"
               >
-                {/* Icon mặt cười */}
-                <motion.button
-                  whileHover={{ scale: 1.1 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={handleReact}
-                  className="bg-white hover:bg-gray-50 rounded-full p-1.5 shadow-lg border border-gray-200 transition-colors"
-                  title="Thả cảm xúc"
+                <Smile className="w-4 h-4" />
+              </button>
+              <div className="relative">
+                <button
+                  onClick={() => setShowReportMenu((prev) => !prev)}
+                  className="text-[#5a6da8] hover:text-[#1f2a44] transition"
                 >
-                  <Smile className="w-4 h-4 text-gray-600" />
-                </motion.button>
-
-                {/* Icon 3 chấm với menu báo cáo */}
-                <div className="relative">
-                  <motion.button
-                    whileHover={{ scale: 1.1 }}
-                    whileTap={{ scale: 0.95 }}
-                    onClick={() => setShowReportMenu(!showReportMenu)}
-                    className="bg-white hover:bg-gray-50 rounded-full p-1.5 shadow-lg border border-gray-200 transition-colors"
-                    title="Tùy chọn"
-                  >
-                    <MoreVertical className="w-4 h-4 text-gray-600" />
-                  </motion.button>
-
-                  {/* Menu báo cáo */}
-                  <AnimatePresence>
-                    {showReportMenu && (
-                      <motion.div
-                        initial={{ opacity: 0, y: -10, scale: 0.95 }}
-                        animate={{ opacity: 1, y: 0, scale: 1 }}
-                        exit={{ opacity: 0, y: -10, scale: 0.95 }}
-                        transition={{ duration: 0.15 }}
-                        className="absolute top-full mt-1.5 right-0 bg-white rounded-lg shadow-xl border border-gray-200 py-1 min-w-[150px] z-50"
+                  <MoreVertical className="w-4 h-4" />
+                </button>
+                <AnimatePresence>
+                  {showReportMenu && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -5 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -5 }}
+                      className="absolute left-1/2 -translate-x-1/2 mt-2 bg-white border border-[#e4e8f1] rounded-xl shadow-xl text-xs text-red-500"
+                    >
+                      <button
+                        onClick={handleReport}
+                        className="px-3 py-1.5 hover:bg-red-50 rounded-xl w-full text-left"
                       >
-                        <button
-                          onClick={handleReport}
-                          className="w-full px-4 py-2.5 text-left text-sm text-red-600 hover:bg-red-50 transition-colors flex items-center space-x-2.5"
-                        >
-                          <span className="text-base">!</span>
-                          <span className="font-medium">Báo cáo</span>
-                        </button>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
+                        Báo cáo tin nhắn
+                      </button>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            </motion.div>
+          )}
 
-          {/* Hover Time - Tin nhắn của mình (bên trái tin nhắn) */}
-          <AnimatePresence>
-            {isMine && isHovered && (
-              <motion.div
-                initial={{ opacity: 0, y: 5 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: 5 }}
-                transition={{ duration: 0.15 }}
-                className={`absolute ${size === "small" ? "-top-6" : "-top-7"} 
-      left-0 right-0 flex justify-between items-center bg-gray-800/90 backdrop-blur-sm 
-      text-white text-xs px-2.5 py-1 rounded-md shadow-lg z-30`}
-              >
-                {/* Thời gian bên trái */}
-                <span>{formatTime(msg.created_at)}</span>
+          {isMine && isHovered && (
+            <motion.button
+              initial={{ opacity: 0, y: -6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              onClick={() => onDeleteMessage(msg.id)}
+              className="absolute -top-7 right-0 px-2.5 py-0.5 bg-white border border-[#f0d4d4] text-[#d24c4c] rounded-full text-[11px] shadow"
+            >
+              Xóa <Trash className="inline w-3.5 h-3.5 ml-1" />
+            </motion.button>
+          )}
 
-                {/* Nút xóa bên phải */}
-                <motion.button
-                  whileHover={{ scale: 1.1 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() => onDeleteMessage(msg.id)}
-                  className="flex items-center justify-center p-1 rounded-full hover:bg-red-600 transition-colors"
-                  title="Xóa tin nhắn"
-                >
-                  <Trash className="w-4 h-4 text-red-500" />
-                </motion.button>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          <motion.div
-            initial={{ scale: 0.8, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{
-              delay: 0.1,
-              type: "spring",
-              stiffness: 400,
-              damping: 25,
-            }}
-            className={`max-w-xs z-2 p-3 rounded-2xl shadow-md ${
-              isMine
-                ? "bg-gradient-to-br from-blue-500 to-indigo-600 text-white rounded-br-sm"
-                : "bg-white text-gray-800 rounded-bl-sm"
-            } ${size === "small" ? "p-2 max-w-[180px]" : ""}`}
+          <div
+            className={`px-3 py-2 rounded-[20px] border shadow-sm w-fit leading-5 ${bubbleStyles} ${
+              size === "small" ? "text-[12px]" : "text-[13px]"
+            }`}
           >
-            {/* Text content */}
             {msg.type !== "file" && editor && (
               <EditorContent
                 editor={editor}
-                className={`prose prose-sm ${
-                  isMine ? "text-white prose-invert" : "text-gray-800"
+                className={`prose prose-sm max-w-none text-[13px] ${
+                  isMine ? "text-[#0f3d8c]" : "text-[#1f2a44]"
                 }`}
               />
             )}
+            {renderMedia()}
+            {renderFiles()}
+          </div>
 
-            {/* File content */}
-            {msg.type === "file" && (
-              <div className="flex flex-col space-y-2">
-                {renderImagesAndVideos()}
-                {renderFiles()}
-                {msg.content && editor && (
-                  <EditorContent
-                    editor={editor}
-                    className={`prose prose-sm ${
-                      isMine ? "text-white prose-invert" : "text-gray-800"
-                    }`}
-                  />
+          <div className="flex items-center gap-1.5 text-[10px] text-[#8a94b3] pl-1 pr-1">
+            <span>{formatTime(msg.created_at)}</span>
+            {isMine && (
+              <span className="flex items-center gap-0.5">
+                {statusInfo.icon && (
+                  <statusInfo.icon className="w-3 h-3" />
                 )}
-              </div>
+                {statusInfo.label}
+              </span>
             )}
-          </motion.div>
-
-          {/* Status - chỉ hiện cho tin nhắn cuối của mình */}
-          {isMine && index === messages.length - 1 && (
-            <motion.div
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 }}
-              className={`flex items-center mt-1.5 space-x-1 text-xs rounded-full px-3 py-1 
-                ${
-                  msg.status === "seen"
-                    ? "bg-blue-100 text-gray-700 border border-purple-200"
-                    : msg.status === "delivered"
-                    ? "bg-green-100 text-green-700 border border-green-200"
-                    : "bg-gray-100 text-gray-600 border border-gray-200"
-                }`}
-            >
-              {msg.status === "sent" && (
-                <>
-                  <Check className="w-3.5 h-3.5" />
-                  <span>Đã gửi</span>
-                </>
-              )}
-              {msg.status === "delivered" && (
-                <>
-                  <CheckCheck className="w-3.5 h-3.5" />
-                  <span>Đã nhận</span>
-                </>
-              )}
-              {msg.status === "seen" && (
-                <>
-                  <Eye className="w-3.5 h-3.5" />
-                  <span>Đã xem</span>
-                </>
-              )}
-            </motion.div>
-          )}
+          </div>
         </div>
       </motion.div>
     </AnimatePresence>

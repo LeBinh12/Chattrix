@@ -11,7 +11,7 @@ export default function AuthInput({ label, ...props }: AuthInputProps) {
       <input
         {...props}
         className="border rounded-lg px-3 py-2 focus:outline-none 
-                   focus:ring-2 focus:ring-[#2665b1] focus:border-[#2665b1] 
+                  focus:ring-2 focus:ring-brand-600 focus:border-brand-600 
                    transition"
       />
     </div>

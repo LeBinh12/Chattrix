@@ -39,17 +39,12 @@ export default function ChannelListWrapper({
   return (
     <div
       ref={containerRef}
-      className="flex flex-col h-full rounded-tl-2xl bg-transparent text-black shadow-lg relative"
+      className="flex flex-col h-full bg-white text-gray-900 border-r border-[#e4e8f1] relative flex-shrink-0"
       style={{ width }}
     >
-      {/* Nội dung chính */}
-      <div className="flex-1 overflow-hidden rounded-tl-2xl rounded-tr-2xl border border-gray-400">
-        {children(width)}
-      </div>
-
-      {/* Thanh resize */}
+      <div className="flex-1 overflow-hidden">{children(width)}</div>
       <div
-        className="absolute top-0 right-0 h-full w-1 cursor-ew-resize bg-transparent hover:bg-white/30"
+        className="absolute top-0 right-0 h-full w-1 cursor-ew-resize bg-transparent hover:bg-brand-200/60"
         onMouseDown={() => setIsResizing(true)}
       />
     </div>

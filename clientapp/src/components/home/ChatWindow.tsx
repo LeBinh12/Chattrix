@@ -13,7 +13,11 @@ import type { Messages } from "../../types/Message";
 import { messageAPI } from "../../api/messageApi";
 import { socketManager } from "../../api/socket";
 
-export default function ChatWindow() {
+type ChatWindowProps = {
+  onBack?: () => void;
+};
+
+export default function ChatWindow({ onBack }: ChatWindowProps) {
   const selectedChat = useRecoilValue(selectedChatState);
   const user = useRecoilValue(userAtom);
   const [messages, setMessages] = useState<Messages[]>([]);
@@ -280,12 +284,13 @@ export default function ChatWindow() {
     return <ChatWindowSkeleton />;
 
   return (
-    <div className="flex flex-col flex-1 h-screen bg-transparent text-white z-1">
+    <div className="flex flex-col w-full h-full max-h-screen bg-[#f5f7fb] text-[#1c2333]">
       <ChatHeaderWindow
         avatar={selectedChat.avatar}
         display_name={selectedChat.display_name ?? "không tên"}
         status={selectedChat.status}
         update_at={selectedChat.update_at}
+        onBack={onBack}
       />
       <ChatContentWindow
         display_name={selectedChat.display_name ?? "không tên"}

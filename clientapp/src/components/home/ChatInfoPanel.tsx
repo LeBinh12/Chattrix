@@ -42,12 +42,12 @@ export default function ChatInfoPanel() {
       <motion.div
         initial={{ x: 200, opacity: 0 }}
         animate={{ x: 0, opacity: 1 }}
-        className="bg-gradient-to-br from-[#1e3a8a] via-[#1e40af] to-[#2563eb] w-80 h-screen flex items-center justify-center shadow-2xl"
+        className="bg-white w-full lg:w-80 h-full flex items-center justify-center border-l border-[#e3e8f2]"
       >
-        <div className="text-center px-6">
-          <div className="w-16 h-16 bg-blue-700/50 backdrop-blur-sm rounded-full mx-auto mb-4 flex items-center justify-center ring-2 ring-blue-500/30">
+        <div className="text-center px-6 space-y-3 text-[#7d89a8]">
+          <div className="w-16 h-16 bg-[#eef2fb] rounded-2xl mx-auto flex items-center justify-center text-[#5a7de1]">
             <svg
-              className="w-8 h-8 text-blue-300"
+              className="w-8 h-8"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -60,12 +60,10 @@ export default function ChatInfoPanel() {
               />
             </svg>
           </div>
-          <p className="text-blue-100 text-sm font-medium">
+          <p className="text-sm font-semibold text-[#2e3a59]">
             Chọn một cuộc trò chuyện
           </p>
-          <p className="text-blue-300/60 text-xs mt-1">
-            Để xem thông tin chi tiết
-          </p>
+          <p className="text-xs">Để xem thông tin chi tiết</p>
         </div>
       </motion.div>
     );
@@ -79,10 +77,9 @@ export default function ChatInfoPanel() {
         initial={{ x: 200, opacity: 0 }}
         animate={{ x: 0, opacity: 1 }}
         transition={{ type: "spring", stiffness: 70, damping: 15 }}
-        className="bg-[#003ea3] w-80 h-screen  flex flex-col rounded-tl-2xl rounded-tr-2xl border border-gray-400 shadow-2xl overflow-y-auto scrollbar-thin scrollbar-thumb-blue-600 scrollbar-track-blue-900/20"
+        className="bg-white w-full lg:w-80 h-full flex flex-col overflow-y-auto border-l border-[#e3e8f2] scrollbar-thin scrollbar-thumb-[#d4dbef]"
       >
-        {/* Header */}
-        <div className="bg-[#1150af] backdrop-blur-sm rounded-tl-2xl  border-b border-gray-500">
+        <div className="border-b border-[#e4e8f1]">
           <ChatInfoHeader
             avatar={selectedChat.avatar}
             displayName={selectedChat.display_name}
@@ -91,11 +88,9 @@ export default function ChatInfoPanel() {
           />
         </div>
 
-        {/* Scrollable Content */}
-        <div className="flex-1">
-          {/* Action Buttons */}
+        <div className="flex-1 divide-y divide-[#edf0f7]">
           {isGroup && (
-            <div className="p-4 bg-blue-900/30 backdrop-blur-sm border-b border-gray-500">
+            <div className="p-4">
               <ActionButtons
                 isGroup={isGroup}
                 onLeaveGroup={handleLeaveGroup}
@@ -106,30 +101,26 @@ export default function ChatInfoPanel() {
             </div>
           )}
 
-          {/* Search Messages */}
-          <div className="p-4 bg-blue-900/30 backdrop-blur-sm border-b border-gray-500">
+          <div className="p-4">
             <SearchMessages
               searchQuery={searchQuery}
               onSearchChange={setSearchQuery}
             />
           </div>
 
-          {/* Recent Media */}
-          <div className="p-4 bg-blue-800/30 backdrop-blur-sm border-b border-gray-500">
+          <div className="p-4">
             <RecentMediaSection
               mediaItems={recentMedia}
               onMediaClick={handleMediaClick}
             />
           </div>
 
-          {/* Recent Files */}
-          <div className="p-4 bg-blue-800/30 backdrop-blur-sm border-b border-gray-500">
+          <div className="p-4">
             <RecentFilesSection fileItems={recentFiles} />
           </div>
 
-          {/* Delete History Button */}
           {!isGroup && (
-            <div className="p-4 bg-blue-900/30 backdrop-blur-sm">
+            <div className="p-4">
               <ActionButtons
                 isGroup={false}
                 onDeleteHistory={handleDeleteHistory}

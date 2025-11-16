@@ -34,6 +34,7 @@ export default function ChannelList({ width }: ChannelListProps) {
   const [results, setResults] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
+  const [activeFilter, setActiveFilter] = useState("favorites");
   const [selectedChat, setSelectedChat] = useRecoilState(selectedChatState);
   const [isGroupModalOpen, setIsGroupModalOpen] =
     useRecoilState(groupModalAtom);
@@ -144,75 +145,53 @@ export default function ChannelList({ width }: ChannelListProps) {
     }
   };
 
-  const theme = {
-    bg: "bg-[#003ea3]",
-    searchBg: "bg-gray-300",
-    searchFocus: "focus:border-blue-400 focus:ring-2 focus:ring-blue-400/30",
-    searchText: "text-gray-600 placeholder-gray-500",
-    searchIcon: "text-gray-600",
-    button:
-      "bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 shadow-lg hover:shadow-xl",
-    buttonIcon: "text-white",
-    card: "bg-blue-800/40 backdrop-blur-sm border border-blue-700/30",
-    cardHover: "hover:bg-blue-700/50 hover:border-blue-600/50 hover:shadow-lg",
-    cardActive:
-      "bg-gradient-to-r from-blue-600 to-blue-700 border-blue-500/50 shadow-lg ring-2 ring-blue-400/30",
-    text: "text-white",
-    textSecondary: "text-blue-200",
-    badge: "bg-gradient-to-r from-red-500 to-pink-600 text-white",
-    loader: "border-blue-400",
-  };
-
   return (
     <>
-      <div
-        className={`h-full flex flex-col ${theme.bg} transition-colors duration-400   shadow-xl z-0`}
-      >
-        {/* Header */}
-        <div className="p-3 flex-shrink-0 space-y-3 border-b border-gray-500 bg-[#1150af]">
-          {width > 100 && (
-            <h2 className={`text-lg font-bold ${theme.text}`}>Tin nhắn</h2>
-          )}
+      <div className="h-full flex flex-col bg-white">
+        <div className="p-4 sm:p-5 flex-shrink-0 border-b border-[#e4e8f1] space-y-3 sm:space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-[10px] uppercase tracking-wide text-[#7c8aac] font-semibold">
+                Danh sách chat
+              </p>
+              <h2 className="text-sm sm:text-base font-semibold text-[#1e2b4a]">
+                Tin nhắn
+              </h2>
+            </div>
 
-          {/* Search + nút tạo nhóm */}
-          <div className="flex items-center gap-2">
-            {width > 100 ? (
-              <div className="relative flex-1">
-                <input
-                  type="text"
-                  placeholder="Tìm nhóm hoặc bạn bè..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  onKeyDown={handleSearchKeyDown}
-                  className={`w-full ${theme.searchBg} ${theme.searchText} px-4 py-2.5 rounded-xl border ${theme.searchFocus} focus:outline-none transition-all duration-300`}
-                />
-                <Search
-                  size={18}
-                  className={`absolute right-4 top-1/2 -translate-y-1/2 ${theme.searchIcon}`}
-                />
-              </div>
-            ) : (
-              <Search size={20} className={theme.searchIcon} />
-            )}
+            <button
+              onClick={() => setIsGroupModalOpen(true)}
+              className="inline-flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 text-xs font-semibold text-white rounded-full bg-gradient-to-r from-[#0172ff] to-[#01c5ff] shadow hover:shadow-md transition"
+            >
+              <UserPlus size={14} />
+              <span className="hidden sm:inline">Nhóm mới</span>
+            </button>
+          </div>
 
-            {width > 100 && (
+          <div className="hidden sm:flex items-center gap-2 text-xs font-semibold text-[#6a7798]">
+            {["favorites", "recent", "folders"].map((filter) => (
               <button
-                onClick={() => setIsGroupModalOpen(true)}
-                className={`${theme.button} p-2.5 rounded-xl transition-all duration-300 flex items-center justify-center`}
-                title="Tạo nhóm mới"
+                key={filter}
+                onClick={() => setActiveFilter(filter)}
+                className={`px-3 py-1.5 rounded-full transition ${
+                  activeFilter === filter
+                    ? "bg-[#e4edff] text-[#2162ff]"
+                    : "hover:bg-[#f1f4fa]"
+                }`}
               >
-                <UserPlus size={20} className={theme.buttonIcon} />
+                {filter === "favorites" && "Ưu tiên"}
+                {filter === "recent" && "Gần đây"}
+                {filter === "folders" && "Phân loại"}
               </button>
-            )}
+            ))}
           </div>
         </div>
 
-        {/* Danh sách hội thoại */}
-        <div className="flex-1 overflow-y-auto px-2 space-y-1 scrollbar-thin scrollbar-thumb-blue-600 scrollbar-track-blue-900/20 mt-2">
+        <div className="flex-1 overflow-y-auto px-3 py-3 bg-[#f6f7fb] space-y-2 scrollbar-thin scrollbar-thumb-[#d0d7e9] scrollbar-track-transparent">
           {loading ? (
             <ChatSkeletonList count={8} />
           ) : hasSearched && results.length === 0 ? (
-            <div className="text-center text-blue-300 py-12 text-sm">
+            <div className="text-center text-[#9ba3b7] py-12 text-sm">
               Không tìm thấy cuộc trò chuyện nào
             </div>
           ) : (
@@ -240,10 +219,10 @@ export default function ChannelList({ width }: ChannelListProps) {
                       update_at: item.updated_at,
                     })
                   }
-                  className={`flex items-center gap-3 w-full text-left px-3 py-3 rounded-xl transition-all duration-300 group border border-gray-400 ${
+                  className={`flex items-center gap-3 w-full text-left px-3.5 py-2.5 rounded-2xl transition-all border ${
                     isSelected
-                      ? theme.cardActive
-                      : `${theme.card} ${theme.cardHover}`
+                      ? "bg-white shadow-lg border-[#bed3ff]"
+                      : "bg-white/70 border-transparent hover:border-[#d8def0] hover:bg-white"
                   }`}
                 >
                   <UserAvatar
@@ -255,19 +234,14 @@ export default function ChannelList({ width }: ChannelListProps) {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between mb-0.5">
                         <p
-                          className={`text-sm font-semibold ${
-                            theme.text
-                          } truncate ${hasUnread ? "font-bold" : ""}`}
+                          className={`text-[13px] font-semibold text-[#1f2a44] truncate ${
+                            hasUnread ? "text-[#0d56d4]" : ""
+                          }`}
                         >
                           {item.display_name}
-                          {isGroup && (
-                            <span className="ml-1 text-xs text-blue-300/70">
-                              (Nhóm)
-                            </span>
-                          )}
                         </p>
                         {item.last_date && (
-                          <span className="text-[11px] text-blue-300/60 flex-shrink-0 ml-2">
+                          <span className="text-[11px] text-[#95a1ba]">
                             {timeAgo.format(new Date(item.last_date))}
                           </span>
                         )}
@@ -275,9 +249,9 @@ export default function ChannelList({ width }: ChannelListProps) {
 
                       <div className="flex items-center justify-between gap-2">
                         <p
-                          className={`text-xs ${
-                            theme.textSecondary
-                          } truncate w-35 ${hasUnread ? "font-medium" : ""}`}
+                          className={`text-[12px] text-[#6f7a95] truncate ${
+                            hasUnread ? "font-semibold text-[#1f2a44]" : ""
+                          }`}
                           dangerouslySetInnerHTML={{
                             __html: `${
                               item.sender_id === user?.data.id ? "Bạn: " : ""
@@ -285,9 +259,7 @@ export default function ChannelList({ width }: ChannelListProps) {
                           }}
                         />
                         {hasUnread && (
-                          <span
-                            className={`${theme.badge} text-[10px] font-bold px-1.5 py-0.5 rounded-full shadow`}
-                          >
+                          <span className="bg-[#ff4d6b] text-white text-[10px] font-semibold px-1.5 py-0.5 rounded-full shadow">
                             {item.unread_count}
                           </span>
                         )}

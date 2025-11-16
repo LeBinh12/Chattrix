@@ -1,5 +1,5 @@
-import ChatWidget from "../components/ChatWidget";
-import { useRecoilValue } from "recoil";
+import { useEffect, useState } from "react";
+import { useRecoilState, useRecoilValue } from "recoil";
 import { userAtom } from "../recoil/atoms/userAtom";
 
 import Sidebar from "../components/home/Sidebar";
@@ -9,11 +9,34 @@ import ChatInfoPanel from "../components/home/ChatInfoPanel";
 
 import ChannelListWrapper from "../components/home/ChannelListWrapper";
 import { chatInfoPanelVisibleAtom } from "../recoil/atoms/uiAtom";
+import { selectedChatState } from "../recoil/atoms/chatAtom";
 import { AnimatePresence, motion } from "framer-motion";
 
 export default function HomeScreen() {
   const user = useRecoilValue(userAtom);
-  const isPanelVisible = useRecoilValue(chatInfoPanelVisibleAtom);
+  const [selectedChat, setSelectedChat] = useRecoilState(selectedChatState);
+  const [isPanelVisible, setPanelVisible] = useRecoilState(
+    chatInfoPanelVisibleAtom
+  );
+  const [isCompact, setIsCompact] = useState(false);
+  const [viewportWidth, setViewportWidth] = useState(0);
+
+  useEffect(() => {
+    const handleResize = () => {
+      if (typeof window === "undefined") return;
+      setViewportWidth(window.innerWidth);
+      setIsCompact(window.innerWidth < 1024);
+    };
+    handleResize();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  useEffect(() => {
+    if (!selectedChat && isPanelVisible) {
+      setPanelVisible(false);
+    }
+  }, [selectedChat, isPanelVisible, setPanelVisible]);
 
   if (!user) {
     return <div>Không có thông tin người dùng</div>;
@@ -24,28 +47,51 @@ export default function HomeScreen() {
   //   setRefreshGroups((prev) => prev + 1);
   // };
 
+  const compactListWidth = Math.min(
+    Math.max(viewportWidth - 80, 240),
+    360
+  );
+
+  const hideSidebar = isCompact && !!selectedChat;
+
   return (
-    <>
-      {/* <Header /> */}
-      <div className="h-screen flex bg-[#2356a6]">
-        {/* Giao diện chính */}
-        <Sidebar />
-        <div className="flex flex-col flex-1 bg-transparent overflow-hidden shadow-inner">
-          {/* Thanh tiêu đề trong suốt với logo */}
-          <div className="flex items-center justify-center h-7  text-black font-semibold text-lg tracking-wider">
-            {/* <span>Chattrix - {user.data.display_name}</span> */}
-          </div>
-
-          <div className="flex flex-1 from-white rounded-tl-2xl rounded-tr-2xl  overflow-hidden">
-            <ChannelListWrapper>
-              {(width) => <ChannelList width={width} />}
-            </ChannelListWrapper>
-
-            <div className="flex-1 flex pb-2 px-2">
-              <div className="flex-1 rounded-b-2xl rounded-tl-2xl rounded-tr-2xl overflow-hidden border-2 border-t-0 border-gray-300 bg-white shadow-lg">
-                <ChatWindow />
+    <div className="h-screen w-screen flex overflow-hidden bg-[#dfe6f5]">
+      {!hideSidebar && <Sidebar />}
+      <div className="flex flex-1 min-w-0 bg-[#e9edf5] overflow-hidden">
+        {isCompact ? (
+          <>
+            {!selectedChat && !isPanelVisible && (
+              <div className="flex-1 flex bg-white overflow-hidden">
+                <div className="flex-1 overflow-y-auto border-l border-[#dbe2ef]">
+                  <ChannelList width={compactListWidth || 300} />
+                </div>
               </div>
+            )}
+
+            {selectedChat && !isPanelVisible && (
+              <div className="flex-1 flex bg-[#f5f6fb] border-l border-[#dbe2ef] overflow-hidden">
+                <ChatWindow onBack={() => setSelectedChat(null)} />
+              </div>
+            )}
+
+            {selectedChat && isPanelVisible && (
+              <div className="flex-1 bg-white border-l border-[#dbe2ef] overflow-y-auto">
+                <ChatInfoPanel />
+              </div>
+            )}
+          </>
+        ) : (
+          <>
+            <div className="hidden lg:block h-full flex-shrink-0 overflow-hidden">
+              <ChannelListWrapper>
+                {(width) => <ChannelList width={width} />}
+              </ChannelListWrapper>
             </div>
+
+            <div className="flex-1 flex bg-[#f5f6fb] border-x border-[#dbe2ef] min-w-0 overflow-hidden">
+              <ChatWindow onBack={() => setSelectedChat(null)} />
+            </div>
+
             <AnimatePresence>
               {isPanelVisible && (
                 <motion.div
@@ -53,19 +99,16 @@ export default function HomeScreen() {
                   initial={{ opacity: 0, x: 200 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: 200 }}
-                  transition={{ type: "spring", stiffness: 70, damping: 15 }}
-                  className="flex-shrink-0"
+                  transition={{ type: "spring", stiffness: 65, damping: 16 }}
+                  className="hidden lg:block flex-shrink-0 border-l border-[#dbe2ef] bg-white w-80"
                 >
                   <ChatInfoPanel />
                 </motion.div>
               )}
             </AnimatePresence>
-          </div>
-        </div>
-
-        {/* Chat widget */}
-        <ChatWidget />
+          </>
+        )}
       </div>
-    </>
+    </div>
   );
 }

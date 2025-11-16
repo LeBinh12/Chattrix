@@ -52,27 +52,23 @@ export default function ActionButtons({
     <>
       {/* Leave Group Button */}
       {isGroup && (
-        <div className="border-b border-blue-700/20">
-          <button
-            onClick={() => setShowLeaveConfirm(true)}
-            className="w-full flex items-center justify-center gap-2 py-2.5 px-4 bg-red-500/20 text-red-300 rounded-lg hover:bg-red-500/30 transition backdrop-blur-sm border border-red-500/30"
-          >
-            <LogOut size={18} />
-            <span className="font-medium">Rời khỏi nhóm</span>
-          </button>
-        </div>
+        <button
+          onClick={() => setShowLeaveConfirm(true)}
+          className="w-full flex items-center justify-center gap-1.5 py-2 px-3 rounded-2xl border border-[#ffd6db] text-[#d93434] text-[13px] hover:bg-[#fff5f6] transition"
+        >
+          <LogOut size={16} />
+          <span className="font-medium">Rời khỏi nhóm</span>
+        </button>
       )}
 
       {/* Delete History Button */}
-      <div>
-        <button
-          onClick={() => setShowDeleteConfirm(true)}
-          className="w-full flex items-center justify-center gap-2 py-2.5 px-4 bg-red-500/20 text-red-300 rounded-lg hover:bg-red-500/30 transition backdrop-blur-sm border border-red-500/30"
-        >
-          <Trash2 size={18} />
-          <span className="font-medium">Xóa lịch sử trò chuyện</span>
-        </button>
-      </div>
+      <button
+        onClick={() => setShowDeleteConfirm(true)}
+        className="w-full flex items-center justify-center gap-1.5 py-2 px-3 rounded-2xl border border-[#ffd6db] text-[#d93434] text-[13px] hover:bg-[#fff5f6] transition mt-2.5"
+      >
+        <Trash2 size={16} />
+        <span className="font-medium">Xóa lịch sử trò chuyện</span>
+      </button>
 
       {/* Modal xác nhận xóa */}
       <ConfirmModal

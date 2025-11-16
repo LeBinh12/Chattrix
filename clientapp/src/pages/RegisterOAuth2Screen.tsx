@@ -122,7 +122,7 @@ export default function CompleteProfileScreen() {
         <motion.div
           className={`flex items-center justify-center w-10 h-10 rounded-full font-semibold transition-all duration-300 ${
             step >= 1
-              ? "bg-white text-[#2665b1] shadow-lg"
+              ? "bg-white text-brand-700 shadow-lg"
               : "bg-white/30 text-white"
           }`}
           whileHover={{ scale: 1.1 }}
@@ -137,7 +137,7 @@ export default function CompleteProfileScreen() {
         <motion.div
           className={`flex items-center justify-center w-10 h-10 rounded-full font-semibold transition-all duration-300 ${
             step >= 2
-              ? "bg-white text-[#2665b1] shadow-lg"
+              ? "bg-white text-brand-700 shadow-lg"
               : "bg-white/30 text-white"
           }`}
           whileHover={{ scale: step >= 2 ? 1.1 : 1 }}
@@ -265,9 +265,9 @@ export default function CompleteProfileScreen() {
                         value={option.value}
                         checked={gender === option.value}
                         onChange={() => setGender(option.value)}
-                        className="w-4 h-4 text-[#2665b1] focus:ring-[#2665b1] cursor-pointer"
+                        className="w-4 h-4 text-brand-600 focus:ring-brand-600 cursor-pointer"
                       />
-                      <span className="text-gray-700 group-hover:text-[#2665b1] font-medium transition-colors">
+                      <span className="text-gray-700 group-hover:text-brand-700 font-medium transition-colors">
                         {option.label}
                       </span>
                     </label>
@@ -285,7 +285,7 @@ export default function CompleteProfileScreen() {
                   <button
                     type="button"
                     onClick={() => setStep(1)}
-                    className="w-full bg-white/80 backdrop-blur-sm text-[#2665b1] py-2 px-4 rounded-lg hover:bg-white shadow-md transition font-semibold"
+                    className="w-full bg-white/80 backdrop-blur-sm text-brand-700 py-2 px-4 rounded-lg hover:bg-white shadow-md transition font-semibold"
                   >
                     <span className="flex items-center justify-center gap-2">
                       <ArrowLeft className="w-5 h-5" />

@@ -52,14 +52,14 @@ export default function AdminLayout() {
     menuItems[0];
 
   return (
-    <div className="flex h-screen bg-gradient-to-br from-gray-50 to-blue-50">
+    <div className="flex h-screen bg-gradient-to-br from-gray-50 to-brand-50">
       {/* Animated Sidebar */}
       <motion.aside
         initial="open"
         animate={sidebarOpen ? "open" : "closed"}
         className="bg-white shadow-2xl relative z-10"
       >
-        <div className="flex items-center justify-between p-4 border-b bg-gradient-to-r from-blue-600 to-purple-600">
+        <div className="flex items-center justify-between p-4 border-b bg-gradient-to-r from-brand-600 to-brand-700">
           <AnimatePresence mode="wait">
             {sidebarOpen && (
               <motion.h1
@@ -100,7 +100,7 @@ export default function AdminLayout() {
                     whileTap={{ scale: 0.98 }}
                     className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
                       isActive
-                        ? "bg-gradient-to-r from-blue-500 to-purple-500 text-white shadow-lg"
+                        ? "bg-gradient-to-r from-brand-500 to-brand-700 text-white shadow-lg"
                         : "hover:bg-gray-100 text-gray-700"
                     }`}
                   >

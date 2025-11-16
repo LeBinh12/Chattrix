@@ -73,7 +73,7 @@ export default function SuggestionScreen() {
               placeholder="Tìm kiếm bạn bè..."
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              className="w-full bg-transparent text-white placeholder-gray-300 pl-10 pr-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-300 transition-all"
+              className="w-full bg-transparent text-white placeholder-gray-300 pl-10 pr-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-300 transition-all"
             />
           </div>
         </motion.div>
@@ -95,7 +95,7 @@ export default function SuggestionScreen() {
                 onClick={() => handleSelect(u)}
                 className={`flex items-center gap-3 cursor-pointer p-2 rounded-lg ${
                   selected.find((s) => s.id === u.id)
-                    ? "bg-blue-100"
+                    ? "bg-brand-100"
                     : "hover:bg-gray-100"
                 }`}
               >
@@ -169,7 +169,7 @@ export default function SuggestionScreen() {
             >
               <button
                 onClick={handleAddFriends}
-                className="bg-blue-500 hover:bg-blue-600 text-white font-semibold px-6 py-2 rounded-xl shadow-lg transition-all"
+                className="bg-brand-600 hover:bg-brand-700 text-white font-semibold px-6 py-2 rounded-xl shadow-lg transition-all"
               >
                 Thêm bạn bè
               </button>
