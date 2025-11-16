@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
+import { LOGO } from "../assets/paths";
 import { motion, AnimatePresence } from "framer-motion";
 import { Search } from "lucide-react";
 import type { UserData } from "../types/suggestion";
@@ -103,11 +104,11 @@ export default function SuggestionScreen() {
                   src={
                     u.avatar && u.avatar.trim() !== ""
                       ? u.avatar
-                      : "assets/logo.png"
+                      : LOGO
                   }
                   alt={u.username}
                   className="w-10 h-10 rounded-full"
-                  onError={(e) => (e.currentTarget.src = "assets/logo.png")}
+                  onError={(e) => (e.currentTarget.src = LOGO)}
                 />
 
                 <span className="font-medium">{u.username}</span>
@@ -138,11 +139,11 @@ export default function SuggestionScreen() {
                       src={
                         u.avatar && u.avatar.trim() !== ""
                           ? u.avatar
-                          : "assets/logo.png"
+                          : LOGO
                       }
                       alt={u.username}
                       className="w-10 h-10 rounded-full"
-                      onError={(e) => (e.currentTarget.src = "assets/logo.png")}
+                      onError={(e) => (e.currentTarget.src = LOGO)}
                     />
                     <span>{u.username}</span>
                     <button

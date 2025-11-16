@@ -1,4 +1,5 @@
 import React from "react";
+import { LOGO } from "../assets/paths";
 import { API_ENDPOINTS } from "../config/api";
 
 type UserAvatarProps = {
@@ -15,7 +16,7 @@ const UserAvatar: React.FC<UserAvatarProps> = ({
   const avatarUrl =
     avatar && avatar.trim() !== "" && avatar !== "null"
       ? `${API_ENDPOINTS.UPLOAD_MEDIA}/${avatar}`
-      : "/assets/logo.png";
+      : LOGO;
 
   return (
     <div
@@ -29,7 +30,7 @@ const UserAvatar: React.FC<UserAvatarProps> = ({
           className="w-full h-full object-cover"
           onError={(e) => {
             e.currentTarget.onerror = null;
-            e.currentTarget.src = "/assets/logo.png";
+            e.currentTarget.src = LOGO;
           }}
         />
       </div>

@@ -2,6 +2,7 @@ import { ArrowLeft } from "lucide-react";
 import { motion } from "framer-motion";
 import type { Conversation } from "../../types/conversation";
 import { API_ENDPOINTS } from "../../config/api";
+import { LOGO } from "../../assets/paths";
 
 type Props = {
   onUser: Conversation;
@@ -25,7 +26,7 @@ export default function ChatHeader({ onUser, onBack }: Props) {
           src={
             onUser && onUser.avatar.trim() !== "" && onUser.avatar !== "null"
               ? `${API_ENDPOINTS.UPLOAD_MEDIA}/${onUser.avatar}`
-              : "/assets/logo.png"
+              : LOGO
           }
           alt={onUser.display_name}
           className="w-full h-full object-cover rounded-full"

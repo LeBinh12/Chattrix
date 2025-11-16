@@ -1,4 +1,5 @@
 import { User } from "lucide-react";
+import { LOGO } from "../../assets/paths";
 
 export default function HomeTab() {
   return (
@@ -8,7 +9,7 @@ export default function HomeTab() {
         {/* Logo Web */}
         <div className="flex items-center space-x-2">
           <img
-            src="assets/logo.png"
+            src={LOGO}
             alt="Logo"
             className="w-12 h-12 rounded-lg"
           />

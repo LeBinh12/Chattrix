@@ -7,7 +7,8 @@ export default function ChatWindowSkeleton() {
         <div className="flex-1">
           <div className="h-4 bg-gray-200 rounded w-32 mb-2"></div>
           <div className="h-3 bg-gray-200 rounded w-20"></div>
-        </div>
+        import React from "react";
+        import { LOGO } from "../assets/paths";
       </div>
 
       {/* Content Skeleton */}
@@ -15,7 +16,7 @@ export default function ChatWindowSkeleton() {
         {/* Logo mờ giữa */}
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-10 z-0">
           <img
-            src="/assets/logo.png"
+            src={LOGO}
             alt="logo"
             className="w-40 h-40 sm:w-52 sm:h-52 object-contain select-none"
           />

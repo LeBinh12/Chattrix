@@ -1,3 +1,4 @@
+import { LOGO } from "../../../assets/paths";
 interface AvatarPreviewProps {
   src: string;
   alt?: string;
@@ -34,7 +35,7 @@ export default function AvatarPreview({
         draggable={false}
         onError={(e) => {
           e.currentTarget.onerror = null;
-          e.currentTarget.src = "/assets/logo.png";
+          e.currentTarget.src = LOGO;
         }}
       />
     </button>

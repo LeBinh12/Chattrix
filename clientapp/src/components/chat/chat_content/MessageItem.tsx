@@ -17,6 +17,7 @@ import StarterKit from "@tiptap/starter-kit";
 import { useMemo, useState } from "react";
 import { API_ENDPOINTS } from "../../../config/api";
 import { socketManager } from "../../../api/socket";
+import { LOGO } from "../../../assets/paths";
 
 type StatusConfig = {
   icon: typeof Check;
@@ -214,7 +215,7 @@ export default function MessageItem({
             src={
               msg.sender_avatar && msg.sender_avatar !== "null"
                 ? `${API_ENDPOINTS.UPLOAD_MEDIA}/${msg.sender_avatar}`
-                : "/assets/logo.png"
+                : LOGO
             }
             alt={display_name}
             size={size === "small" ? 30 : 32}

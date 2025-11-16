@@ -7,6 +7,7 @@ import { userApi } from "../../../api/userApi";
 import { toast } from "react-toastify";
 import { userAtom } from "../../../recoil/atoms/userAtom";
 import { API_ENDPOINTS } from "../../../config/api";
+import { LOGO } from "../../../assets/paths";
 import AddMemberModal from "../../group/AddMemberModal";
 import { chatInfoPanelVisibleAtom } from "../../../recoil/atoms/uiAtom";
 
@@ -139,7 +140,7 @@ export default function ChatInfoHeader({
   const avatarUrl =
     avatar && avatar.trim() !== "" && avatar !== "null"
       ? `${API_ENDPOINTS.UPLOAD_MEDIA}/${avatar}`
-      : "/assets/logo.png";
+      : LOGO;
 
   if (loading) {
     return <div>Đang tải dữ liệu....</div>;
@@ -163,7 +164,7 @@ export default function ChatInfoHeader({
             className="w-full h-full object-cover"
             onError={(e) => {
               e.currentTarget.onerror = null;
-              e.currentTarget.src = "/assets/logo.png";
+              e.currentTarget.src = LOGO;
             }}
           />
         </div>

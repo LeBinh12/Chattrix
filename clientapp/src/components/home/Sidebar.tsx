@@ -1,4 +1,5 @@
 import { MessageSquare, Users, Settings, LogOut, Phone } from "lucide-react";
+import { LOGO } from "../../assets/paths";
 import { useRecoilValue, useSetRecoilState } from "recoil";
 import { selectedChatState } from "../../recoil/atoms/chatAtom";
 import { useState } from "react";
@@ -46,13 +47,13 @@ export default function Sidebar() {
                 src={
                   user?.data.avatar
                     ? `http://localhost:3000/v1/upload/media/${user.data.avatar}`
-                    : "/assets/logo.png"
+                    : LOGO
                 }
                 alt={user?.data.display_name || "avatar"}
                 className="w-full h-full object-cover"
                 onError={(e) => {
                   e.currentTarget.onerror = null;
-                  e.currentTarget.src = "/assets/logo.png";
+                  e.currentTarget.src = LOGO;
                 }}
               />
               <span className="absolute -bottom-1 -right-1 w-3 h-3 bg-emerald-400 border-2 border-[#0d52c9] rounded-full"></span>

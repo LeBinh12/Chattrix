@@ -4,6 +4,7 @@ import { LogOut } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useRecoilValue } from "recoil";
 import { userAtom } from "../recoil/atoms/userAtom";
+import { LOGO } from "../assets/paths";
 import { useLoadUser } from "../hooks/useLoadUser";
 import { toast } from "react-toastify";
 import { socketManager } from "../api/socket";
@@ -32,7 +33,7 @@ export default function Header() {
           <div className="flex items-center gap-2">
             <Link to="/" className="flex items-center">
               <img
-                src="assets/logo.png"
+                src={LOGO}
                 alt="Chattrix Logo"
                 className="w-24 h-24 sm:w-20 sm:h-20 object-contain drop-shadow-md"
               />
@@ -52,7 +53,7 @@ export default function Header() {
                   user?.data?.avatar.trim() !== "" &&
                   user?.data?.avatar !== "null"
                     ? user?.data?.avatar
-                    : "/assets/logo.png"
+                    : LOGO
                 }
                 alt={user?.data?.username || "User avatar"}
                 className="w-10 h-10 rounded-full border border-line object-cover"

@@ -11,6 +11,7 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import { conversationApi } from "../../api/conversation";
+import { LOGO } from "../../assets/paths";
 import { toast } from "react-toastify";
 import { groupApi } from "../../api/group";
 import { API_ENDPOINTS } from "../../config/api";
@@ -363,7 +364,7 @@ export default function CreateGroupModal({
                             src={
                               user.avatar && user.avatar !== "null"
                                 ? `${API_ENDPOINTS.UPLOAD_MEDIA}/${user.avatar}`
-                                : "/assets/logo.png"
+                                : LOGO
                             }
                             alt={user.name}
                             className="w-12 h-12 rounded-full object-cover ring-2 ring-white shadow-md"
@@ -470,7 +471,7 @@ export default function CreateGroupModal({
                         src={
                           user.avatar && user.avatar !== "null"
                             ? `${API_ENDPOINTS.UPLOAD_MEDIA}/${user.avatar}`
-                            : "/assets/logo.png"
+                            : LOGO
                         }
                         alt={user.name}
                         className="w-10 h-10 rounded-full object-cover"

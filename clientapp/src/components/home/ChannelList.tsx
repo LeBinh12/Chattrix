@@ -1,6 +1,7 @@
 import { Search, UserPlus } from "lucide-react";
 import { useState, useEffect } from "react";
 import { conversationApi } from "../../api/conversation";
+import { TING } from "../../assets/paths";
 import type { Conversation } from "../../types/conversation";
 import { useRecoilState, useRecoilValue } from "recoil";
 import { selectedChatState } from "../../recoil/atoms/chatAtom";
@@ -19,7 +20,7 @@ TimeAgo.addDefaultLocale(vi);
 const timeAgo = new TimeAgo("vi-VN");
 
 const ding = new Howl({
-  src: ["/assets/ting.mp3"],
+  src: [TING],
   preload: true,
   volume: 0.8,
 });

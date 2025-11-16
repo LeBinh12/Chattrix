@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState, useRef } from "react";
+import { TING } from "../../assets/paths";
 import { useRecoilState, useRecoilValue } from "recoil";
 import ChatHeaderWindow from "./chat_window/ChatHeaderWindow";
 import ChatContentWindow from "./chat_window/ChatContentWindow";
@@ -69,7 +70,7 @@ export default function ChatWindow({ onBack }: ChatWindowProps) {
 
   // Preload âm thanh
   useEffect(() => {
-    tingAudioRef.current = new Audio("/assets/ting.mp3");
+    tingAudioRef.current = new Audio(TING);
 
     return () => {
       if (loadingTimeoutRef.current) {

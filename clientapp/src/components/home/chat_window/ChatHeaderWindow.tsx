@@ -1,4 +1,5 @@
 import { ChevronLeft, CircleUserRound } from "lucide-react";
+import { LOGO } from "../../../assets/paths";
 import { motion } from "framer-motion";
 import TimeAgo from "react-timeago";
 import vi from "react-timeago/lib/language-strings/vi";
@@ -51,13 +52,13 @@ export default function ChatHeaderWindow({
             src={
               avatar && avatar.trim() !== "" && avatar !== "null"
                 ? `http://localhost:3000/v1/upload/media/${avatar}`
-                : "/assets/logo.png"
+                : LOGO
             }
             alt={display_name}
             className="w-9 h-9 sm:w-10 sm:h-10 rounded-full object-cover flex-shrink-0 ring-2 ring-[#e8f0ff]"
             onError={(e) => {
               e.currentTarget.onerror = null;
-              e.currentTarget.src = "/assets/logo.png";
+              e.currentTarget.src = LOGO;
             }}
           />
         )}

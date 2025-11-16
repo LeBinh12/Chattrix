@@ -3,6 +3,7 @@ import { X, UserPlus, Check } from "lucide-react";
 import { toast } from "react-toastify";
 import { groupApi } from "../../api/group";
 import { API_ENDPOINTS } from "../../config/api";
+import { LOGO } from "../../assets/paths";
 
 interface User {
   id: string;
@@ -152,7 +153,7 @@ export default function AddMemberModal({
                       src={
                         user.avatar && user.avatar !== "null"
                           ? `${API_ENDPOINTS.UPLOAD_MEDIA}/${user.avatar}`
-                          : "/assets/logo.png"
+                          : LOGO
                       }
                       alt={user.display_name}
                       className="w-12 h-12 rounded-full object-cover"

@@ -1,10 +1,11 @@
 import { Outlet } from "react-router-dom";
+import { LOGO } from "../assets/paths";
 
 export default function AuthLayout() {
   return (
     <main className="h-screen w-full relative overflow-hidden bg-gradient-to-br from-brand-700 to-brand-500">
       <img
-        src="/assets/logo.png"
+        src={LOGO}
         alt="Chattrix Logo"
         className="
     absolute top-3 left-3

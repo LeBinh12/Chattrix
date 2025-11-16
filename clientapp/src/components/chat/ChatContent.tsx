@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { LOGO } from "../../assets/paths";
 import { ChevronDown } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import type { Messages } from "../../types/Message";
@@ -119,7 +120,7 @@ export default function ChatContent({
         {messages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-white opacity-80 select-none py-10">
             <img
-              src="/assets/logo.png"
+              src={LOGO}
               alt="logo"
               className="w-16 h-16 mb-4 opacity-80"
             />

@@ -1,7 +1,7 @@
 import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react-swc'
-import tailwindcss from '@tailwindcss/vite'
+import react from '@vitejs/plugin-react'
 import federation from '@originjs/vite-plugin-federation'
+import tailwindcss from '@tailwindcss/vite'
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -14,17 +14,16 @@ export default defineConfig({
       exposes: {
         './mount': './src/mount.tsx',
       },
-      // Do not share React to avoid cross-version singleton issues
-      shared: [],
+      shared: ['react', 'react-dom', 'react-router-dom'],
     }),
   ],
-  base: "/",
   build: {
     target: 'esnext',
     minify: false,
     cssCodeSplit: false,
     rollupOptions: {
       output: {
+        // Keep remoteEntry.js at root, not in assets folder
         entryFileNames: (chunkInfo) => {
           if (chunkInfo.name === 'remoteEntry') {
             return '[name].js'

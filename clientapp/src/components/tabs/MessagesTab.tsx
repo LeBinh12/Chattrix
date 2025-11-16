@@ -8,6 +8,8 @@ import { conversationApi } from "../../api/conversation";
 import { socketManager } from "../../api/socket";
 import { Search } from "lucide-react";
 import { Howl } from "howler";
+import { TING } from "../../assets/paths";
+import { LOGO } from "../../assets/paths";
 
 type Props = {
   onFriend: (friend: Conversation) => void;
@@ -15,7 +17,7 @@ type Props = {
 };
 
 const ding = new Howl({
-  src: ["/assets/ting.mp3"],
+  src: [TING],
   preload: true,
   volume: 0.8,
 });
@@ -188,7 +190,7 @@ export default function MessagesTab({ onFriend, onOpenId }: Props) {
                     src={
                       conv.avatar && conv.avatar !== "null"
                         ? `http://localhost:3000/v1/upload/media/${conv.avatar}`
-                        : "/assets/logo.png"
+                        : LOGO
                     }
                     alt={conv.display_name}
                     className="w-12 h-12 rounded-full object-cover"

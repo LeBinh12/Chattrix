@@ -1,12 +1,10 @@
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { BANNERS } from "../../assets/paths";
 
 const images = [
-  "/assets/banner-1.jpg",
-  "/assets/banner-2.png",
-  "/assets/banner-3.jpg",
-  "/assets/banner-4.jpg",
+  ...BANNERS,
 ];
 
 export default function EmptyChatWindow() {
