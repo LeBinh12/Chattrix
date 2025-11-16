@@ -1,4 +1,4 @@
-import { ArrowLeftCircle, Info, Phone, Video } from "lucide-react";
+import { ChevronLeft, CircleUserRound, Phone, Video } from "lucide-react";
 import { motion } from "framer-motion";
 import TimeAgo from "react-timeago";
 import vi from "react-timeago/lib/language-strings/vi";
@@ -29,18 +29,24 @@ export default function ChatHeaderWindow({
   );
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 px-4 sm:px-5 py-3 bg-white border-b border-[#e4e8f1] shadow-sm">
-      <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
+    <div className="flex items-center justify-between gap-3 px-3 sm:px-5 py-3 bg-white border-b border-[#e4e8f1] shadow-sm">
+      {/* Left: Back button */}
+      <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
         {onBack && (
           <motion.button
-            whileHover={{ scale: 1.1 }}
+            whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             onClick={onBack}
-            className="inline-flex mr-2 rounded-full bg-white shadow hover:shadow-md border border-[#dbe2ef] text-[#1e2b4a] transition-colors"
+            className="flex items-center justify-center w-9 h-9 rounded-full bg-[#f0f4ff] hover:bg-[#e1e9ff] border border-[#d0deff] text-[#2754d7] transition-all"
+            title="Quay lại"
           >
-            <ArrowLeftCircle size={26} />
+            <ChevronLeft size={20} strokeWidth={2.5} />
           </motion.button>
         )}
+      </div>
+
+      {/* Center: Avatar and info */}
+      <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
         {avatar && (
           <img
             src={
@@ -49,7 +55,7 @@ export default function ChatHeaderWindow({
                 : "/assets/logo.png"
             }
             alt={display_name}
-            className="w-8 h-8 sm:w-9 sm:h-9 rounded-full object-cover mr-2 flex-shrink-0"
+            className="w-9 h-9 sm:w-10 sm:h-10 rounded-full object-cover flex-shrink-0 ring-2 ring-[#e8f0ff]"
             onError={(e) => {
               e.currentTarget.onerror = null;
               e.currentTarget.src = "/assets/logo.png";
@@ -57,16 +63,16 @@ export default function ChatHeaderWindow({
           />
         )}
         <div className="flex flex-col min-w-0">
-          <h2 className="text-sm font-semibold text-[#1e2b4a]">
+          <h2 className="text-sm sm:text-base font-semibold text-[#1e2b4a] truncate">
             {display_name}
           </h2>
           {status === "online" ? (
-            <span className="text-[11px] text-emerald-500 font-medium flex items-center">
-              <span className="w-2 h-2 bg-emerald-400 rounded-full mr-1.5 animate-pulse" />
+            <span className="text-[10px] sm:text-[11px] text-emerald-500 font-medium flex items-center">
+              <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-emerald-400 rounded-full mr-1.5 animate-pulse" />
               Đang hoạt động
             </span>
           ) : (
-            <span className="text-[11px] text-[#8e96ac]">
+            <span className="text-[10px] sm:text-[11px] text-[#8e96ac] truncate">
               Hoạt động{" "}
               <TimeAgo date={update_at ?? new Date()} formatter={formatter} />
             </span>
@@ -74,17 +80,18 @@ export default function ChatHeaderWindow({
         </div>
       </div>
 
-      <div className="flex items-center gap-1.5 flex-wrap justify-end w-full sm:w-auto">
-        <HeaderAction icon={<Phone size={15} />} label="Gọi thoại" className="hidden sm:flex" />
-        <HeaderAction icon={<Video size={15} />} label="Gọi video" className="hidden sm:flex" />
+      {/* Right: Action buttons */}
+      <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
+        <HeaderAction icon={<Phone size={16} />} label="Gọi thoại" className="hidden sm:flex" />
+        <HeaderAction icon={<Video size={16} />} label="Gọi video" className="hidden sm:flex" />
         <motion.button
-          whileHover={{ scale: 1.08 }}
+          whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
           onClick={() => setPanelVisible(!isPanelVisible)}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-2xl border border-[#dfe3ee] text-[#4d5a78] text-[13px] hover:bg-[#f1f4fa] transition w-full sm:w-auto justify-center"
+          className="flex items-center justify-center w-9 h-9 rounded-full bg-[#f0f4ff] hover:bg-[#e1e9ff] border border-[#d0deff] text-[#2754d7] transition-all"
+          title="Thông tin"
         >
-          <Info size={16} />
-          <span className="font-medium">Thông tin</span>
+          <CircleUserRound size={18} strokeWidth={2} />
         </motion.button>
       </div>
     </div>
@@ -101,8 +108,8 @@ function HeaderAction({ icon, label, className = "" }: HeaderActionProps) {
   return (
     <motion.button
       whileHover={{ scale: 1.05 }}
-      whileTap={{ scale: 0.9 }}
-      className={`w-8 h-8 sm:w-9 sm:h-9 rounded-full border border-[#dfe3ee] text-[#51608a] flex items-center justify-center bg-[#f8f9ff] hover:bg-white transition ${className}`}
+      whileTap={{ scale: 0.95 }}
+      className={`w-9 h-9 rounded-full border border-[#d0deff] text-[#2754d7] flex items-center justify-center bg-[#f0f4ff] hover:bg-[#e1e9ff] transition-all ${className}`}
       title={label}
     >
       {icon}

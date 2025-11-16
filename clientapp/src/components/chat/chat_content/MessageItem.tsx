@@ -163,7 +163,7 @@ export default function MessageItem({
   const renderFiles = () => {
     if (!fileItems.length) return null;
     return (
-      <div className="mt-3 space-y-2">
+      <div className="mt-3 space-y-2 w-full">
         {fileItems.map((file) => {
           const mediaUrl = `${API_ENDPOINTS.UPLOAD_MEDIA}/${file.url}`;
           return (
@@ -171,13 +171,13 @@ export default function MessageItem({
               key={file.id}
               href={mediaUrl}
               download
-              className="flex items-center gap-2 sm:gap-3 p-2.5 sm:p-3 rounded-2xl border border-[#dfe3ef] bg-white/70 hover:border-[#bfd1ff] transition max-w-full"
+              className="flex items-center gap-2 sm:gap-3 p-2.5 sm:p-3 rounded-2xl border border-[#dfe3ef] bg-white/70 hover:border-[#bfd1ff] transition w-full min-w-0"
             >
               <div className="w-9 h-9 sm:w-10 sm:h-10 flex-shrink-0 rounded-xl bg-[#e6edff] text-[#4c6fd8] flex items-center justify-center">
                 <FileText className="w-4 h-4 sm:w-5 sm:h-5" />
               </div>
               <div className="flex-1 min-w-0 overflow-hidden">
-                <p className="text-xs sm:text-sm font-semibold text-[#1f2a44] truncate" title={file.filename}>
+                <p className="text-xs sm:text-sm font-semibold text-[#1f2a44] truncate break-all" title={file.filename}>
                   {file.filename}
                 </p>
                 <p className="text-[10px] sm:text-xs text-[#7e8aac]">
