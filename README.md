@@ -40,6 +40,16 @@ Dưới đây là mô tả về cấu trúc dự án
 - database/ – chứa các tệp và script liên quan đến cơ sở dữ liệu.
 - logs/ – chứa các tệp nhật ký hoạt động của ứng dụng.
 - middleware/ – chứa các middleware cho ứng dụng.
-- modules/ – chứa các module chức năng của ứng dụng.
+- modules/ – chứa các module chức năng của ứng dụng (đang được di chuyển dần sang kiến trúc sạch – xem bên dưới).
 - routes/ – chứa định nghĩa các tuyến đường API.
 - utils/ – chứa các hàm tiện ích hỗ trợ.
+
+### Kiến trúc sạch (Clean Architecture)
+
+Mã nguồn đang được refactor theo Clean Architecture với các lớp sau:
+
+- `internal/domain/*`: entity và interface thuần domain.
+- `internal/usecase/*`: use case điều phối nghiệp vụ, không phụ thuộc framework.
+- `internal/adapter/*`: adapter cho HTTP, DB, bảo mật, v.v.
+
+Tiến trình hiện tại: flow đăng nhập người dùng đã được chuyển sang Clean Architecture. Chi tiết xem `docs/architecture.md`.

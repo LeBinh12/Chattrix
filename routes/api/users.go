@@ -3,6 +3,7 @@ package api
 import (
 	"my-app/middleware"
 	ginUser "my-app/modules/user/transport/gin"
+	cleanUser "my-app/internal/adapter/http/user"
 
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -14,7 +15,7 @@ func RegisterUserRoutes(rg *gin.RouterGroup, db *mongo.Database) {
 		users.GET("/profile", middleware.AuthMiddleware(), ginUser.ProfileHandler(db))
 		users.POST("/register", ginUser.RegisterHandler(db))
 		users.POST("/register-oauth", middleware.AuthMiddleware(), ginUser.CompleteProfileHandler(db))
-		users.POST("/login", ginUser.LoginHandler(db))
+		users.POST("/login", cleanUser.LoginHandler(db))
 		users.POST("/login-open-dict", ginUser.OpenIddictCallbackHandler(db))
 		users.POST("/google-login", ginUser.GoogleLoginHandler(db))
 		users.GET("/status", ginUser.GetUserStatusHandler(db))
