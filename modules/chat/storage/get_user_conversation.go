@@ -36,6 +36,7 @@ func (s *MongoChatStore) getUserConversations(ctx context.Context, userObjectID 
 							}},
 						},
 					},
+					"deleted_for": bson.M{"$ne": userObjectID},
 				}},
 				{"$sort": bson.M{"created_at": -1}},
 				{"$limit": 1},

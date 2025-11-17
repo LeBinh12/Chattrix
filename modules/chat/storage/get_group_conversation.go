@@ -36,7 +36,10 @@ func (s *MongoChatStore) getGroupConversations(ctx context.Context, userObjectID
 			"from": "messages",
 			"let":  bson.M{"groupId": "$group_id"},
 			"pipeline": []bson.M{
-				{"$match": bson.M{"$expr": bson.M{"$eq": []interface{}{"$group_id", "$$groupId"}}}},
+				{"$match": bson.M{
+					"$expr":       bson.M{"$eq": []interface{}{"$group_id", "$$groupId"}},
+					"deleted_for": bson.M{"$ne": userObjectID},
+				}},
 				{"$sort": bson.M{"created_at": -1}},
 				{"$limit": 1},
 			},

@@ -146,7 +146,7 @@ export default function ChatWindow() {
 
       setHasMore(newMessages.length >= limit);
     } catch (err) {
-      console.error("❌ Lỗi khi tải thêm tin nhắn:", err);
+      console.error("Lỗi khi tải thêm tin nhắn:", err);
     } finally {
       setIsLoadingMore(false);
     }
@@ -166,7 +166,8 @@ export default function ChatWindow() {
           handleUpdateSeen(data.message);
           break;
         case "delete_for_me":
-          handleDeleteForMe(data.payload);
+          console.log("delete", data.message);
+          handleDeleteForMe(data.message);
           break;
       }
     };
@@ -177,12 +178,12 @@ export default function ChatWindow() {
 
   // Xử lý delete_for_me
   const handleDeleteForMe = (payload: {
-    UserID: string;
-    MessageIDs: string[];
+    user_id: string;
+    message_ids: string[];
   }) => {
-    if (!payload || payload.UserID !== user?.data.id) return;
+    if (!payload || payload.user_id !== user?.data.id) return;
 
-    const messageIDsToDelete = new Set(payload.MessageIDs);
+    const messageIDsToDelete = new Set(payload.message_ids);
 
     // Xoá trong cache
     setMessagesCache((prev) => {

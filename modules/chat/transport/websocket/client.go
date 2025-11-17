@@ -132,9 +132,10 @@ func (c *Client) ReadPump(db *mongo.Database) {
 					return
 				}
 
-				if err := kafka.SendMessage("chat-topic", msgCopy.SenderID.Hex(), string(data)); err != nil {
-					log.Println("Kafka send error:", err)
-				}
+				// if err := kafka.SendMessage("chat-topic", msgCopy.SenderID.Hex(), string(data)); err != nil {
+				// 	log.Println("Kafka send error:", err)
+				// }
+				kafka.EnqueueMessage("chat-topic", msgCopy.SenderID.Hex(), string(data))
 			}()
 
 		case "update_seen":
@@ -213,7 +214,6 @@ func (c *Client) ReadPump(db *mongo.Database) {
 			if delMsg == nil {
 				continue
 			}
-
 			// Convert UserID
 			userID, err := primitive.ObjectIDFromHex(delMsg.UserID)
 			if err != nil {
@@ -232,6 +232,12 @@ func (c *Client) ReadPump(db *mongo.Database) {
 				messageIDs = append(messageIDs, id)
 			}
 
+			// Realtime: gửi event này về chính user (ẩn tin nhắn đó)
+			c.Hub.Broadcast <- HubEvent{
+				Type:    "delete_for_me",
+				Payload: delMsg,
+			}
+
 			// Gửi lên Kafka để consumer xử lý lưu vào DB
 			go func() {
 				data, err := json.Marshal(delMsg)
@@ -244,18 +250,6 @@ func (c *Client) ReadPump(db *mongo.Database) {
 					log.Println("Kafka send error:", err)
 				}
 			}()
-
-			// Realtime: gửi event này về chính user (ẩn tin nhắn đó)
-			c.Hub.Broadcast <- HubEvent{
-				Type: "delete_for_me",
-				Payload: struct {
-					UserID     string   `json:"user_id"`
-					MessageIDs []string `json:"message_ids"`
-				}{
-					UserID:     delMsg.UserID,
-					MessageIDs: delMsg.MessageIDs,
-				},
-			}
 
 		}
 

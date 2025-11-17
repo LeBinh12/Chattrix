@@ -57,6 +57,7 @@ export default function MessageItem({
 
   // xóa tin nhắn
   const onDeleteMessage = (messageId: string) => {
+    console.log("messageID", messageId);
     socketManager.sendDeleteMessageForMe(currentUserId ?? "", [messageId]);
   };
 

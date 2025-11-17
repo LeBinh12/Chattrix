@@ -223,10 +223,7 @@ func (h *Hub) Run() {
 
 				// xử lý gửi về client chính mình khi xóa tin nhắn
 			case "delete_for_me":
-				payload := event.Payload.(struct {
-					UserID     string
-					MessageIDs []string
-				})
+				payload := event.Payload.(*models.DeleteMessageForMe)
 
 				if sessions, ok := h.Clients[payload.UserID]; ok {
 					data, _ := json.Marshal(map[string]interface{}{

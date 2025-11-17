@@ -28,8 +28,9 @@ func (s *MongoChatStore) GetMessage(ctx context.Context, SenderID, ReceiverID, G
 		}
 
 		filter = bson.M{
-			"group_id":   GroupID,
-			"created_at": bson.M{"$gte": member.JoinedAt}, // Chỉ lấy từ lúc join
+			"group_id":    GroupID,
+			"created_at":  bson.M{"$gte": member.JoinedAt}, // Chỉ lấy từ lúc join
+			"deleted_for": bson.M{"$ne": SenderID},
 		}
 	} else {
 		filter = bson.M{
@@ -37,6 +38,7 @@ func (s *MongoChatStore) GetMessage(ctx context.Context, SenderID, ReceiverID, G
 				{"sender_id": SenderID, "receiver_id": ReceiverID},
 				{"sender_id": ReceiverID, "receiver_id": SenderID},
 			},
+			"deleted_for": bson.M{"$ne": SenderID},
 		}
 	}
 

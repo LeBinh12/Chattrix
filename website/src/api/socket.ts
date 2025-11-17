@@ -107,11 +107,13 @@ class SocketManager {
 
     const msg = {
       type: "delete_for_me", // trùng với topic Kafka
-      message: {
+      delete_msg: {
         user_id: userId,
         message_ids: messageIds,
       },
     };
+
+    console.log("msg", msg)
 
     this.socket.send(JSON.stringify(msg));
   }
