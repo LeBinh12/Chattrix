@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   X,
@@ -32,6 +32,22 @@ export default function MediaViewer({
   const currentMedia = mediaItems[currentIndex];
   const isVideo = currentMedia?.type === "video";
 
+  const handlePrev = useCallback(
+    () =>
+      setCurrentIndex((prev) =>
+        prev > 0 ? prev - 1 : mediaItems.length - 1
+      ),
+    [mediaItems.length]
+  );
+
+  const handleNext = useCallback(
+    () =>
+      setCurrentIndex((prev) =>
+        prev < mediaItems.length - 1 ? prev + 1 : 0
+      ),
+    [mediaItems.length]
+  );
+
   useEffect(() => {
     if (!isOpen) return;
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -41,18 +57,12 @@ export default function MediaViewer({
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, currentIndex]);
+  }, [isOpen, handlePrev, handleNext, onClose]);
 
   useEffect(() => {
     setZoom(1);
     setRotation(0);
   }, [currentIndex]);
-
-  const handlePrev = () =>
-    setCurrentIndex((prev) => (prev > 0 ? prev - 1 : mediaItems.length - 1));
-
-  const handleNext = () =>
-    setCurrentIndex((prev) => (prev < mediaItems.length - 1 ? prev + 1 : 0));
 
   const handleZoomIn = () => setZoom((z) => Math.min(z + 0.25, 3));
   const handleZoomOut = () => setZoom((z) => Math.max(z - 0.25, 0.5));

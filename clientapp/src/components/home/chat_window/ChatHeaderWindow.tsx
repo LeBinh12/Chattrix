@@ -5,11 +5,7 @@ import TimeAgo from "react-timeago";
 import vi from "react-timeago/lib/language-strings/vi";
 import buildFormatter from "react-timeago/lib/formatters/buildFormatter";
 import { useRecoilState } from "recoil";
-import {
-  activePanelAtom,
-  chatInfoPanelVisibleAtom,
-  chatSearchModalVisibleAtom,
-} from "../../../recoil/atoms/uiAtom";
+import { activePanelAtom } from "../../../recoil/atoms/uiAtom";
 
 const formatter = buildFormatter(vi);
 
@@ -28,12 +24,6 @@ export default function ChatHeaderWindow({
   status,
   update_at,
 }: ChatHeaderWindowProps) {
-  const [isPanelVisible, setPanelVisible] = useRecoilState(
-    chatInfoPanelVisibleAtom
-  );
-  const [isSearchModal, setSearchModal] = useRecoilState(
-    chatSearchModalVisibleAtom
-  );
   const [activePanel, setActivePanel] = useRecoilState(activePanelAtom);
 
   return (

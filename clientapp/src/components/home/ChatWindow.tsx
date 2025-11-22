@@ -13,6 +13,19 @@ import type { Messages } from "../../types/Message";
 import { messageAPI } from "../../api/messageApi";
 import { socketManager } from "../../api/socket";
 
+type ChatSocketEvent =
+  | { type: "chat"; message: Messages }
+  | {
+      type: "update_seen";
+      message: {
+        last_seen_message_id?: string;
+        receiver_id?: string;
+        sender_id?: string;
+      };
+    }
+  | { type: "delete_for_me"; message: { user_id: string; message_ids: string[] } }
+  | { type?: string; message?: unknown };
+
 type ChatWindowProps = {
   onBack?: () => void;
 };
@@ -215,27 +228,33 @@ export default function ChatWindow({ onBack }: ChatWindowProps) {
     if (!user?.data.id) return;
     socketManager.connect(user?.data.id);
 
-    const listener = (data: any) => {
+    const listener = (data: ChatSocketEvent) => {
       switch (data.type) {
         case "chat":
-          handleIncomingMessage(data.message);
+          if (data.message) {
+            handleIncomingMessage(data.message as Messages);
+          }
           break;
         case "update_seen":
-          handleUpdateSeen(data.message);
+          if (data.message) {
+            handleUpdateSeen(data.message);
+          }
           break;
         case "delete_for_me":
           console.log("delete", data.message);
-          handleDeleteForMe(data.message);
+          if (data.message) {
+            handleDeleteForMe(data.message);
+          }
           break;
       }
     };
 
     socketManager.addListener(listener);
     return () => socketManager.removeListener(listener);
-  }, [user?.data.id, conversationKey]);
+  }, [user?.data.id, conversationKey, handleDeleteForMe, handleIncomingMessage, handleUpdateSeen]);
 
   // Xử lý delete_for_me
-  const handleDeleteForMe = (payload: {
+  const handleDeleteForMe = useCallback((payload: {
     user_id: string;
     message_ids: string[];
   }) => {
@@ -258,10 +277,10 @@ export default function ChatWindow({ onBack }: ChatWindowProps) {
     setMessages((prev) =>
       prev.filter((msg) => !messageIDsToDelete.has(msg.id))
     );
-  };
+  }, [conversationKey, setMessagesCache, user?.data.id]);
 
   // Xử lý message mới
-  const handleIncomingMessage = (msg: Messages) => {
+  const handleIncomingMessage = useCallback((msg: Messages) => {
     if (!msg) return;
     const msgKey =
       msg.group_id && msg.group_id !== "000000000000000000000000"
@@ -292,11 +311,15 @@ export default function ChatWindow({ onBack }: ChatWindowProps) {
     ) {
       setHasLeftGroup(true);
     }
-  };
+  }, [conversationKey, playNotificationSound, selectedChat?.group_id, setMessagesCache, user?.data.id]);
 
   // Xử lý update seen
-  const handleUpdateSeen = (seenData: any) => {
-    if (!seenData) return;
+  const handleUpdateSeen = useCallback((seenData: {
+    last_seen_message_id?: string;
+    receiver_id?: string;
+    sender_id?: string;
+  }) => {
+    if (!seenData?.last_seen_message_id) return;
     const { last_seen_message_id, receiver_id, sender_id } = seenData;
     const seenConversationKey =
       sender_id === user?.data.id ? `user_${receiver_id}` : `user_${sender_id}`;
@@ -319,7 +342,7 @@ export default function ChatWindow({ onBack }: ChatWindowProps) {
     if (seenConversationKey === conversationKey) {
       setMessages((prev) => updateStatus(prev));
     }
-  };
+  }, [conversationKey, setMessagesCache, user?.data.id]);
 
   // Gửi seen status khi xem tin nhắn
   useEffect(() => {

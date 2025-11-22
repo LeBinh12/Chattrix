@@ -8,7 +8,7 @@ import { MemoryRouter } from 'react-router-dom';
 
 let root: ReactDOM.Root | null = null;
 
-export function mount(container: HTMLElement, props?: { basePath?: string; user?: any }) {
+export function mount(container: HTMLElement, props?: { basePath?: string; user?: unknown }) {
   const initialPath = props?.basePath || '/';
 
   if (!root) {

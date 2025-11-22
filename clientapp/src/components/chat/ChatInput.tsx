@@ -1,4 +1,4 @@
-import EmojiPicker, { Theme } from "emoji-picker-react";
+import EmojiPicker, { Theme, type EmojiClickData } from "emoji-picker-react";
 import { motion } from "framer-motion";
 import { Image, Send, Smile, ThumbsUp, FileText, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -7,7 +7,12 @@ import { toast } from "react-toastify";
 import type { Media } from "../../types/upload";
 import { socketManager } from "../../api/socket";
 
-export default function ChatInput({ senderID, receiverID }: any) {
+type ChatInputProps = {
+  senderID: { id: string };
+  receiverID: { user_id?: string; GroupID?: string };
+};
+
+export default function ChatInput({ senderID, receiverID }: ChatInputProps) {
   const [message, setMessage] = useState("");
   const [showPicker, setShowPicker] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]); // tạm lưu file
@@ -16,7 +21,7 @@ export default function ChatInput({ senderID, receiverID }: any) {
   const pickerRef = useRef<HTMLDivElement>(null);
   const [uploading, setUploading] = useState(false);
 
-  const handleEmojiClick = (emojiData: any) =>
+  const handleEmojiClick = (emojiData: EmojiClickData) =>
     setMessage((prev) => prev + emojiData.emoji);
 
   const handleSend = async () => {
@@ -37,10 +42,14 @@ export default function ChatInput({ senderID, receiverID }: any) {
             });
           }
         );
-      } catch (err: any) {
-        console.error("Upload lỗi:", err);
+      } catch (err) {
+        const error = err as {
+          response?: { data?: { error?: string } };
+          message?: string;
+        };
+        console.error("Upload lỗi:", error);
         toast.error(
-          `Upload file lỗi: ${err.response?.data?.error || err.message}`
+          `Upload file lỗi: ${error.response?.data?.error || error.message}`
         );
         setUploading(false);
         return;

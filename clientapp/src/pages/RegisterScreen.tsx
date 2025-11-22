@@ -121,9 +121,13 @@ export default function RegisterScreen() {
       const res = await authApi.register(formData);
       toast.success(res.message);
       navigation("/login");
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || "Đăng ký thất bại");
-      console.log(err.response?.data || err.message);
+    } catch (err) {
+      const error = err as {
+        response?: { data?: { message?: string } };
+        message?: string;
+      };
+      toast.error(error.response?.data?.message || "Đăng ký thất bại");
+      console.log(error.response?.data || error.message);
     }
   };
 

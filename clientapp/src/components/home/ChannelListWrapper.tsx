@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 
 interface ChannelListWrapperProps {
   children: (width: number) => React.ReactNode; // render props
@@ -14,18 +14,21 @@ export default function ChannelListWrapper({
   const minWidth = 60; // nhỏ nhất: chỉ hiện avatar
   const maxWidth = 400; // rộng nhất
 
-  const handleMouseMove = (e: MouseEvent) => {
-    if (!isResizing) return;
-    const newWidth =
-      e.clientX - (containerRef.current?.getBoundingClientRect().left || 0);
-    if (newWidth >= minWidth && newWidth <= maxWidth) {
-      setWidth(newWidth);
-    }
-  };
+  const handleMouseMove = useCallback(
+    (e: MouseEvent) => {
+      if (!isResizing) return;
+      const newWidth =
+        e.clientX - (containerRef.current?.getBoundingClientRect().left || 0);
+      if (newWidth >= minWidth && newWidth <= maxWidth) {
+        setWidth(newWidth);
+      }
+    },
+    [isResizing, maxWidth, minWidth]
+  );
 
-  const handleMouseUp = () => {
+  const handleMouseUp = useCallback(() => {
     setIsResizing(false);
-  };
+  }, []);
 
   useEffect(() => {
     window.addEventListener("mousemove", handleMouseMove);
@@ -34,7 +37,7 @@ export default function ChannelListWrapper({
       window.removeEventListener("mousemove", handleMouseMove);
       window.removeEventListener("mouseup", handleMouseUp);
     };
-  }, [isResizing]);
+  }, [handleMouseMove, handleMouseUp]);
 
   return (
     <div

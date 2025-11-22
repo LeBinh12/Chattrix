@@ -1,7 +1,8 @@
 import type { ReplyMessage } from "../types/Message";
 import type { Media } from "../types/upload";
 
-type MessageCallback = (data: any) => void;
+type MessagePayload = Record<string, unknown>;
+type MessageCallback = (data: MessagePayload) => void;
 
 class SocketManager {
   private socket: WebSocket | null = null;
@@ -69,7 +70,7 @@ class SocketManager {
   sendMessage(senderId: string, receiverId: string, groupID: string, content: string,
     mediaIDs: Media[], display_name?: string, avatar?: string, sender_avatar?: string, reply?: ReplyMessage) {
     if (!this.socket || this.socket.readyState !== WebSocket.OPEN) return;
-    const msg: any = {
+    const msg: MessagePayload = {
       type: "chat",
       message: {
         sender_id: senderId,
@@ -153,4 +154,3 @@ export const socketManager = new SocketManager();
 
 // Disconnect khi unload
 window.addEventListener("beforeunload", () => socketManager.disconnect());
-

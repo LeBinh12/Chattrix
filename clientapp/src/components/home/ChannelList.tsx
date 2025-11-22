@@ -1,4 +1,4 @@
-import { ChevronDown, Search, UserPlus, UserPlus2, Users } from "lucide-react";
+import { ChevronDown, Search, Users } from "lucide-react";
 import { useState, useEffect } from "react";
 import { conversationApi } from "../../api/conversation";
 import { TING } from "../../assets/paths";
@@ -28,6 +28,21 @@ const ding = new Howl({
 interface ChannelListProps {
   width: number;
 }
+
+type ConversationSocketData = {
+  type?: string;
+  message?: {
+    group_id?: string;
+    user_id?: string;
+    display_name?: string;
+    avatar?: string;
+    last_message?: string;
+    last_message_type?: string;
+    sender_id?: string;
+  };
+  user_id?: string;
+  status?: Conversation["status"];
+};
 
 export default function ChannelList({ width }: ChannelListProps) {
   const user = useRecoilValue(userAtom);
@@ -61,7 +76,7 @@ export default function ChannelList({ width }: ChannelListProps) {
 
     socketManager.connect(user.data.id);
 
-    const listener = async (data: any) => {
+    const listener = async (data: ConversationSocketData) => {
       if (data.type === "conversations" && data.message) {
         const msg = data.message;
         const isGroup =

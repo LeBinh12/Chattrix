@@ -30,9 +30,7 @@ export default function ChatInfoHeader({
   const selectedChat = useRecoilValue(selectedChatState);
   const [loading, setLoading] = useState(false);
   const user = useRecoilValue(userAtom);
-  const [isPanelVisible, setPanelVisible] = useRecoilState(
-    chatInfoPanelVisibleAtom
-  );
+  const [, setPanelVisible] = useRecoilState(chatInfoPanelVisibleAtom);
 
   useEffect(() => {
     (async () => {
@@ -57,7 +55,7 @@ export default function ChatInfoHeader({
       }
       setLoading(false);
     })();
-  }, [selectedChat]);
+  }, [selectedChat, setBell]);
 
   const handleBellClick = () => {
     if (!bell?.is_muted) {
@@ -88,7 +86,7 @@ export default function ChatInfoHeader({
 
       setBell({ ...bell, is_muted: false, mute_until: "" });
       toast.success("Đã bật thông báo");
-    } catch (err) {
+    } catch {
       toast.error("Không thể bật lại thông báo");
     }
   };
@@ -126,7 +124,7 @@ export default function ChatInfoHeader({
           ? "Đã tắt thông báo vĩnh viễn"
           : `Đã tắt thông báo trong ${label}`
       );
-    } catch (err) {
+    } catch {
       toast.error("Không thể tắt thông báo");
     } finally {
       setShowMuteModal(false);

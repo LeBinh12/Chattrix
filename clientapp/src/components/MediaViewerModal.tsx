@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   X,
@@ -48,6 +48,14 @@ export default function MediaViewerModal({
   }, [currentIndex]);
 
   // Keyboard navigation
+  const handlePrevious = useCallback(() => {
+    setCurrentIndex((prev) => (prev > 0 ? prev - 1 : mediaItems.length - 1));
+  }, [mediaItems.length]);
+
+  const handleNext = useCallback(() => {
+    setCurrentIndex((prev) => (prev < mediaItems.length - 1 ? prev + 1 : 0));
+  }, [mediaItems.length]);
+
   useEffect(() => {
     if (!isOpen) return;
 
@@ -67,15 +75,7 @@ export default function MediaViewerModal({
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, currentIndex]);
-
-  const handlePrevious = () => {
-    setCurrentIndex((prev) => (prev > 0 ? prev - 1 : mediaItems.length - 1));
-  };
-
-  const handleNext = () => {
-    setCurrentIndex((prev) => (prev < mediaItems.length - 1 ? prev + 1 : 0));
-  };
+  }, [isOpen, handlePrevious, handleNext, onClose]);
 
   const handleZoomIn = () => {
     setZoom((prev) => Math.min(prev + 0.25, 3));

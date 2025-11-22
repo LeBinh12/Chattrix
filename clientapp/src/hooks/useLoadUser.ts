@@ -21,7 +21,7 @@ export const useLoadUser = () => {
         if (!res.data.is_profile_complete) {
           navigate("/register-oauth");
         }
-      } catch (err) {
+      } catch {
         console.warn("Token hết hạn hoặc không hợp lệ");
         localStorage.removeItem("access_token");
         setUser(null);
@@ -29,7 +29,7 @@ export const useLoadUser = () => {
     };
 
     loadUser();
-  }, [navigate]);
+  }, [navigate, setUser]);
 
 
 

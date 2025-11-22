@@ -58,21 +58,21 @@ export default function MediaPreview({
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [currentIndex, allMedia.length]);
+  }, [onClose, nextMedia, prevMedia]);
 
-  const nextMedia = () => {
+  const nextMedia = useCallback(() => {
     if (allMedia.length <= 1) return;
     setCurrentIndex((prev) => (prev + 1) % allMedia.length);
     setIsLoading(true);
     setZoom(1);
-  };
+  }, [allMedia.length]);
 
-  const prevMedia = () => {
+  const prevMedia = useCallback(() => {
     if (allMedia.length <= 1) return;
     setCurrentIndex((prev) => (prev - 1 + allMedia.length) % allMedia.length);
     setIsLoading(true);
     setZoom(1);
-  };
+  }, [allMedia.length]);
 
   const handleZoomIn = () => {
     setZoom((prev) => Math.min(prev + 0.25, 3));

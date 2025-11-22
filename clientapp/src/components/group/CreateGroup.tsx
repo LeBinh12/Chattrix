@@ -1,10 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { X, Search, Camera, Check } from "lucide-react";
 import { conversationApi } from "../../api/conversation";
-import { LOGO } from "../../assets/paths";
 import { toast } from "react-toastify";
 import { groupApi } from "../../api/group";
-import { API_ENDPOINTS } from "../../config/api";
 import { motion, AnimatePresence } from "framer-motion";
 import UserAvatar from "../UserAvatar";
 
@@ -292,7 +290,6 @@ export default function CreateGroupModal({
                 <div className="px-5 py-3">
                   {users.map((user) => {
                     const isSelected = selectedMembers.has(user.id);
-                    const firstChar = user.name?.[0]?.toUpperCase() || "?";
 
                     return (
                       <div

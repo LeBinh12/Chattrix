@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { motion } from "framer-motion";
-import { X, Search, User, Calendar, ChevronDown } from "lucide-react";
+import { Search, User, Calendar, ChevronDown } from "lucide-react";
 import { useRecoilValue } from "recoil";
 import { selectedChatState } from "../../recoil/atoms/chatAtom";
 import { searchApi } from "../../api/searchApi";

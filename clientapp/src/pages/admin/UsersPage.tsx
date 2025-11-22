@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import SearchBar from "../../components/admin/SearchBar";
 import { userAdminApi } from "../../api/admin/userAdminApi";
 import { toast } from "react-toastify";
@@ -15,11 +15,7 @@ export default function UsersPage() {
   const [limit] = useState(10);
   const [total, setTotal] = useState(0);
 
-  useEffect(() => {
-    fetchUsers();
-  }, [page, limit]);
-
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async () => {
     try {
       setLoading(true);
       const response = await userAdminApi.getPagination(page, limit);
@@ -31,7 +27,11 @@ export default function UsersPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [limit, page]);
+
+  useEffect(() => {
+    fetchUsers();
+  }, [fetchUsers]);
 
   return (
     <div className="p-1.5 space-y-1.5">

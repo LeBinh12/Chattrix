@@ -17,7 +17,7 @@ import { motion } from "framer-motion";
 import { toast } from "react-toastify";
 import { uploadAPI } from "../../../api/upload";
 import type { Media } from "../../../types/upload";
-import EmojiPicker, { Theme } from "emoji-picker-react";
+import EmojiPicker, { Theme, type EmojiClickData } from "emoji-picker-react";
 import { socketManager } from "../../../api/socket";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
@@ -56,7 +56,6 @@ export default function ChatInputWindow({
   const [uploading, setUploading] = useState(false);
   const pickerRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [editorHeight, setEditorHeight] = useState(48);
 
   // Recoil state để lấy thông tin reply
   const replyTo = useRecoilValue(replyMessageState);
@@ -126,7 +125,7 @@ export default function ChatInputWindow({
     return hasText || selectedFiles.length > 0;
   };
 
-  const handleEmojiClick = (emojiData: any) => {
+  const handleEmojiClick = (emojiData: EmojiClickData) => {
     if (!editor) return;
 
     editor.commands.focus();
@@ -156,10 +155,14 @@ export default function ChatInputWindow({
             });
           }
         );
-      } catch (err: any) {
-        console.error("Upload lỗi:", err);
+      } catch (err) {
+        const error = err as {
+          response?: { data?: { error?: string } };
+          message?: string;
+        };
+        console.error("Upload lỗi:", error);
         toast.error(
-          `Upload file lỗi: ${err.response?.data?.error || err.message}`
+          `Upload file lỗi: ${error.response?.data?.error || error.message}`
         );
         setUploading(false);
         return;
@@ -186,7 +189,6 @@ export default function ChatInputWindow({
     setProgress([]);
     setUploading(false);
     setShowRichText(false);
-    setEditorHeight(60);
     setReplyTo(null); // Clear reply state
     editor?.commands.focus();
   };

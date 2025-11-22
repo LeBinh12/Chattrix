@@ -33,7 +33,7 @@ export default function RecentMediaSection({
 
       {mediaItems.length > 0 ? (
         <div className="grid grid-cols-4 gap-1.5">
-          {mediaItems.slice(0, 8).map((media, index) => (
+          {mediaItems.slice(0, 8).map((media) => (
             <div
               key={media.id}
               onClick={() => onMediaClick(media.id)}

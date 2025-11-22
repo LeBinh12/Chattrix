@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { LOGO } from "../../assets/paths";
 import { ChevronDown } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";

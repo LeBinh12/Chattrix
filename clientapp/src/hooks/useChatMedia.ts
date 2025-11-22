@@ -1,12 +1,15 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { FileItem, MediaItem } from "../types/media";
 import type { Messages } from "../types/Message";
 import { socketManager } from "../api/socket";
 import { messageAPI } from "../api/messageApi";
 
 
+type ChatTarget = { user_id?: string; group_id?: string } | null;
+type ChatSocketPayload = { type?: string; message?: Messages };
+
 interface UseChatMediaProps {
-    selectedChat: any;
+    selectedChat: ChatTarget;
     userId?: string;
 }
 
@@ -23,7 +26,7 @@ export const useChatMedia = ({ selectedChat, userId }: UseChatMediaProps) => {
     };
 
     // Helper function để extract media và files từ message
-    const extractMediaFromMessage = (msg: Messages) => {
+    const extractMediaFromMessage = useCallback((msg: Messages) => {
         const mediaItems: MediaItem[] = [];
         const fileItems: FileItem[] = [];
 
@@ -52,7 +55,7 @@ export const useChatMedia = ({ selectedChat, userId }: UseChatMediaProps) => {
         }
 
         return { mediaItems, fileItems };
-    };
+    }, []);
 
     // Fetch media và files ban đầu
     useEffect(() => {
@@ -86,15 +89,15 @@ export const useChatMedia = ({ selectedChat, userId }: UseChatMediaProps) => {
         };
 
         fetchMediaAndFiles();
-    }, [selectedChat, userId]);
+    }, [extractMediaFromMessage, selectedChat, userId]);
 
     // Lắng nghe socket realtime để cập nhật media/files
     useEffect(() => {
         if (!userId || !selectedChat) return;
 
-        const listener = (data: any) => {
+        const listener = (data: ChatSocketPayload) => {
             if (data.type === "chat" && data.message) {
-                const msg: Messages = data.message;
+                const msg = data.message;
 
                 // Kiểm tra xem tin nhắn có thuộc cuộc trò chuyện hiện tại không
                 const isCurrentChat =
@@ -124,7 +127,7 @@ export const useChatMedia = ({ selectedChat, userId }: UseChatMediaProps) => {
         return () => {
             socketManager.removeListener(listener);
         };
-    }, [userId, selectedChat]);
+    }, [extractMediaFromMessage, selectedChat, userId]);
 
     return { recentMedia, recentFiles };
 };

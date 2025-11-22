@@ -90,9 +90,13 @@ export default function CompleteProfileScreen() {
 
       toast.success(res.message || "Hoàn thiện hồ sơ thành công!");
       navigation("/home"); // hoặc trang chủ của bạn
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || "Hoàn thiện hồ sơ thất bại");
-      console.log(err.response?.data || err.message);
+    } catch (err) {
+      const error = err as {
+        response?: { data?: { message?: string } };
+        message?: string;
+      };
+      toast.error(error.response?.data?.message || "Hoàn thiện hồ sơ thất bại");
+      console.log(error.response?.data || error.message);
     }
   };
 
