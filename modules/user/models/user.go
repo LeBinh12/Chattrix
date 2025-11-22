@@ -43,3 +43,9 @@ type LoginRequest struct {
 	Username string `json:"username" binding:"required"`
 	Password string `json:"password" binding:"required"`
 }
+
+type UserWithStatus struct {
+	User          User   `json:"user"`
+	Status        string `json:"status"` // online || offline
+	MessagesCount int    `json:"messages_count"`
+}

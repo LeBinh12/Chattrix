@@ -15,6 +15,14 @@ const (
 	StatusFailed    MessageStatus = "failed"
 )
 
+type ReplyMessageMini struct {
+	ID       primitive.ObjectID `json:"id"`
+	Sender   string             `json:"sender"`
+	Content  string             `json:"content"`
+	MediaUrl string             `json:"media_url,omitempty"` // tham chiếu nhiều media
+	Type     MediaType          `json:"type"`
+}
+
 type Message struct {
 	ID         primitive.ObjectID   `bson:"_id,omitempty" json:"id"`
 	SenderID   primitive.ObjectID   `bson:"sender_id" json:"sender_id"`
@@ -27,7 +35,7 @@ type Message struct {
 	Status     MessageStatus        `bson:"status" json:status`
 	IsRead     bool                 `bson:"is_read" json:"is_read"`
 	DeletedFor []primitive.ObjectID `bson:"deleted_for,omitempty" json:"deleted_for"` // lưu user nào đã xóa
-
+	Reply      ReplyMessageMini     `bson:"reply,omitempty" json:"reply,omitempty"`
 }
 
 type MessageReaction struct {
@@ -65,6 +73,7 @@ type MessageResponse struct {
 	IsRead       bool               `json:"is_read"`
 	MediaIDs     []Media            `json:"media_ids,omitempty"`
 	Type         MediaType          `bson:"type" json:"type"` // "image", "video", "file"
+	Reply        ReplyMessageMini   `bson:"reply,omitempty" json:"reply,omitempty"`
 
 	DisplayName     string    `json:"display_name"`
 	Avatar          string    `json:"avatar"`

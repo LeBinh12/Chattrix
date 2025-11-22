@@ -132,10 +132,10 @@ func (c *Client) ReadPump(db *mongo.Database) {
 					return
 				}
 
-				// if err := kafka.SendMessage("chat-topic", msgCopy.SenderID.Hex(), string(data)); err != nil {
-				// 	log.Println("Kafka send error:", err)
-				// }
-				kafka.EnqueueMessage("chat-topic", msgCopy.SenderID.Hex(), string(data))
+				if err := kafka.SendMessage("chat-topic", msgCopy.SenderID.Hex(), string(data)); err != nil {
+					log.Println("Kafka send error:", err)
+				}
+				// kafka.EnqueueMessage("chat-topic", msgCopy.SenderID.Hex(), string(data))
 			}()
 
 		case "update_seen":

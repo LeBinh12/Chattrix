@@ -1,0 +1,307 @@
+@import "tailwindcss";
+@import 'ag-grid-community/styles/ag-grid.css';
+@import 'ag-grid-community/styles/ag-theme-alpine.css';
+/* Reset padding/margin cơ bản */
+.ag-theme-quartz * {
+  padding: 0;
+  margin: 0;
+  line-height: 1;
+}
+.ag-theme-alpine .ag-header-cell.pinned-left {
+  border-bottom: 1px solid #e5e7eb !important; /* Tailwind gray-200 */
+}
+
+
+.ag-theme-alpine .ag-header-cell-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* Header cell label custom */
+.ag-theme-alpine .ag-header-cell-label {
+  color: gray;
+  display: flex;
+  align-items: center;
+  justify-content: space-between; /* push icon sang phải */
+  padding-right: 8px; /* khoảng cách bên phải */
+}
+
+/* Tạo icon filter */
+.ag-theme-alpine .ag-header-cell-label::after {
+  content: "⏷"; /* Icon filter có thể thay bằng SVG inline nếu muốn */
+  margin-left: 8px;
+  color: #9ca3af; /* text-gray-400 */
+  font-size: 14px;
+  display: inline-flex;
+  align-items: center;
+  border-right: 1px solid #d1d5db; /* gray-300 */
+  padding-right: 6px; /* khoảng cách icon với line */
+  height: 60%; /* height ngắn hơn cell để nhìn thanh thoát */
+}
+.ag-theme-alpine .ag-row {
+  min-height: 36px !important; /* thấp hơn default 48px */
+}
+
+
+
+
+/* Header */
+.ag-theme-quartz .ag-header {
+  background-color: #dbeafe; /* bg-blue-100 */
+  color: #1e3a8a; /* text-blue-800 */
+  font-weight: bold;
+  border-bottom: 1px solid #e4e8f1;
+}
+
+/* Header text alignment */
+.ag-theme-quartz .ag-header-cell-label {
+  display: flex;
+  justify-content: flex-start;
+  padding-left: 0.5rem;
+  padding-right: 0.5rem;
+}
+
+/* Row cơ bản */
+.ag-theme-quartz .ag-row {
+  background-color: #ffffff; /* bg-white */
+  color: #111827; /* text-gray-900 */
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+
+/* Row hover */
+.ag-theme-quartz .ag-row:hover {
+  background-color: #eff6ff; /* bg-blue-50 */
+}
+
+/* Row selected */
+.ag-theme-quartz .ag-row-selected {
+  background-color: #bfdbfe; /* bg-blue-200 */
+  font-weight: 800;
+}
+
+/* Cell */
+/* Căn giữa tất cả các cell */
+.ag-theme-alpine .ag-cell {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 0 8px !important; /* khoảng cách trái phải */
+}
+
+/* Căn giữa nội dung floating filter */
+.ag-theme-alpine .ag-floating-filter-input {
+  text-align: center;
+}
+
+/* Checkbox căn chỉnh */
+.ag-theme-quartz .ag-checkbox-input {
+  width: 1rem;  /* w-4 */
+  height: 1rem; /* h-4 */
+}
+
+/* Scrollbar */
+.ag-theme-quartz .ag-body-viewport::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.ag-theme-quartz .ag-body-viewport::-webkit-scrollbar-thumb {
+  background-color: #93c5fd; /* bg-blue-300 */
+  border-radius: 9999px;     /* rounded-full */
+}
+
+/* Optional: border radius và shadow cho table */
+.ag-theme-quartz .ag-root-wrapper {
+  border-radius: 0.75rem; /* rounded-xl */
+  box-shadow: 0 1px 2px rgba(0,0,0,0.05); /* shadow-sm */
+}
+
+/* Header checkbox */
+.ag-theme-quartz .ag-header-checkbox {
+  margin-left: 0.5rem; /* ml-2 */
+}
+
+/* Checkbox bên trái chữ trong cellRenderer */
+.ag-theme-quartz .flex.items-center.gap-2 input[type="checkbox"] {
+  margin-right: 0.5rem; /* mr-2 */
+}
+
+/* Row và cell height */
+.ag-theme-quartz .ag-row,
+.ag-theme-quartz .ag-cell {
+  height: 36px;
+  line-height: 1.25rem;
+}
+
+
+@layer utilities {
+  .scrollbar-thin::-webkit-scrollbar {
+    height: 6px;
+    width: 6px;
+  }
+
+  /* TipTap Prose Styles */
+  .prose {
+    color: #374151;
+  }
+
+  /* Headings */
+  .prose h1 { 
+    font-size: 2rem; 
+    font-weight: 700; 
+    line-height: 1.25;
+    margin-top: 0.5rem;
+    margin-bottom: 0.5rem;
+  }
+  
+  .prose h2 { 
+    font-size: 1.75rem; 
+    font-weight: 700; 
+    line-height: 1.3;
+    margin-top: 0.5rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .prose h3 { 
+    font-size: 1.5rem; 
+    font-weight: 600; 
+    line-height: 1.35;
+    margin-top: 0.5rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .prose h4 { 
+    font-size: 1.25rem; 
+    font-weight: 600; 
+    line-height: 1.4;
+    margin-top: 0.5rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .prose h5 { 
+    font-size: 1.125rem; 
+    font-weight: 600; 
+    line-height: 1.45;
+    margin-top: 0.5rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .prose h6 { 
+    font-size: 1rem; 
+    font-weight: 600; 
+    line-height: 1.5;
+    margin-top: 0.5rem;
+    margin-bottom: 0.5rem;
+  }
+
+  /* Lists */
+  .prose ul { 
+    list-style-position: outside;
+    list-style-type: disc; 
+    padding-left: 2rem;
+    margin-top: 0.5rem;
+    margin-bottom: 0.5rem;
+  }
+  
+  .prose ol { 
+    list-style-position: outside;
+    list-style-type: decimal; 
+    padding-left: 2rem;
+    margin-top: 0.5rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .prose ul li,
+  .prose ol li {
+    display: list-item;
+    margin-top: 0.25rem;
+    margin-bottom: 0.25rem;
+    padding-left: 0.5rem;
+  }
+  
+  .prose li > p {
+    margin: 0;
+    display: inline;
+  }
+  
+  /* Nested lists */
+  .prose ul ul,
+  .prose ul ol,
+  .prose ol ul,
+  .prose ol ol {
+    margin-top: 0.25rem;
+    margin-bottom: 0.25rem;
+  }
+
+  /* Blockquote */
+  .prose blockquote {
+    border-left: 4px solid #e5e7eb;
+    padding-left: 1rem;
+    margin-top: 0.5rem;
+    margin-bottom: 0.5rem;
+    font-style: italic;
+    color: #6b7280;
+  }
+
+  /* Paragraph */
+  .prose p {
+    margin-top: 0.5rem;
+    margin-bottom: 0.5rem;
+    line-height: 1.625;
+  }
+
+  /* Code & pre */
+  .prose code {
+    background-color: #f3f4f6;
+    padding: 0.125rem 0.25rem;
+    border-radius: 0.25rem;
+    font-size: 0.875em;
+    font-family: 'Courier New', monospace;
+  }
+
+  .prose pre {
+    background-color: #1f2937;
+    color: #f9fafb;
+    padding: 1rem;
+    border-radius: 0.5rem;
+    overflow-x: auto;
+    margin-top: 0.5rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .prose pre code {
+    background-color: transparent;
+    padding: 0;
+    color: inherit;
+  }
+
+  /* Placeholder */
+  .prose .ProseMirror p.is-editor-empty:first-child::before {
+    content: attr(data-placeholder);
+    float: left;
+    color: #9ca3af;
+    pointer-events: none;
+    height: 0;
+  }
+
+  /* Remove margins for first/last children */
+  .prose > *:first-child {
+    margin-top: 0;
+  }
+
+  .prose > *:last-child {
+    margin-bottom: 0;
+  }
+
+  /* Focus outline */
+  .prose .ProseMirror:focus {
+    outline: none;
+  }
+
+  /* Selection */
+  .prose .ProseMirror ::selection {
+    background-color: #bfdbfe;
+  }
+}

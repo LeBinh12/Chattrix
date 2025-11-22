@@ -151,6 +151,25 @@ func (s *MongoChatStore) GetMessage(ctx context.Context, SenderID, ReceiverID, G
 				res.MediaIDs = append(res.MediaIDs, m)
 			}
 		}
+		// --- XỬ LÝ REPLY ---
+		if msg.Reply.ID != primitive.NilObjectID {
+			// Lấy sender của reply
+			replyUser, ok := userMap[msg.Reply.ID] // Nếu lưu ID sender trong reply
+			senderName := ""
+			if ok {
+				senderName = replyUser.DisplayName
+			} else {
+				senderName = msg.Reply.Sender
+			}
+
+			res.Reply = models.ReplyMessageMini{
+				ID:       msg.Reply.ID,
+				Sender:   senderName,
+				Content:  msg.Reply.Content,
+				Type:     msg.Reply.Type,
+				MediaUrl: msg.Reply.MediaUrl,
+			}
+		}
 
 		messageResponses = append(messageResponses, res)
 	}

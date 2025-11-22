@@ -1,0 +1,374 @@
+import React, { useState, useEffect } from "react";
+import { X, Search, Camera, Check } from "lucide-react";
+import { conversationApi } from "../../api/conversation";
+import { LOGO } from "../../assets/paths";
+import { toast } from "react-toastify";
+import { groupApi } from "../../api/group";
+import { API_ENDPOINTS } from "../../config/api";
+import { motion, AnimatePresence } from "framer-motion";
+import UserAvatar from "../UserAvatar";
+
+// Types
+interface User {
+  id: string;
+  name: string;
+  avatar: string;
+  online?: boolean;
+}
+
+interface CreateGroupModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onCreateGroup: () => void;
+}
+
+const CATEGORIES = [
+  { id: "all", label: "Tất cả" },
+  { id: "customers", label: "Customers" },
+  { id: "family", label: "Family" },
+  { id: "work", label: "Work" },
+  { id: "friends", label: "Friends" },
+  { id: "todo", label: "Todo" },
+];
+
+export default function CreateGroupModal({
+  isOpen,
+  onClose,
+  onCreateGroup,
+}: CreateGroupModalProps) {
+  const [groupName, setGroupName] = useState("");
+  const [groupImage, setGroupImage] = useState("");
+  const [imagePreview, setImagePreview] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedMembers, setSelectedMembers] = useState<Set<string>>(
+    new Set()
+  );
+  const [users, setUsers] = useState<User[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [tempQuery, setTempQuery] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [activeCategory, setActiveCategory] = useState("all");
+
+  // Fetch users
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const fetchUsers = async () => {
+      try {
+        setLoading(true);
+        const res = await conversationApi.getConversation(1, 50, searchQuery);
+        if (res.status === 200) {
+          const mappedUsers: User[] = res.data.data
+            .filter((item) => !!item.user_id)
+            .map((item) => ({
+              id: item.user_id,
+              name: item.display_name,
+              avatar: item.avatar || "https://via.placeholder.com/150",
+              online: item.status === "online",
+            }));
+          setUsers(mappedUsers);
+        }
+      } catch (error) {
+        console.error("Lỗi tải danh sách user:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchUsers();
+  }, [isOpen, searchQuery]);
+
+  // Reset when modal closes
+  useEffect(() => {
+    if (!isOpen) {
+      setGroupName("");
+      setGroupImage("");
+      setImagePreview("");
+      setSearchQuery("");
+      setSelectedMembers(new Set());
+      setTempQuery("");
+      setActiveCategory("all");
+    }
+  }, [isOpen]);
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const result = reader.result as string;
+        setImagePreview(result);
+        setGroupImage(result);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const toggleMember = (userId: string) => {
+    const newSelected = new Set(selectedMembers);
+    if (newSelected.has(userId)) {
+      newSelected.delete(userId);
+    } else {
+      newSelected.add(userId);
+    }
+    setSelectedMembers(newSelected);
+  };
+
+  const handleSubmit = async () => {
+    if (!groupName.trim() || selectedMembers.size === 0) {
+      toast.error("Vui lòng nhập tên nhóm và chọn ít nhất 1 thành viên!");
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+      const formData = new FormData();
+      formData.append("name", groupName);
+      formData.append("status", "active");
+
+      if (groupImage) {
+        const blob = await fetch(groupImage).then((res) => res.blob());
+        const file = new File([blob], "group.jpg", { type: blob.type });
+        formData.append("image", file);
+      }
+
+      const res = await groupApi.addGroup(formData);
+      if (res.status === 200) {
+        const groupId = res.data || res.data;
+        const memberIds = Array.from(selectedMembers);
+
+        for (const userId of memberIds) {
+          await groupApi.addMember({
+            group_id: groupId,
+            user_id: userId,
+            role: "member",
+          });
+        }
+
+        toast.success("Tạo nhóm thành công!");
+        onCreateGroup?.();
+        onClose();
+      } else {
+        toast.error("Không thể tạo nhóm!");
+      }
+    } catch (error) {
+      console.error("Lỗi tạo nhóm:", error);
+      toast.error("Đã xảy ra lỗi khi tạo nhóm!");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      setSearchQuery(tempQuery);
+    }
+  };
+
+  return (
+    <AnimatePresence>
+      {isOpen && (
+        <motion.div
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+          onClick={onClose}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.2 }}
+        >
+          <motion.div
+            className="bg-white w-full max-w-md max-h-[90vh] flex flex-col shadow-2xl rounded-lg overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.8, opacity: 0 }}
+            transition={{ duration: 0.2, ease: "easeOut" }}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 py-4 border-b-2 border-gray-200">
+              <h2 className="text-lg font-semibold text-gray-800">Tạo nhóm</h2>
+              <button
+                onClick={onClose}
+                className="p-1 hover:bg-gray-100 rounded-full transition-colors"
+              >
+                <X size={24} className="text-gray-600" />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="flex-1 overflow-y-auto">
+              {/* Group Info Section */}
+              <div className="px-5 py-3 bg-gray-50 flex items-center gap-4 border-b border-gray-200">
+                {/* Group Image */}
+                <label className="cursor-pointer relative">
+                  <div
+                    className="w-10 h-10 rounded-md bg-gray-100 flex items-center justify-center 
+      overflow-hidden border border-gray-300 shadow-sm hover:shadow-md transition-all"
+                  >
+                    {imagePreview ? (
+                      <img
+                        src={imagePreview}
+                        alt="Group"
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <Camera size={18} className="text-gray-600" />
+                    )}
+                  </div>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageChange}
+                    className="hidden"
+                  />
+                </label>
+
+                {/* Group Name */}
+                <input
+                  type="text"
+                  value={groupName}
+                  onChange={(e) => setGroupName(e.target.value)}
+                  placeholder="Tên nhóm..."
+                  className="flex-1 px-3 py-2 rounded-lg bg-white shadow-sm  
+      focus:outline-none focus:ring-2 focus:ring-blue-400 text-sm"
+                />
+              </div>
+
+              {/* Search Bar */}
+              <div className="px-5 py-1">
+                <div className="relative">
+                  <Search
+                    size={20}
+                    className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                  />
+                  <input
+                    type="text"
+                    value={tempQuery}
+                    onChange={(e) => setTempQuery(e.target.value)}
+                    onKeyDown={handleSearchKeyDown}
+                    placeholder="Nhập tên, số điện thoại, hoặc danh sách số điện thoại"
+                    className="w-full pl-10 pr-4 py-2 bg-gray-100 rounded-full text-sm focus:outline-none focus:bg-gray-200 transition-colors"
+                  />
+                </div>
+              </div>
+
+              {/* Categories */}
+              <div className="px-5 py-3 overflow-hidden">
+                <div className="border-b border-gray-300 pb-3">
+                  <div className="flex gap-2">
+                    {CATEGORIES.map((category) => (
+                      <button
+                        key={category.id}
+                        onClick={() => setActiveCategory(category.id)}
+                        className={`text-xs px-3 py-0.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
+                          activeCategory === category.id
+                            ? "bg-blue-500 text-white"
+                            : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                        }`}
+                      >
+                        {category.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Members List Header */}
+              <div className="px-5 ">
+                <p className="text-xs font-bold text-gray-800">
+                  Trò chuyện gần đây
+                </p>
+              </div>
+
+              {/* Loading */}
+              {loading && (
+                <div className="text-center py-8">
+                  <div className="inline-block w-8 h-8 border-3 border-gray-200 border-t-blue-500 rounded-full animate-spin"></div>
+                </div>
+              )}
+
+              {/* Members List */}
+              {!loading && (
+                <div className="px-5 py-3">
+                  {users.map((user) => {
+                    const isSelected = selectedMembers.has(user.id);
+                    const firstChar = user.name?.[0]?.toUpperCase() || "?";
+
+                    return (
+                      <div
+                        key={user.id}
+                        onClick={() => toggleMember(user.id)}
+                        className="
+flex items-center gap-3 py-2 cursor-pointer 
+hover:bg-blue-50 rounded-lg px-3 transition-all
+border border-transparent hover:border-blue-300
+"
+                      >
+                        <UserAvatar
+                          avatar={user.avatar}
+                          display_name={user.name}
+                          isOnline={user.online}
+                          size={48} // kích thước avatar
+                        />
+
+                        {/* User Info */}
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-gray-800 text-sm truncate">
+                            {user.name}
+                          </p>
+                        </div>
+
+                        {/* Checkbox */}
+                        <div
+                          className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all ${
+                            isSelected
+                              ? "bg-blue-500 border-blue-500"
+                              : "border-gray-300"
+                          }`}
+                        >
+                          {isSelected && (
+                            <Check size={14} className="text-white" />
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  {users.length === 0 && (
+                    <div className="text-center py-8">
+                      <p className="text-gray-500 text-sm">
+                        Không tìm thấy người dùng nào
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="flex items-center justify-end gap-3 px-5 py-3 border-t border-gray-300 bg-white">
+              <button
+                onClick={onClose}
+                className="text-sm px-6 py-2 text-gray-600 hover:bg-gray-100 rounded-md transition-colors font-medium"
+              >
+                Hủy
+              </button>
+              <button
+                onClick={handleSubmit}
+                disabled={
+                  submitting || !groupName.trim() || selectedMembers.size === 0
+                }
+                className="text-sm px-6 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                {submitting && (
+                  <div className=" w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                )}
+                <span>Tạo nhóm</span>
+              </button>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}

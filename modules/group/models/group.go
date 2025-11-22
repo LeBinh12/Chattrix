@@ -23,3 +23,22 @@ type GroupMember struct {
 	Status            string             `json:"status" bson:"status"`
 	JoinedAt          time.Time          `json:"joined_at" bson:"joined_at"`
 }
+
+type GroupDetail struct {
+	ID            primitive.ObjectID `json:"id" bson:"id"`
+	Name          string             `json:"name" bson:"name"`
+	Image         string             `json:"image" bson:"image"`
+	MembersCount  int64              `json:"members_count" bson:"members_count"`
+	MessagesCount int64              `json:"messages_count" bson:"messages_count"`
+}
+
+type UserInfoInGroup struct {
+	ID          primitive.ObjectID `json:"id" bson:"id"` // ID của GroupMember
+	UserID      primitive.ObjectID `json:"user_id" bson:"user_id"`
+	DisplayName string             `json:"display_name" bson:"display_name"` // từ collection users
+	Email       string             `json:"email" bson:"email"`
+	Avatar      string             `json:"avatar" bson:"avatar"`
+	JoinedAt    time.Time          `json:"joined_at" bson:"joined_at"`
+	Role        string             `json:"role" bson:"role"`
+	Status      string             `json:"status" bson:"status"`
+}

@@ -21,27 +21,27 @@ func (s *MongoChatStore) UploadMedia(ctx context.Context, media *models.Media) (
 	return media, nil
 }
 
-func (s *MongoChatStore) OpenMedia(ctx context.Context, ID primitive.ObjectID) (io.ReadSeeker, int64, time.Time, error) {
+func (s *MongoChatStore) OpenMedia(ctx context.Context, ID primitive.ObjectID) (io.ReadSeeker, int64, time.Time, models.MediaType, error) {
 
 	var media models.Media
 	err := s.db.Collection("medias").FindOne(ctx, bson.M{"_id": ID}).Decode(&media)
 
 	if err != nil {
-		return nil, 0, time.Time{}, err
+		return nil, 0, time.Time{}, "", err
 	}
 
 	// Lấy object từ MinIO
 	bucketName := "chat-media" // bucket của bạn
 	obj, err := config.MinioClient.GetObject(ctx, bucketName, media.URL, minio.GetObjectOptions{})
 	if err != nil {
-		return nil, 0, time.Time{}, err
+		return nil, 0, time.Time{}, "", err
 	}
 
 	// Lấy size
 	stat, err := obj.Stat()
 	if err != nil {
-		return nil, 0, time.Time{}, err
+		return nil, 0, time.Time{}, "", err
 	}
 
-	return obj, stat.Size, stat.LastModified, nil
+	return obj, stat.Size, stat.LastModified, media.Type, nil
 }

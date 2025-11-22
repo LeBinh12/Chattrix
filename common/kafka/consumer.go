@@ -16,31 +16,40 @@ import (
 	StorageGroup "my-app/modules/group/storage"
 
 	"github.com/IBM/sarama"
+	"github.com/elastic/go-elasticsearch/v8"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
 type chatConsumer struct {
 	db *mongo.Database
+	es *elasticsearch.Client
 }
 
-// Hàm này sẽ chạy Consumer của 1 Topic đã truyền ở trên và nó sẽ liên tục lắng nghe
-func StartConsumer(brokers []string, groupID string, topics []string, db *mongo.Database) {
+// StartConsumer listens to Kafka topics until the provided context is cancelled.
+func StartConsumer(ctx context.Context, brokers []string, groupID string, topics []string, db *mongo.Database, es *elasticsearch.Client) error {
 	config := sarama.NewConfig()
 	config.Version = sarama.V2_1_0_0
 	config.Consumer.Return.Errors = true
 
 	consumerGroup, err := sarama.NewConsumerGroup(brokers, groupID, config)
 	if err != nil {
-		log.Fatalf("Error creating consumer group: %v", err)
+		return fmt.Errorf("create consumer group: %w", err)
 	}
+	defer consumerGroup.Close()
 
-	handler := &chatConsumer{db: db}
-	ctx := context.Background()
+	handler := &chatConsumer{db: db, es: es}
 
 	for {
 		if err := consumerGroup.Consume(ctx, topics, handler); err != nil {
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
 			log.Printf("Consumer error: %v", err)
+		}
+
+		if ctx.Err() != nil {
+			return ctx.Err()
 		}
 	}
 }
@@ -59,13 +68,17 @@ func (c *chatConsumer) ConsumeClaim(sess sarama.ConsumerGroupSession, claim sara
 				log.Println("Unmarshal error:", err)
 				continue
 			}
+			esChatStore := storage.NewESChatStore(c.es) // implements ChatESIndexer
 			chatStore := storage.NewMongoChatStore(c.db)
-			chatBiz := biz.NewChatBiz(chatStore)
+			chatBiz := biz.NewChatBiz(chatStore, esChatStore)
 
 			// Lưu xuống database
 			if _, err := chatBiz.HandleMessage(context.Background(), chatMsg.SenderID.Hex(),
-				chatMsg.ReceiverID.Hex(), chatMsg.Content, chatMsg.Status, chatMsg.GroupID.Hex(), chatMsg.Type, chatMsg.MediaIDs, chatMsg.CreatedAt); err != nil {
+				chatMsg.ReceiverID.Hex(), chatMsg.Content, chatMsg.Status, chatMsg.GroupID.Hex(),
+				chatMsg.Type, chatMsg.MediaIDs, chatMsg.CreatedAt, chatMsg.Reply); err != nil {
+
 				log.Println("DB save error:", err)
+
 			}
 
 			sess.MarkMessage(msg, "")

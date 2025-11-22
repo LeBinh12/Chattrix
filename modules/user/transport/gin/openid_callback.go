@@ -52,7 +52,7 @@ func OpenIddictCallbackHandler(db *mongo.Database) gin.HandlerFunc {
 		oauth2Config := &oauth2.Config{
 			ClientID:     "chat-system",
 			ClientSecret: "",
-			RedirectURL:  "http://localhost:3000/auth/opendict/callback",
+			RedirectURL:  "http://localhost:5173/auth/opendict/callback",
 			Endpoint: oauth2.Endpoint{
 				AuthURL:  "http://localhost:9005/connect/authorize",
 				TokenURL: "http://localhost:9005/connect/token",
