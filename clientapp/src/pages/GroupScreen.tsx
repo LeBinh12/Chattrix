@@ -8,7 +8,7 @@ import {
   TrendingUp,
   Sparkles,
 } from "lucide-react";
-import { mockGroups } from "../data/group";
+import { mockGroups } from "../mockups/group";
 
 const categories = [
   "Tất cả",

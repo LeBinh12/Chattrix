@@ -8,8 +8,8 @@ import {
   Trash2,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { mockGroups } from "../../data/group";
 import { useNavigate } from "react-router-dom";
+import { mockGroups } from "../../mockups/group";
 
 // Types
 interface Group {

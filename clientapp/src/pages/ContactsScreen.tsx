@@ -9,7 +9,7 @@ import {
   UserX,
   Zap,
 } from "lucide-react";
-import { mockContacts } from "../data/contact";
+import { mockContacts } from "../mockups/contact";
 
 // Mock data cho danh bạ
 
