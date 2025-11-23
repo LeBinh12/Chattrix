@@ -193,6 +193,11 @@ export default function ChannelList({ width }: ChannelListProps) {
     );
   };
 
+  const truncateText = (text: string, max = 40) => {
+    if (!text) return "";
+    return text.length > max ? text.slice(0, max) + "..." : text;
+  };
+
   return (
     <>
       <div className="h-full flex flex-col bg-white">
@@ -388,7 +393,10 @@ export default function ChannelList({ width }: ChannelListProps) {
                           dangerouslySetInnerHTML={{
                             __html: `${
                               item.sender_id === user?.data.id ? "Bạn: " : ""
-                            }${item.last_message || "Chưa có tin nhắn"}`,
+                            }${truncateText(
+                              item.last_message || "Chưa có tin nhắn",
+                              40
+                            )}`,
                           }}
                         />
                         {hasUnread && (

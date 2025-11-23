@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Search, User, Calendar, ChevronDown } from "lucide-react";
 import { useRecoilValue, useSetRecoilState } from "recoil";
@@ -56,7 +56,7 @@ export default function ChatSearchPanel() {
 
         let items = res.data.data;
 
-        // ✅ Apply filter người gửi
+        //  Apply filter người gửi
         if (selectedSender === "me") {
           // Lọc tin nhắn của chính tôi
           items = items.filter((item) => item.sender_id === user?.data.id);
@@ -66,7 +66,7 @@ export default function ChatSearchPanel() {
         }
         // selectedSender === "all" thì không filter
 
-        // ✅ Apply filter ngày - MẶC ĐỊNH là "newest"
+        //  Apply filter ngày - MẶC ĐỊNH là "newest"
         if (selectedDate === "newest" || !selectedDate) {
           items.sort(
             (a, b) =>
@@ -113,7 +113,7 @@ export default function ChatSearchPanel() {
 
     const timer = setTimeout(doSearch, 300);
     return () => clearTimeout(timer);
-  }, [searchQuery, selectedSender, selectedDate, selectedChat]);
+  }, [searchQuery, selectedSender, selectedDate, selectedChat, user?.data.id]);
 
   const handleClearSearch = () => {
     setSearchQuery("");

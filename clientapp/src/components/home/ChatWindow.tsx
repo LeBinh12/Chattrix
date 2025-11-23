@@ -163,7 +163,7 @@ export default function ChatWindow({ onBack }: ChatWindowProps) {
             setMessages(cachedMsgs);
           }
         }
-      } catch (error: any) {
+      } catch (error: unknown) {
         // ✅ Xử lý lỗi - chỉ thông báo, giữ nguyên cache
         if (axios.isAxiosError(error)) {
           const status = error.response?.status;
