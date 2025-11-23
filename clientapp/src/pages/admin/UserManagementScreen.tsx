@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Eye, Mail, UserX, CheckCircle, Trash2, UserPlus } from "lucide-react";
 import { toast } from "react-toastify";
@@ -20,11 +20,7 @@ export default function UserManagementScreen() {
   const [limit] = useState(10);
   const [total, setTotal] = useState(0);
 
-  useEffect(() => {
-    fetchUsers();
-  }, [page, limit]);
-
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async () => {
     setLoading(true);
     try {
       const response = await userAdminApi.getPagination(page, limit);
@@ -37,7 +33,11 @@ export default function UserManagementScreen() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [limit, page]);
+
+  useEffect(() => {
+    fetchUsers();
+  }, [fetchUsers]);
 
   // Define columns for DataTable
   const columns: Column<UserStatus>[] = [

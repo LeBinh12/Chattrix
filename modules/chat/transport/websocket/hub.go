@@ -89,7 +89,8 @@ func (h *Hub) Run() {
 						// Tạo conversation preview riêng cho từng member
 						convPreview := &models.ConversationPreview{
 							SenderID:        msg.SenderID.Hex(),
-							UserID:          memberID.Hex(), // member nhận conversation
+							GroupID:         msg.GroupID.Hex(),
+							UserID:          "", // member nhận conversation
 							LastMessage:     msg.Content,
 							LastMessageType: string(msg.Type),
 							Avatar:          msg.Avatar,      // avatar nhóm
@@ -121,9 +122,7 @@ func (h *Hub) Run() {
 					})
 
 					for _, memberID := range members {
-						if memberID.Hex() == msg.SenderID.Hex() {
-							continue // đã gửi sender rồi
-						}
+
 						if sessions, ok := h.Clients[memberID.Hex()]; ok {
 							for _, c := range sessions {
 								select {

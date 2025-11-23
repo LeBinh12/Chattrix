@@ -21,6 +21,11 @@ import {
 import { userAtom } from "../recoil/atoms/userAtom";
 import { generatePKCECodes } from "../utils/pkce";
 
+type LoginResponse = {
+  message: string;
+  data: unknown;
+};
+
 export default function LoginScreen() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -32,7 +37,7 @@ export default function LoginScreen() {
   // --------------------------
   // Common Success Handler
   // --------------------------
-  const handleAfterLoginSuccess = async (res: any) => {
+  const handleAfterLoginSuccess = async (res: LoginResponse) => {
     toast.success(res.message);
     saveToken(res.data);
 
@@ -146,11 +151,12 @@ export default function LoginScreen() {
 
         toast.success("Đăng nhập thành công!");
         navigate("/home");
-      } catch (err: any) {
+      } catch (err) {
+        const error = err as { response?: { data?: { message?: string } } };
         const message =
-          err.response?.data?.message || "Đăng nhập OpenDict thất bại!";
+          error.response?.data?.message || "Đăng nhập OpenDict thất bại!";
         toast.error(message);
-        console.error(err);
+        console.error(error);
       } finally {
         popup?.close();
         window.removeEventListener("message", listener);

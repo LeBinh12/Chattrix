@@ -1,5 +1,5 @@
 // Topbar.tsx – nhận thêm props title và subtitle
-import { Bell, User, Menu, X } from "lucide-react";
+import { Bell, Menu, X } from "lucide-react";
 
 interface TopbarProps {
   isSidebarCollapsed: boolean;

@@ -3,33 +3,14 @@ import { AgGridReact } from "ag-grid-react";
 import type {
   ColDef,
   ICellRendererParams,
-  IHeaderParams,
   GridApi,
 } from "ag-grid-community";
-import {
-  useMemo,
-  useRef,
-  useState,
-  useCallback,
-  type CSSProperties,
-} from "react";
-import { Filter, MoreHorizontal, Plus } from "lucide-react";
+import { useMemo, useState, useCallback } from "react";
+import { MoreHorizontal, Plus } from "lucide-react";
 import { format } from "date-fns";
 import "ag-grid-community/styles/ag-grid.css";
 import "ag-grid-community/styles/ag-theme-alpine.css";
 import type { UserStatus } from "../../types/admin/user";
-
-// --- Custom Header Component ---
-const CustomHeader = (props: IHeaderParams) => (
-  <div className="flex items-center justify-between w-full h-full px-3">
-    <span className="text-sm font-semibold text-gray-700">
-      {props.displayName}
-    </span>
-    {props.enableMenu && (
-      <Filter size={14} className="text-gray-400 flex-shrink-0" />
-    )}
-  </div>
-);
 
 // --- UserTable Props ---
 interface UserTableAgProps {
@@ -45,38 +26,11 @@ interface UserTableAgProps {
 
 export default function UserTableAg({
   users,
-  searchTerm,
-  statusFilter,
   loading = false,
-  page,
-  total,
-  limit,
-  onPageChange,
 }: UserTableAgProps) {
-  const gridRef = useRef<AgGridReact<UserStatus>>(null);
   const [selectedRows, setSelectedRows] = useState<UserStatus[]>([]);
   const [gridApi, setGridApi] = useState<GridApi<UserStatus> | null>(null);
 
-  // --- Action menu cell ---
-  const ActionMenuCell = useCallback(
-    (params: ICellRendererParams<UserStatus>) => {
-      if (!params.data) return null;
-      return (
-        <div className="flex items-center justify-center h-full">
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              alert(`Hành động cho: ${params.data?.user.display_name}`);
-            }}
-            className="p-1.5 hover:bg-gray-100 rounded-md transition-colors"
-          >
-            <MoreHorizontal size={16} className="text-gray-500" />
-          </button>
-        </div>
-      );
-    },
-    []
-  );
   const firstRow: UserStatus = {
     user: {
       id: "",
@@ -157,15 +111,6 @@ export default function UserTableAg({
     ),
     []
   );
-
-  // --- Format Date ---
-  const formatDate = useCallback((dateString: string): string => {
-    try {
-      return format(new Date(dateString), "dd/MM/yyyy HH:mm:ss");
-    } catch {
-      return "—";
-    }
-  }, []);
 
   // --- Column Definitions ---
   const columnDefs: ColDef<UserStatus>[] = useMemo(
@@ -274,7 +219,7 @@ export default function UserTableAg({
           params.data?.status === "online" ? "Hoạt động" : "Offline",
       },
     ],
-    []
+    [StatusBadge]
   );
 
   // --- Grid Ready ---
@@ -297,7 +242,6 @@ export default function UserTableAg({
       {/* AG Grid */}
       <div className="ag-theme-alpine" style={{ height: "650px" }}>
         <AgGridReact<UserStatus>
-          ref={gridRef}
           rowData={[firstRow, ...users]}
           columnDefs={columnDefs}
           rowSelection="multiple"

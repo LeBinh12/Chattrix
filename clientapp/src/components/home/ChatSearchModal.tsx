@@ -1,11 +1,13 @@
 import { useState, useEffect, useMemo } from "react";
 import { motion } from "framer-motion";
-import { X, Search, User, Calendar, ChevronDown } from "lucide-react";
-import { useRecoilValue } from "recoil";
+import { Search, User, Calendar, ChevronDown } from "lucide-react";
+import { useRecoilValue, useSetRecoilState } from "recoil";
 import { selectedChatState } from "../../recoil/atoms/chatAtom";
 import { searchApi } from "../../api/searchApi";
 import { formatTimeAgo } from "../../utils/tomeAgo";
 import { LOGO } from "../../assets/paths";
+import { messageIDAtom } from "../../recoil/atoms/messageAtom";
+import { userAtom } from "../../recoil/atoms/userAtom";
 
 interface SearchResult {
   id: string;
@@ -17,20 +19,24 @@ interface SearchResult {
   highlightedContent?: string;
 }
 
+// Các tùy chọn filter cố định
+// Các tùy chọn filter cố định
+const senderOptions = [
+  { value: "all", label: "Tất cả" },
+  { value: "me", label: "Tôi gửi" },
+  { value: "others", label: "Nhóm" }, // Thay "Người khác gửi" thành "Nhóm"
+];
 export default function ChatSearchPanel() {
   const selectedChat = useRecoilValue(selectedChatState);
+  const user = useRecoilValue(userAtom);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedSender, setSelectedSender] = useState<string>("all");
-  const [selectedDate, setSelectedDate] = useState<string>("all");
+  const [selectedDate, setSelectedDate] = useState<string>("newest"); // Đổi từ "all" thành "newest"
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [isDateOpen, setIsDateOpen] = useState(false);
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
-  // Tự động tạo danh sách người gửi
-  const uniqueSenders = useMemo(() => {
-    const senders = new Set(searchResults.map((x) => x.senderName));
-    return Array.from(senders);
-  }, [searchResults]);
+  const setMessageID = useSetRecoilState(messageIDAtom);
 
   useEffect(() => {
     const doSearch = async () => {
@@ -50,13 +56,18 @@ export default function ChatSearchPanel() {
 
         let items = res.data.data;
 
-        // Apply filter người gửi
-        if (selectedSender !== "all") {
-          items = items.filter((item) => item.sender_name === selectedSender);
+        // ✅ Apply filter người gửi
+        if (selectedSender === "me") {
+          // Lọc tin nhắn của chính tôi
+          items = items.filter((item) => item.sender_id === user?.data.id);
+        } else if (selectedSender === "others") {
+          // Lọc tin nhắn của các thành viên khác (không phải tôi)
+          items = items.filter((item) => item.sender_id !== user?.data.id);
         }
+        // selectedSender === "all" thì không filter
 
-        // Apply filter ngày
-        if (selectedDate === "newest") {
+        // ✅ Apply filter ngày - MẶC ĐỊNH là "newest"
+        if (selectedDate === "newest" || !selectedDate) {
           items.sort(
             (a, b) =>
               new Date(b.created_at).getTime() -
@@ -110,7 +121,7 @@ export default function ChatSearchPanel() {
   };
 
   const handleResultClick = (resultId: string) => {
-    console.log("Navigate to message:", resultId);
+    setMessageID(resultId);
   };
 
   return (
@@ -164,7 +175,8 @@ export default function ChatSearchPanel() {
           >
             <User size={14} />
             <span className="text-xs font-medium">
-              {selectedSender === "all" ? "Người gửi" : selectedSender}
+              {senderOptions.find((opt) => opt.value === selectedSender)
+                ?.label || "Người gửi"}
             </span>
             <ChevronDown size={14} />
           </button>
@@ -176,34 +188,20 @@ export default function ChatSearchPanel() {
                 onClick={() => setIsFilterOpen(false)}
               />
               <div className="absolute top-full mt-1 left-0 bg-white border border-[#e4e8f1] rounded-lg shadow-xl py-0.5 z-20 min-w-[150px]">
-                <button
-                  onClick={() => {
-                    setSelectedSender("all");
-                    setIsFilterOpen(false);
-                  }}
-                  className={`w-full px-2 py-1 text-left text-xs ${
-                    selectedSender === "all"
-                      ? "text-[#0068ff] font-medium bg-[#f0f7ff]"
-                      : "text-[#1e2b4a] hover:bg-[#f8f9fd]"
-                  }`}
-                >
-                  Tất cả
-                </button>
-
-                {uniqueSenders.map((sender) => (
+                {senderOptions.map((option) => (
                   <button
-                    key={sender}
+                    key={option.value}
                     onClick={() => {
-                      setSelectedSender(sender);
+                      setSelectedSender(option.value);
                       setIsFilterOpen(false);
                     }}
                     className={`w-full px-2 py-1 text-left text-xs ${
-                      selectedSender === sender
+                      selectedSender === option.value
                         ? "text-[#0068ff] font-medium bg-[#f0f7ff]"
                         : "text-[#1e2b4a] hover:bg-[#f8f9fd]"
                     }`}
                   >
-                    {sender}
+                    {option.label}
                   </button>
                 ))}
               </div>
@@ -237,7 +235,11 @@ export default function ChatSearchPanel() {
                     setSelectedDate("newest");
                     setIsDateOpen(false);
                   }}
-                  className="w-full px-2 py-1 text-left text-xs hover:bg-[#f8f9fd]"
+                  className={`w-full px-2 py-1 text-left text-xs ${
+                    selectedDate === "newest"
+                      ? "text-[#0068ff] font-medium bg-[#f0f7ff]"
+                      : "text-[#1e2b4a] hover:bg-[#f8f9fd]"
+                  }`}
                 >
                   Mới nhất
                 </button>
@@ -246,7 +248,11 @@ export default function ChatSearchPanel() {
                     setSelectedDate("oldest");
                     setIsDateOpen(false);
                   }}
-                  className="w-full px-2 py-1 text-left text-xs hover:bg-[#f8f9fd]"
+                  className={`w-full px-2 py-1 text-left text-xs ${
+                    selectedDate === "oldest"
+                      ? "text-[#0068ff] font-medium bg-[#f0f7ff]"
+                      : "text-[#1e2b4a] hover:bg-[#f8f9fd]"
+                  }`}
                 >
                   Cũ nhất
                 </button>

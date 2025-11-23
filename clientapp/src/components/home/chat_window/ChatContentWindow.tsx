@@ -12,6 +12,8 @@ type Props = {
   loadMoreMessages: () => void;
   isLoadingMore: boolean;
   isInitialLoading: boolean;
+  highlightMessageId?: string | null;
+  onClearHighlight?: () => void;
 };
 
 export default function ChatContentWindow({
@@ -21,11 +23,14 @@ export default function ChatContentWindow({
   loadMoreMessages,
   isLoadingMore,
   isInitialLoading,
+  highlightMessageId,
+  onClearHighlight,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [showScrollButton, setShowScrollButton] = useState(false);
   const [previewMedia, setPreviewMedia] = useState<string | null>(null);
   const [newMessageIds, setNewMessageIds] = useState<Set<string>>(new Set());
+  const messageRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
 
   const allMedia = messages.flatMap((msg) =>
     (msg.media_ids || [])
@@ -33,7 +38,7 @@ export default function ChatContentWindow({
       .map((m) => ({
         id: m.id,
         url: m.url,
-        type: m.type as "image" | "video", // ép kiểu
+        type: m.type as "image" | "video",
         filename: m.filename || m.url,
         timestamp: msg.created_at,
       }))
@@ -42,6 +47,27 @@ export default function ChatContentWindow({
   const prevMessageCount = useRef(0);
   const prevDisplayName = useRef(display_name);
   const lastMessageId = useRef<string | null>(null);
+
+  // Xử lý scroll đến tin nhắn được highlight
+  useEffect(() => {
+    if (!highlightMessageId || !containerRef.current) return;
+
+    const targetElement = messageRefs.current[highlightMessageId];
+    if (targetElement) {
+      // Đợi render xong
+      setTimeout(() => {
+        targetElement.scrollIntoView({
+          behavior: "smooth",
+          block: "center",
+        });
+
+        // Tự động xóa highlight sau 3 giây
+        setTimeout(() => {
+          onClearHighlight?.();
+        }, 3000);
+      }, 100);
+    }
+  }, [highlightMessageId, messages, onClearHighlight]);
 
   const handleScroll = async () => {
     if (!containerRef.current) return;
@@ -217,41 +243,47 @@ export default function ChatContentWindow({
                     </div>
                   </motion.div>
                 ) : (
-                  messages.map((msg, index) => (
-                    <motion.div
-                      key={msg.id}
-                      layout
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -10 }}
-                      transition={{ duration: 0.2 }}
-                      className="relative"
-                    >
-                      {/* Hiệu ứng highlight cho tin nhắn mới */}
-                      {newMessageIds.has(msg.id) && (
-                        <motion.div
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: [0, 0.3, 0] }}
-                          transition={{ duration: 2, ease: "easeInOut" }}
-                          className={`absolute inset-0 rounded-2xl pointer-events-none z-0 ${
-                            msg.sender_id === currentUserId
-                              ? "bg-[#bcd5ff]/40"
-                              : "bg-[#d4dded]/50"
-                          }`}
-                        />
-                      )}
+                  messages.map((msg, index) => {
+                    const isHighlighted = highlightMessageId === msg.id;
 
-                      <MessageItem
-                        msg={msg}
-                        index={index}
-                        messages={messages}
-                        currentUserId={currentUserId}
-                        onPreviewMedia={setPreviewMedia}
-                        display_name={display_name}
-                        size="large"
-                      />
-                    </motion.div>
-                  ))
+                    return (
+                      <motion.div
+                        key={msg.id}
+                        ref={(el) => (messageRefs.current[msg.id] = el)}
+                        layout
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -10 }}
+                        transition={{ duration: 0.2 }}
+                        className="relative"
+                      >
+                        {/* Hiệu ứng highlight cho tin nhắn mới */}
+                        {newMessageIds.has(msg.id) && (
+                          <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: [0, 0.3, 0] }}
+                            transition={{ duration: 2, ease: "easeInOut" }}
+                            className={`absolute inset-0 rounded-2xl pointer-events-none z-0 ${
+                              msg.sender_id === currentUserId
+                                ? "bg-[#bcd5ff]/40"
+                                : "bg-[#d4dded]/50"
+                            }`}
+                          />
+                        )}
+
+                        <MessageItem
+                          msg={msg}
+                          index={index}
+                          messages={messages}
+                          currentUserId={currentUserId}
+                          onPreviewMedia={setPreviewMedia}
+                          display_name={display_name}
+                          size="large"
+                          isHighlighted={isHighlighted}
+                        />
+                      </motion.div>
+                    );
+                  })
                 )}
               </AnimatePresence>
             </div>

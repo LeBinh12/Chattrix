@@ -1,4 +1,4 @@
-import { ChevronDown, Filter } from "lucide-react";
+import { Filter } from "lucide-react";
 
 interface HeaderWithFilterIconProps {
   title: string;

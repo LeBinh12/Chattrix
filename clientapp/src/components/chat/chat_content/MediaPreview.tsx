@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   X,
@@ -49,6 +49,21 @@ export default function MediaPreview({
     type: "image",
   };
 
+  // ✅ DI CHUYỂN CÁC HANDLER LÊN TRƯỚC useEffect
+  const nextMedia = useCallback(() => {
+    if (allMedia.length <= 1) return;
+    setCurrentIndex((prev) => (prev + 1) % allMedia.length);
+    setIsLoading(true);
+    setZoom(1);
+  }, [allMedia.length]);
+
+  const prevMedia = useCallback(() => {
+    if (allMedia.length <= 1) return;
+    setCurrentIndex((prev) => (prev - 1 + allMedia.length) % allMedia.length);
+    setIsLoading(true);
+    setZoom(1);
+  }, [allMedia.length]);
+
   // Keyboard navigation
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -58,21 +73,7 @@ export default function MediaPreview({
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [currentIndex, allMedia.length]);
-
-  const nextMedia = () => {
-    if (allMedia.length <= 1) return;
-    setCurrentIndex((prev) => (prev + 1) % allMedia.length);
-    setIsLoading(true);
-    setZoom(1);
-  };
-
-  const prevMedia = () => {
-    if (allMedia.length <= 1) return;
-    setCurrentIndex((prev) => (prev - 1 + allMedia.length) % allMedia.length);
-    setIsLoading(true);
-    setZoom(1);
-  };
+  }, [onClose, nextMedia, prevMedia]);
 
   const handleZoomIn = () => {
     setZoom((prev) => Math.min(prev + 0.25, 3));

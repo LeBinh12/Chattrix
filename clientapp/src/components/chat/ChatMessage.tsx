@@ -62,7 +62,7 @@ export default function ChatMessage({ onFriend, onBack }: Props) {
 
     socketManager.connect(currentUserId);
 
-    const listener = (data: any) => {
+    const listener = (data: { type?: string; message?: Messages }) => {
       if (data.type !== "chat" || !data.message) return;
 
       const msg: Messages = data.message;

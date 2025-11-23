@@ -15,7 +15,7 @@ export const userApi = {
         const response = await axiosClient.post<UpsertSettingResponse>(`/users/upsert-setting`, res);
         return response.data
     },
-    getSetting: async (target_id: string, is_group: boolean): Promise<GetSettingResponse> => {
+    getSetting: async (target_id?: string, is_group?: boolean): Promise<GetSettingResponse> => {
         const response = await axiosClient.get<GetSettingResponse>(`/users/get-setting`, {
             params: {
                 target_id: target_id,

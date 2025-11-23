@@ -19,9 +19,13 @@ type MenuBarProps = {
   toggleHeight?: () => void;
 };
 
-export default function MenuBar({ editor, toggleHeight }: MenuBarProps) {
-  if (!editor) return null;
-
+function MenuBarContent({
+  editor,
+  toggleHeight,
+}: {
+  editor: Editor;
+  toggleHeight?: () => void;
+}) {
   const editorState = useEditorState({
     editor,
     selector: (ctx) => ({
@@ -187,4 +191,9 @@ export default function MenuBar({ editor, toggleHeight }: MenuBarProps) {
       </button>
     </div>
   );
+}
+
+export default function MenuBar({ editor, toggleHeight }: MenuBarProps) {
+  if (!editor) return null;
+  return <MenuBarContent editor={editor} toggleHeight={toggleHeight} />;
 }

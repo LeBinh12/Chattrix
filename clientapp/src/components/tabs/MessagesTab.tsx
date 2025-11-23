@@ -11,6 +11,19 @@ import { Howl } from "howler";
 import { TING } from "../../assets/paths";
 import { LOGO } from "../../assets/paths";
 
+type ConversationSocketPayload = {
+  type?: string;
+  message?: {
+    group_id?: string;
+    user_id?: string;
+    display_name?: string;
+    avatar?: string;
+    last_message?: string;
+    last_message_type?: string;
+    sender_id?: string;
+  };
+};
+
 type Props = {
   onFriend: (friend: Conversation) => void;
   onOpenId?: (id: string) => void;
@@ -55,7 +68,7 @@ export default function MessagesTab({ onFriend, onOpenId }: Props) {
     if (!user?.data?.id) return;
     socketManager.connect(user.data.id);
 
-    const handleRealtime = (data: any) => {
+    const handleRealtime = (data: ConversationSocketPayload) => {
       if (data.type !== "conversations" || !data.message) return;
 
       const msg = data.message;

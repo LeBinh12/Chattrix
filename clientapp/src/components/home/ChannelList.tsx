@@ -1,4 +1,4 @@
-import { ChevronDown, Search, UserPlus, UserPlus2, Users } from "lucide-react";
+import { ChevronDown, Search, Users } from "lucide-react";
 import { useState, useEffect } from "react";
 import { conversationApi } from "../../api/conversation";
 import { TING } from "../../assets/paths";
@@ -28,6 +28,21 @@ const ding = new Howl({
 interface ChannelListProps {
   width: number;
 }
+
+type ConversationSocketData = {
+  type?: string;
+  message?: {
+    group_id?: string;
+    user_id?: string;
+    display_name?: string;
+    avatar?: string;
+    last_message?: string;
+    last_message_type?: string;
+    sender_id?: string;
+  };
+  user_id?: string;
+  status?: Conversation["status"];
+};
 
 export default function ChannelList({ width }: ChannelListProps) {
   const user = useRecoilValue(userAtom);
@@ -61,11 +76,17 @@ export default function ChannelList({ width }: ChannelListProps) {
 
     socketManager.connect(user.data.id);
 
-    const listener = async (data: any) => {
+    const listener = async (data: ConversationSocketData) => {
       if (data.type === "conversations" && data.message) {
         const msg = data.message;
         const isGroup =
           msg.group_id && msg.group_id !== "000000000000000000000000";
+
+        console.log("📩 Message:", {
+          isGroup,
+          group_id: msg.group_id,
+          user_id: msg.user_id,
+        }); // Debug
 
         if (isGroup && msg.sender_id !== user.data.id) {
           const res = await userApi.getSetting(msg.group_id, true);
@@ -74,15 +95,29 @@ export default function ChannelList({ width }: ChannelListProps) {
 
         setResults((prev) => {
           const existIndex = prev.findIndex((c) => {
-            if (isGroup) return c.group_id === msg.group_id;
-            return !c.group_id && c.user_id === (isGroup ? "" : msg.user_id);
+            if (isGroup) {
+              const match = c.group_id === msg.group_id;
+              console.log(
+                `🔍 Checking group: ${c.group_id} === ${msg.group_id} => ${match}`
+              );
+              return match;
+            }
+            // Chat 1-1
+            const match =
+              c.user_id === msg.user_id &&
+              (!c.group_id ||
+                c.group_id === "" ||
+                c.group_id === "000000000000000000000000");
+
+            return match;
           });
 
           const oldConversation = existIndex >= 0 ? prev[existIndex] : null;
 
           const updatedConversation: Conversation = {
-            user_id: isGroup ? "" : msg.user_id,
-            group_id: isGroup ? msg.group_id : "",
+            user_id: isGroup ? "" : msg.user_id ?? "",
+            sender_id: msg.sender_id ?? "",
+            group_id: isGroup ? msg.group_id ?? "" : "",
             display_name:
               msg.display_name ||
               oldConversation?.display_name ||
@@ -104,15 +139,16 @@ export default function ChannelList({ width }: ChannelListProps) {
                 : oldConversation?.unread_count || 0,
             status: isGroup ? "group" : oldConversation?.status || "offline",
             updated_at: new Date().toISOString(),
-            sender_id: msg.sender_id,
           };
 
           if (existIndex >= 0) {
+            // Cập nhật conversation có sẵn
             const newList = [...prev];
             newList.splice(existIndex, 1);
             return [updatedConversation, ...newList];
           }
 
+          // Thêm conversation mới
           return [updatedConversation, ...prev];
         });
       }
@@ -121,7 +157,7 @@ export default function ChannelList({ width }: ChannelListProps) {
         setResults((prev) =>
           prev.map((conv) =>
             conv.user_id === data.user_id
-              ? { ...conv, status: data.status }
+              ? { ...conv, status: data.status ?? conv.status }
               : conv
           )
         );

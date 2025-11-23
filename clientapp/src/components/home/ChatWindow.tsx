@@ -7,11 +7,32 @@ import ChatInputWindow from "./chat_window/ChatInputWindow";
 import EmptyChatWindow from "./EmptyChatWindow";
 import { selectedChatState } from "../../recoil/atoms/chatAtom";
 import { userAtom } from "../../recoil/atoms/userAtom";
-import { messagesCacheAtom } from "../../recoil/atoms/messageAtom";
+import {
+  messageIDAtom,
+  messagesCacheAtom,
+} from "../../recoil/atoms/messageAtom";
 import { bellStateAtom } from "../../recoil/atoms/bellAtom";
 import type { Messages } from "../../types/Message";
 import { messageAPI } from "../../api/messageApi";
 import { socketManager } from "../../api/socket";
+import axios from "axios";
+import { toast } from "react-toastify";
+
+type ChatSocketEvent =
+  | { type: "chat"; message: Messages }
+  | {
+      type: "update_seen";
+      message: {
+        last_seen_message_id?: string;
+        receiver_id?: string;
+        sender_id?: string;
+      };
+    }
+  | {
+      type: "delete_for_me";
+      message: { user_id: string; message_ids: string[] };
+    }
+  | { type?: string; message?: unknown };
 
 type ChatWindowProps = {
   onBack?: () => void;
@@ -27,7 +48,10 @@ export default function ChatWindow({ onBack }: ChatWindowProps) {
   const [hasLeftGroup, setHasLeftGroup] = useState(false);
   const [bell] = useRecoilState(bellStateAtom);
   const [isInitialLoading, setIsInitialLoading] = useState(false);
-  console.log("messagesCache", messagesCache);
+  const [messageIDSearch, setMessageIDSearch] = useRecoilState(messageIDAtom);
+  const [highlightMessageId, setHighlightMessageId] = useState<string | null>(
+    null
+  );
 
   const limit = 30;
   const tingAudioRef = useRef<HTMLAudioElement | null>(null);
@@ -69,7 +93,6 @@ export default function ChatWindow({ onBack }: ChatWindowProps) {
     }, remaining);
   }, []);
 
-  // Preload âm thanh
   useEffect(() => {
     tingAudioRef.current = new Audio(TING);
 
@@ -87,11 +110,94 @@ export default function ChatWindow({ onBack }: ChatWindowProps) {
     }
   }, [bell]);
 
-  // Fetch message
+  // Fetch messages với hỗ trợ tìm kiếm theo ID
   const fetchMessages = useCallback(async () => {
     if (!user?.data.id || !conversationKey) return;
 
-    // Check cache
+    // Nếu có messageIDSearch, xử lý tìm kiếm
+    // Nếu có messageIDSearch, xử lý tìm kiếm
+    if (messageIDSearch) {
+      // Kiểm tra trong cache trước
+      const cachedMsgs = messagesCache[conversationKey];
+      const foundInCache = cachedMsgs?.find(
+        (msg) => msg.id === messageIDSearch
+      );
+
+      if (foundInCache) {
+        // Tin nhắn đã có trong cache
+        setMessages(cachedMsgs);
+        setHighlightMessageId(messageIDSearch);
+        setIsInitialLoading(false);
+        setMessageIDSearch(""); // Clear search sau khi tìm thấy
+        return;
+      }
+
+      // Nếu chưa có trong cache, gọi API
+      try {
+        beginInitialLoading();
+        const res = await messageAPI.getMessageById(
+          selectedChat?.user_id ?? "",
+          selectedChat?.group_id ?? "",
+          messageIDSearch
+        );
+
+        if (res.status === 200 && res.data.data && res.data.data.length > 0) {
+          const sorted: Messages[] = res.data.data.sort(
+            (a, b) =>
+              new Date(a.created_at).getTime() -
+              new Date(b.created_at).getTime()
+          );
+
+          setMessagesCache((prev) => ({
+            ...prev,
+            [conversationKey]: sorted,
+          }));
+          setMessages(sorted);
+          setHighlightMessageId(messageIDSearch);
+          setHasMore(true);
+        } else {
+          // ✅ Tin nhắn không tồn tại - chỉ thông báo, giữ nguyên cache
+          toast.warning("Tin nhắn này đã được bạn xóa!");
+          // Không thay đổi messages, giữ nguyên cache hiện tại
+          if (cachedMsgs && cachedMsgs.length > 0) {
+            setMessages(cachedMsgs);
+          }
+        }
+      } catch (error: any) {
+        // ✅ Xử lý lỗi - chỉ thông báo, giữ nguyên cache
+        if (axios.isAxiosError(error)) {
+          const status = error.response?.status;
+          const apiMsg =
+            error.response?.data?.error || error.response?.data?.message;
+
+          if (
+            status === 404 ||
+            apiMsg?.toLowerCase().includes("xóa") ||
+            apiMsg?.toLowerCase().includes("deleted")
+          ) {
+            toast.warning("Tin nhắn này đã được bạn xóa!");
+          } else {
+            toast.error(apiMsg || "Đã xảy ra lỗi khi lấy tin nhắn!");
+          }
+        } else {
+          toast.error("Lỗi không xác định!");
+        }
+
+        // Giữ nguyên cache hiện tại
+        if (cachedMsgs && cachedMsgs.length > 0) {
+          setMessages(cachedMsgs);
+        }
+
+        console.error("❌ Lỗi khi tải tin nhắn theo ID:", error);
+      } finally {
+        finishInitialLoading();
+        setMessageIDSearch(""); // ✅ Clear search ID trong mọi trường hợp
+      }
+
+      return;
+    }
+
+    // Fetch bình thường nếu không có messageIDSearch
     if (messagesCache[conversationKey]?.length) {
       setMessages(messagesCache[conversationKey]);
       setHasMore(messagesCache[conversationKey].length >= limit);
@@ -132,6 +238,8 @@ export default function ChatWindow({ onBack }: ChatWindowProps) {
     setMessagesCache,
     beginInitialLoading,
     finishInitialLoading,
+    messageIDSearch,
+    setMessageIDSearch,
   ]);
 
   // Reset messages when selected chat changes
@@ -141,10 +249,11 @@ export default function ChatWindow({ onBack }: ChatWindowProps) {
       setHasMore(true);
       setHasLeftGroup(false);
       setIsInitialLoading(false);
+      setHighlightMessageId(null);
       return;
     }
 
-    if (cachedMessages?.length) {
+    if (cachedMessages?.length && !messageIDSearch) {
       setMessages(cachedMessages);
       setIsInitialLoading(false);
     } else {
@@ -154,7 +263,7 @@ export default function ChatWindow({ onBack }: ChatWindowProps) {
 
     setHasMore(true);
     setHasLeftGroup(false);
-  }, [selectedChat, cachedMessages, beginInitialLoading]);
+  }, [selectedChat, cachedMessages, beginInitialLoading, messageIDSearch]);
 
   useEffect(() => {
     fetchMessages();
@@ -210,118 +319,144 @@ export default function ChatWindow({ onBack }: ChatWindowProps) {
     }
   };
 
-  // Realtime socket listener
+  const handleDeleteForMe = useCallback(
+    (payload: { user_id: string; message_ids: string[] }) => {
+      if (!payload || payload.user_id !== user?.data.id) return;
+
+      const messageIDsToDelete = new Set(payload.message_ids);
+
+      setMessagesCache((prev) => {
+        if (!conversationKey || !prev[conversationKey]) return prev;
+        return {
+          ...prev,
+          [conversationKey]: prev[conversationKey].filter(
+            (msg) => !messageIDsToDelete.has(msg.id)
+          ),
+        };
+      });
+
+      setMessages((prev) =>
+        prev.filter((msg) => !messageIDsToDelete.has(msg.id))
+      );
+    },
+    [conversationKey, setMessagesCache, user?.data.id]
+  );
+
+  const handleIncomingMessage = useCallback(
+    (msg: Messages) => {
+      if (!msg) return;
+      const msgKey =
+        msg.group_id && msg.group_id !== "000000000000000000000000"
+          ? `group_${msg.group_id}`
+          : `user_${
+              msg.sender_id === user?.data.id ? msg.receiver_id : msg.sender_id
+            }`;
+
+      if (msg.sender_id !== user?.data.id) playNotificationSound();
+
+      setMessagesCache((prev) => {
+        const oldMessages = prev[msgKey] || [];
+        if (oldMessages.some((m) => m.id === msg.id)) return prev;
+        return { ...prev, [msgKey]: [...oldMessages, msg] };
+      });
+
+      if (msgKey === conversationKey) {
+        setMessages((prev) => {
+          if (prev.some((m) => m.id === msg.id)) return prev;
+          return [...prev, msg];
+        });
+      }
+
+      if (
+        msg.type === "system" &&
+        msg.sender_id === user?.data.id &&
+        msg.group_id === selectedChat?.group_id
+      ) {
+        setHasLeftGroup(true);
+      }
+    },
+    [
+      conversationKey,
+      playNotificationSound,
+      selectedChat?.group_id,
+      setMessagesCache,
+      user?.data.id,
+    ]
+  );
+
+  const handleUpdateSeen = useCallback(
+    (seenData: {
+      last_seen_message_id?: string;
+      receiver_id?: string;
+      sender_id?: string;
+    }) => {
+      if (!seenData?.last_seen_message_id) return;
+      const { last_seen_message_id, receiver_id, sender_id } = seenData;
+      const seenConversationKey =
+        sender_id === user?.data.id
+          ? `user_${receiver_id}`
+          : `user_${sender_id}`;
+
+      const updateStatus = (msgs: Messages[]) =>
+        msgs.map((msg) =>
+          msg.sender_id === user?.data.id && msg.id <= last_seen_message_id
+            ? { ...msg, status: "seen", is_read: true }
+            : msg
+        );
+
+      setMessagesCache((prev) => {
+        const cached = prev[seenConversationKey];
+        if (!cached?.length) return prev;
+        return { ...prev, [seenConversationKey]: updateStatus(cached) };
+      });
+
+      if (seenConversationKey === conversationKey) {
+        setMessages((prev) => updateStatus(prev));
+      }
+    },
+    [conversationKey, setMessagesCache, user?.data.id]
+  );
+
   useEffect(() => {
     if (!user?.data.id) return;
     socketManager.connect(user?.data.id);
 
-    const listener = (data: any) => {
+    const listener = (data: ChatSocketEvent) => {
       switch (data.type) {
         case "chat":
-          handleIncomingMessage(data.message);
+          if (data.message) {
+            handleIncomingMessage(data.message as Messages);
+          }
           break;
         case "update_seen":
-          handleUpdateSeen(data.message);
+          if (data.message) {
+            handleUpdateSeen(data.message);
+          }
           break;
         case "delete_for_me":
-          console.log("delete", data.message);
-          handleDeleteForMe(data.message);
+          if (
+            data.message &&
+            typeof data.message === "object" &&
+            "user_id" in data.message &&
+            "message_ids" in data.message
+          ) {
+            handleDeleteForMe(
+              data.message as { user_id: string; message_ids: string[] }
+            );
+          }
           break;
       }
     };
 
     socketManager.addListener(listener);
     return () => socketManager.removeListener(listener);
-  }, [user?.data.id, conversationKey]);
+  }, [
+    user?.data.id,
+    handleDeleteForMe,
+    handleIncomingMessage,
+    handleUpdateSeen,
+  ]);
 
-  // Xử lý delete_for_me
-  const handleDeleteForMe = (payload: {
-    user_id: string;
-    message_ids: string[];
-  }) => {
-    if (!payload || payload.user_id !== user?.data.id) return;
-
-    const messageIDsToDelete = new Set(payload.message_ids);
-
-    // Xoá trong cache
-    setMessagesCache((prev) => {
-      if (!conversationKey || !prev[conversationKey]) return prev;
-      return {
-        ...prev,
-        [conversationKey]: prev[conversationKey].filter(
-          (msg) => !messageIDsToDelete.has(msg.id)
-        ),
-      };
-    });
-
-    // Xoá trong UI nếu đang xem conversation này
-    setMessages((prev) =>
-      prev.filter((msg) => !messageIDsToDelete.has(msg.id))
-    );
-  };
-
-  // Xử lý message mới
-  const handleIncomingMessage = (msg: Messages) => {
-    if (!msg) return;
-    const msgKey =
-      msg.group_id && msg.group_id !== "000000000000000000000000"
-        ? `group_${msg.group_id}`
-        : `user_${
-            msg.sender_id === user?.data.id ? msg.receiver_id : msg.sender_id
-          }`;
-
-    if (msg.sender_id !== user?.data.id) playNotificationSound();
-
-    setMessagesCache((prev) => {
-      const oldMessages = prev[msgKey] || [];
-      if (oldMessages.some((m) => m.id === msg.id)) return prev;
-      return { ...prev, [msgKey]: [...oldMessages, msg] };
-    });
-
-    if (msgKey === conversationKey) {
-      setMessages((prev) => {
-        if (prev.some((m) => m.id === msg.id)) return prev;
-        return [...prev, msg];
-      });
-    }
-
-    if (
-      msg.type === "system" &&
-      msg.sender_id === user?.data.id &&
-      msg.group_id === selectedChat?.group_id
-    ) {
-      setHasLeftGroup(true);
-    }
-  };
-
-  // Xử lý update seen
-  const handleUpdateSeen = (seenData: any) => {
-    if (!seenData) return;
-    const { last_seen_message_id, receiver_id, sender_id } = seenData;
-    const seenConversationKey =
-      sender_id === user?.data.id ? `user_${receiver_id}` : `user_${sender_id}`;
-
-    const updateStatus = (msgs: Messages[]) =>
-      msgs.map((msg) =>
-        msg.sender_id === user?.data.id && msg.id <= last_seen_message_id
-          ? { ...msg, status: "seen", is_read: true }
-          : msg
-      );
-
-    // Update cache
-    setMessagesCache((prev) => {
-      const cached = prev[seenConversationKey];
-      if (!cached?.length) return prev;
-      return { ...prev, [seenConversationKey]: updateStatus(cached) };
-    });
-
-    // Update UI nếu đang xem conversation này
-    if (seenConversationKey === conversationKey) {
-      setMessages((prev) => updateStatus(prev));
-    }
-  };
-
-  // Gửi seen status khi xem tin nhắn
   useEffect(() => {
     if (!messages.length || !selectedChat) return;
     const lastMsg = messages[messages.length - 1];
@@ -352,6 +487,8 @@ export default function ChatWindow({ onBack }: ChatWindowProps) {
         loadMoreMessages={loadMoreMessages}
         isLoadingMore={isLoadingMore}
         isInitialLoading={isInitialLoading}
+        highlightMessageId={highlightMessageId}
+        onClearHighlight={() => setHighlightMessageId(null)}
       />
       <ChatInputWindow
         user_id={user?.data.id || ""}

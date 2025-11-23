@@ -1,3 +1,6 @@
+import React from "react";
+import { LOGO } from "../assets/paths";
+
 export default function ChatWindowSkeleton() {
   return (
     <div className="flex flex-col flex-1 h-screen bg-gradient-to-b from-brand-50 via-white to-brand-100 animate-pulse relative overflow-hidden">
@@ -7,8 +10,7 @@ export default function ChatWindowSkeleton() {
         <div className="flex-1">
           <div className="h-4 bg-gray-200 rounded w-32 mb-2"></div>
           <div className="h-3 bg-gray-200 rounded w-20"></div>
-        import React from "react";
-        import { LOGO } from "../assets/paths";
+        </div>
       </div>
 
       {/* Content Skeleton */}

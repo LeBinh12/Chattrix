@@ -8,8 +8,7 @@ import {
   Zap,
 } from "lucide-react";
 import { LOGO } from "../../assets/paths";
-import { useRecoilValue, useSetRecoilState } from "recoil";
-import { selectedChatState } from "../../recoil/atoms/chatAtom";
+import { useRecoilValue } from "recoil";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -20,19 +19,11 @@ import { userAtom } from "../../recoil/atoms/userAtom";
 type TabType = "messages" | "groups" | "contacts" | "admin" | null;
 
 export default function Sidebar() {
-  const setSelectedChat = useSetRecoilState(selectedChatState);
   const user = useRecoilValue(userAtom);
   const [activeTab, setActiveTab] = useState<TabType>("messages");
   const [showSettings, setShowSettings] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const navigate = useNavigate();
-
-  const handleTabClick = (tab: TabType) => {
-    setActiveTab(tab);
-    if (tab === "contacts") {
-      setSelectedChat(null);
-    }
-  };
 
   const handleSettingsClick = () => {
     setShowSettings(!showSettings);

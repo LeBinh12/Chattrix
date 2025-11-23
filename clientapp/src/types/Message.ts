@@ -11,7 +11,7 @@ export type ReplyMessage = {
   id: string;
   sender: string;
   content: string;
-  media_url: string;
+  media_url?: string;
   type: string
 };
 
@@ -23,6 +23,14 @@ export type MessageResponse = {
     count: number,
     limit: number,
     skip: number,
+    data: Messages[]
+  }
+}
+
+export type MessageIDResponse = {
+  status: number,
+  message: string,
+  data: {
     data: Messages[]
   }
 }
