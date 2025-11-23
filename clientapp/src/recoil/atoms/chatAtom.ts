@@ -2,8 +2,8 @@
 import { atom } from "recoil";
 
 export type SelectedChat = {
-    user_id: string;
-    group_id: string;
+    user_id?: string;
+    group_id?: string;
     avatar: string;
     display_name: string;
     status: string;

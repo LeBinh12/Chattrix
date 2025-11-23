@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   X,
@@ -49,17 +49,7 @@ export default function MediaPreview({
     type: "image",
   };
 
-  // Keyboard navigation
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-      if (e.key === "ArrowRight") nextMedia();
-      if (e.key === "ArrowLeft") prevMedia();
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [onClose, nextMedia, prevMedia]);
-
+  // ✅ DI CHUYỂN CÁC HANDLER LÊN TRƯỚC useEffect
   const nextMedia = useCallback(() => {
     if (allMedia.length <= 1) return;
     setCurrentIndex((prev) => (prev + 1) % allMedia.length);
@@ -73,6 +63,17 @@ export default function MediaPreview({
     setIsLoading(true);
     setZoom(1);
   }, [allMedia.length]);
+
+  // Keyboard navigation
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+      if (e.key === "ArrowRight") nextMedia();
+      if (e.key === "ArrowLeft") prevMedia();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose, nextMedia, prevMedia]);
 
   const handleZoomIn = () => {
     setZoom((prev) => Math.min(prev + 0.25, 3));

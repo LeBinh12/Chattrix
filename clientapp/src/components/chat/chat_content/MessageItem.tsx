@@ -30,6 +30,7 @@ import { LOGO } from "../../../assets/paths";
 import { toast } from "react-toastify";
 import { useSetRecoilState } from "recoil";
 import { replyMessageState } from "../../../recoil/atoms/uiAtom";
+import { messageIDAtom } from "../../../recoil/atoms/messageAtom";
 
 type StatusConfig = {
   icon: typeof Check;
@@ -44,6 +45,7 @@ type Props = {
   onPreviewMedia: (url: string) => void;
   display_name: string;
   size?: "small" | "large";
+  isHighlighted?: boolean;
 };
 
 const statusMap: Record<string, StatusConfig> = {
@@ -60,6 +62,7 @@ export default function MessageItem({
   messages,
   display_name,
   size = "large",
+  isHighlighted = false,
 }: Props) {
   const isMine = msg.sender_id === currentUserId;
   const isLastMineMessage =
@@ -71,10 +74,10 @@ export default function MessageItem({
   const [isHovered, setIsHovered] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
-
+  const messageRef = useRef<HTMLDivElement>(null);
   // Recoil state để set reply
   const setReplyTo = useSetRecoilState(replyMessageState);
-
+  const setMessageID = useSetRecoilState(messageIDAtom);
   const hasMedia = (msg.media_ids || []).length > 0;
 
   // Hàm xử lý reply - Lưu toàn bộ thông tin vào Recoil
@@ -126,6 +129,14 @@ export default function MessageItem({
     toast.success("Đã tải tất cả media!");
     setShowMenu(false);
   };
+  useEffect(() => {
+    if (isHighlighted && messageRef.current) {
+      messageRef.current.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+    }
+  }, [isHighlighted]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -233,7 +244,10 @@ export default function MessageItem({
     const hasReplyMedia = ["image", "video", "file"].includes(msg.reply.type);
 
     return (
-      <div className="mb-3 w-full">
+      <div
+        onClick={() => setMessageID(msg.reply?.id ?? "")}
+        className="mb-3 w-full cursor-pointer"
+      >
         <div className="flex gap-3 p-3 rounded-lg bg-gray-100 border-l-4 border-blue-500">
           {/* Cột trái: chỉ hiển thị nếu reply có media */}
           {hasReplyMedia && (
@@ -687,6 +701,10 @@ export default function MessageItem({
           <div
             className={`px-3 py-2 rounded-[20px] border shadow-sm max-w-full leading-5 ${bubbleStyles} ${
               size === "small" ? "text-[12px]" : "text-[13px]"
+            } ${
+              isHighlighted
+                ? "ring-2 ring-blue-500 shadow-lg shadow-blue-200/50"
+                : ""
             }`}
           >
             {/* Hiển thị reply preview nếu tin nhắn này reply tin khác */}

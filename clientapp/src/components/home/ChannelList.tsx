@@ -82,6 +82,12 @@ export default function ChannelList({ width }: ChannelListProps) {
         const isGroup =
           msg.group_id && msg.group_id !== "000000000000000000000000";
 
+        console.log("📩 Message:", {
+          isGroup,
+          group_id: msg.group_id,
+          user_id: msg.user_id,
+        }); // Debug
+
         if (isGroup && msg.sender_id !== user.data.id) {
           const res = await userApi.getSetting(msg.group_id, true);
           if (!res.data.is_muted) ding.play();
@@ -89,15 +95,29 @@ export default function ChannelList({ width }: ChannelListProps) {
 
         setResults((prev) => {
           const existIndex = prev.findIndex((c) => {
-            if (isGroup) return c.group_id === msg.group_id;
-            return !c.group_id && c.user_id === (isGroup ? "" : msg.user_id);
+            if (isGroup) {
+              const match = c.group_id === msg.group_id;
+              console.log(
+                `🔍 Checking group: ${c.group_id} === ${msg.group_id} => ${match}`
+              );
+              return match;
+            }
+            // Chat 1-1
+            const match =
+              c.user_id === msg.user_id &&
+              (!c.group_id ||
+                c.group_id === "" ||
+                c.group_id === "000000000000000000000000");
+
+            return match;
           });
 
           const oldConversation = existIndex >= 0 ? prev[existIndex] : null;
 
           const updatedConversation: Conversation = {
-            user_id: isGroup ? "" : msg.user_id,
-            group_id: isGroup ? msg.group_id : "",
+            user_id: isGroup ? "" : msg.user_id ?? "",
+            sender_id: msg.sender_id ?? "",
+            group_id: isGroup ? msg.group_id ?? "" : "",
             display_name:
               msg.display_name ||
               oldConversation?.display_name ||
@@ -119,15 +139,16 @@ export default function ChannelList({ width }: ChannelListProps) {
                 : oldConversation?.unread_count || 0,
             status: isGroup ? "group" : oldConversation?.status || "offline",
             updated_at: new Date().toISOString(),
-            sender_id: msg.sender_id,
           };
 
           if (existIndex >= 0) {
+            // Cập nhật conversation có sẵn
             const newList = [...prev];
             newList.splice(existIndex, 1);
             return [updatedConversation, ...newList];
           }
 
+          // Thêm conversation mới
           return [updatedConversation, ...prev];
         });
       }
@@ -136,7 +157,7 @@ export default function ChannelList({ width }: ChannelListProps) {
         setResults((prev) =>
           prev.map((conv) =>
             conv.user_id === data.user_id
-              ? { ...conv, status: data.status }
+              ? { ...conv, status: data.status ?? conv.status }
               : conv
           )
         );

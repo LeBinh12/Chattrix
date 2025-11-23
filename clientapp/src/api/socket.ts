@@ -75,7 +75,7 @@ class SocketManager {
       message: {
         sender_id: senderId,
         receiver_id: receiverId || undefined,
-        group_id: groupID || undefined,
+        group_id: groupID,
         content,
         media_ids: mediaIDs,
         type: mediaIDs.length > 0 ? "file" : "text",

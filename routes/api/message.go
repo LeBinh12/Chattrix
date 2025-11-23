@@ -13,5 +13,7 @@ func MessageRoutes(rg *gin.RouterGroup, db *mongo.Database, esClient *elasticsea
 	{
 		message.GET("/get-message", ginMessage.GetMessages(db))
 		message.GET("/search", ginMessage.SearchMessages(esClient))
+		message.GET("/get-message-by-id", ginMessage.GetMessageId(db))
+
 	}
 }
