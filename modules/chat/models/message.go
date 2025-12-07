@@ -36,6 +36,16 @@ type Message struct {
 	IsRead     bool                 `bson:"is_read" json:"is_read"`
 	DeletedFor []primitive.ObjectID `bson:"deleted_for,omitempty" json:"deleted_for"` // lưu user nào đã xóa
 	Reply      ReplyMessageMini     `bson:"reply,omitempty" json:"reply,omitempty"`
+
+	///Hôm nay xử lý
+	//     // Ghim
+	// IsPinned    bool                 `bson:"is_pinned,omitempty" json:"is_pinned,omitempty"`
+	// PinnedBy    primitive.ObjectID   `bson:"pinned_by,omitempty" json:"pinned_by,omitempty"`
+	// PinnedAt    *time.Time           `bson:"pinned_at,omitempty" json:"pinned_at,omitempty"`
+
+	// // Thu hồi
+	RecalledAt *time.Time          `bson:"recalled_at,omitempty" json:"recalled_at,omitempty"`
+	RecalledBy *primitive.ObjectID `bson:"recalled_by,omitempty" json:"recalled_by,omitempty"`
 }
 
 type MessageReaction struct {
@@ -45,9 +55,13 @@ type MessageReaction struct {
 }
 
 type MessagePreview struct {
-	Content   string    `bson:"content"`
-	CreatedAt time.Time `bson:"created_at"`
-	Type      string    `bson:"type"`
+	Content    string              `bson:"content"`
+	CreatedAt  time.Time           `bson:"created_at"`
+	Type       string              `bson:"type"`
+	ID         primitive.ObjectID  `bson:"_id,omitempty" json:"id"`
+	SenderID   primitive.ObjectID  `bson:"sender_id" json:"sender_id"`
+	RecalledAt *time.Time          `bson:"recalled_at,omitempty" json:"recalled_at,omitempty"`
+	RecalledBy *primitive.ObjectID `bson:"recalled_by,omitempty" json:"recalled_by,omitempty"`
 }
 
 type MessageRequest struct {
@@ -85,6 +99,8 @@ type MessageResponse struct {
 
 	IsMuted bool `bson:"is_muted" json:"is_muted"` // đã tắt thông báo chưa
 
+	RecalledAt *time.Time          `bson:"recalled_at,omitempty" json:"recalled_at,omitempty"`
+	RecalledBy *primitive.ObjectID `bson:"recalled_by,omitempty" json:"recalled_by,omitempty"`
 }
 
 type MessageStatusRequest struct {
@@ -97,4 +113,18 @@ type MessageStatusRequest struct {
 type DeleteMessageForMe struct {
 	UserID     string   `json:"user_id"`     // Người xóa
 	MessageIDs []string `json:"message_ids"` // Danh sách message cần xóa
+}
+
+type MessageResponseSocket struct {
+	MessageID      string             `json:"message_id"` // Người xóa
+	Content        string             `json:"content"`
+	SenderID       string             `json:"sender_id"`
+	SenderName     string             `json:"sender_name"`
+	PinnedByID     string             `json:"pinned_by_id"`
+	PinnedByName   string             `json:"pinned_by_name"`
+	MessageType    string             `json:"message_type"`
+	CreatedAt      string             `json:"created_at"`
+	ConversationID string             `json:"conversation_id" `
+	GroupID        primitive.ObjectID `json:"group_id,omitempty"`
+	ReceiverID     string             `json:"receiver_id"`
 }

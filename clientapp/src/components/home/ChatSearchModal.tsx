@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { motion } from "framer-motion";
 import { Search, User, Calendar, ChevronDown } from "lucide-react";
 import { useRecoilValue, useSetRecoilState } from "recoil";
@@ -8,6 +8,7 @@ import { formatTimeAgo } from "../../utils/tomeAgo";
 import { LOGO } from "../../assets/paths";
 import { messageIDAtom } from "../../recoil/atoms/messageAtom";
 import { userAtom } from "../../recoil/atoms/userAtom";
+import { API_ENDPOINTS } from "../../config/api";
 
 interface SearchResult {
   id: string;
@@ -17,56 +18,72 @@ interface SearchResult {
   content: string;
   timestamp: string;
   highlightedContent?: string;
+  created_at: string; // Thêm field này để tracking cursor
 }
 
-// Các tùy chọn filter cố định
-// Các tùy chọn filter cố định
 const senderOptions = [
   { value: "all", label: "Tất cả" },
   { value: "me", label: "Tôi gửi" },
-  { value: "others", label: "Nhóm" }, // Thay "Người khác gửi" thành "Nhóm"
+  { value: "others", label: "Nhóm" },
 ];
+
 export default function ChatSearchPanel() {
   const selectedChat = useRecoilValue(selectedChatState);
   const user = useRecoilValue(userAtom);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedSender, setSelectedSender] = useState<string>("all");
-  const [selectedDate, setSelectedDate] = useState<string>("newest"); // Đổi từ "all" thành "newest"
+  const [selectedDate, setSelectedDate] = useState<string>("newest");
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [isDateOpen, setIsDateOpen] = useState(false);
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
   const setMessageID = useSetRecoilState(messageIDAtom);
 
-  useEffect(() => {
-    const doSearch = async () => {
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const observerTarget = useRef<HTMLDivElement>(null);
+
+  // Reset khi thay đổi query hoặc filter
+  const resetSearch = useCallback(() => {
+    setSearchResults([]);
+    setNextCursor(null);
+    setHasMore(true);
+  }, []);
+
+  // Hàm fetch data
+  const fetchSearchResults = useCallback(
+    async (cursor: string | null = null, isInitial: boolean = false) => {
       if (!searchQuery.trim() || !selectedChat) {
         setSearchResults([]);
         return;
       }
 
-      setIsSearching(true);
+      if (isInitial) {
+        setIsSearching(true);
+      } else {
+        setIsLoadingMore(true);
+      }
 
       try {
         const res = await searchApi.search(
-          selectedChat?.user_id, // receiver_id
-          searchQuery, // search text
-          selectedChat?.group_id // group_id nếu có
+          selectedChat?.user_id,
+          searchQuery,
+          selectedChat?.group_id,
+          cursor
         );
 
         let items = res.data.data;
 
-        //  Apply filter người gửi
+        // Apply filter người gửi
         if (selectedSender === "me") {
-          // Lọc tin nhắn của chính tôi
           items = items.filter((item) => item.sender_id === user?.data.id);
         } else if (selectedSender === "others") {
-          // Lọc tin nhắn của các thành viên khác (không phải tôi)
           items = items.filter((item) => item.sender_id !== user?.data.id);
         }
-        // selectedSender === "all" thì không filter
 
-        //  Apply filter ngày - MẶC ĐỊNH là "newest"
+        // Apply filter ngày
         if (selectedDate === "newest" || !selectedDate) {
           items.sort(
             (a, b) =>
@@ -96,28 +113,85 @@ export default function ChatSearchPanel() {
             senderAvatar:
               item.sender_avatar === "null" || !item.sender_avatar
                 ? LOGO
-                : `http://localhost:3000/v1/upload/media/${item.sender_avatar}`,
+                : `${API_ENDPOINTS.STREAM_MEDIA}/${item.sender_avatar}`,
             content: item.content_raw,
             highlightedContent,
             timestamp: formatTimeAgo(item.created_at),
+            created_at: item.created_at,
           };
         });
 
-        setSearchResults(highlighted);
+        if (isInitial) {
+          setSearchResults(highlighted);
+        } else {
+          setSearchResults((prev) => [...prev, ...highlighted]);
+        }
+
+        // Update cursor và hasMore
+        setNextCursor(
+          res.data.next_cursor !== null ? String(res.data.next_cursor) : null
+        );
+        setHasMore(!!res.data.next_cursor && highlighted.length > 0);
       } catch (error) {
         console.error("Search error:", error);
+      } finally {
+        setIsSearching(false);
+        setIsLoadingMore(false);
       }
+    },
+    [searchQuery, selectedSender, selectedDate, selectedChat, user?.data.id]
+  );
 
-      setIsSearching(false);
-    };
-
-    const timer = setTimeout(doSearch, 300);
+  // Initial search với debounce
+  useEffect(() => {
+    resetSearch();
+    const timer = setTimeout(() => {
+      fetchSearchResults(null, true);
+    }, 300);
     return () => clearTimeout(timer);
-  }, [searchQuery, selectedSender, selectedDate, selectedChat, user?.data.id]);
+  }, [
+    searchQuery,
+    selectedSender,
+    selectedDate,
+    selectedChat,
+    user?.data.id,
+    resetSearch,
+    fetchSearchResults,
+  ]);
+
+  // Intersection Observer cho lazy loading
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (
+          entries[0].isIntersecting &&
+          hasMore &&
+          !isSearching &&
+          !isLoadingMore &&
+          nextCursor
+        ) {
+          fetchSearchResults(nextCursor, false);
+        }
+      },
+      { threshold: 0.1, rootMargin: "100px" }
+    );
+
+    const currentTarget = observerTarget.current;
+    if (currentTarget) {
+      observer.observe(currentTarget);
+    }
+
+    return () => {
+      if (currentTarget) {
+        observer.unobserve(currentTarget);
+      }
+    };
+  }, [hasMore, isSearching, isLoadingMore, nextCursor, fetchSearchResults]);
 
   const handleClearSearch = () => {
     setSearchQuery("");
     setSearchResults([]);
+    resetSearch();
   };
 
   const handleResultClick = (resultId: string) => {
@@ -134,7 +208,7 @@ export default function ChatSearchPanel() {
       </div>
 
       {/* Search Input */}
-      <div className="flex-shrink-0 p-4 bg-white ">
+      <div className="flex-shrink-0 p-4 bg-white">
         <div className="relative">
           <Search
             className="absolute left-3 top-1/2 -translate-y-1/2 text-[#010616]"
@@ -160,8 +234,7 @@ export default function ChatSearchPanel() {
       </div>
 
       {/* Filters */}
-      {/* Filters */}
-      <div className="flex-shrink-0 px-4 bg-white  flex items-center gap-2 text-xs">
+      <div className="flex-shrink-0 px-4 bg-white flex items-center gap-2 text-xs">
         <span className="text-[#5a6a8a] font-medium">Lọc theo:</span>
 
         {/* Sender Filter */}
@@ -266,11 +339,13 @@ export default function ChatSearchPanel() {
       <div className="flex-1 overflow-hidden flex flex-col bg-white">
         {searchQuery && (
           <div className="flex-shrink-0 px-4 py-2.5 bg-white border-b border-[#e4e8f1]">
-            <span className="text-[#5a6a8a] text-sm font-medium">Tin nhắn</span>
+            <span className="text-[#5a6a8a] text-sm font-medium">
+              Tin nhắn ({searchResults.length})
+            </span>
           </div>
         )}
 
-        <div className="flex-1 overflow-y-auto">
+        <div ref={scrollContainerRef} className="flex-1 overflow-y-auto">
           {isSearching ? (
             <div className="py-20 text-center">
               <div className="inline-block w-8 h-8 border-3 border-[#5a7de1] border-t-transparent rounded-full animate-spin" />
@@ -313,6 +388,25 @@ export default function ChatSearchPanel() {
                   </div>
                 </motion.div>
               ))}
+
+              {/* Loading More Indicator */}
+              {isLoadingMore && (
+                <div className="py-6 text-center">
+                  <div className="inline-block w-6 h-6 border-2 border-[#5a7de1] border-t-transparent rounded-full animate-spin" />
+                </div>
+              )}
+
+              {/* Intersection Observer Target */}
+              <div ref={observerTarget} className="h-4" />
+
+              {/* End of Results */}
+              {!hasMore && searchResults.length > 0 && (
+                <div className="py-6 text-center">
+                  <p className="text-[#a8b3c9] text-xs">
+                    Đã hiển thị tất cả kết quả
+                  </p>
+                </div>
+              )}
             </div>
           ) : searchQuery ? (
             <div className="py-20 text-center">

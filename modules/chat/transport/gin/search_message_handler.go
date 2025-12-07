@@ -36,19 +36,22 @@ func SearchMessages(esClient *elasticsearch.Client) gin.HandlerFunc {
 		limitStr := ctx.DefaultQuery("limit", "20")
 		limit, _ := strconv.Atoi(limitStr)
 
+		cursorTime := ctx.Query("cursor_time") // <<< thêm
+
 		store := storage.NewESChatStore(esClient)
 		business := biz.NewChatSearchBiz(store)
 
-		messages, err := business.Search(ctx.Request.Context(), content, senderIDStr, receiverID, groupID, limit)
+		messages, nextCursor, err := business.Search(ctx.Request.Context(), content, senderIDStr, receiverID, groupID, limit, cursorTime)
 		if err != nil {
 			ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
 
 		ctx.JSON(http.StatusOK, common.NewResponse(http.StatusOK, "Tìm kiếm thành công", map[string]interface{}{
-			"data":  messages,
-			"count": len(messages),
-			"limit": limit,
+			"data":        messages,
+			"count":       len(messages),
+			"limit":       limit,
+			"next_cursor": nextCursor,
 		}))
 	}
 }

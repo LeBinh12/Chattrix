@@ -60,9 +60,15 @@ func (s *MongoChatStore) GetConversations(ctx context.Context, userID string, pa
 		if u.LastMessage != nil {
 			preview.LastMessage = u.LastMessage.Content
 			preview.LastMessageType = u.LastMessage.Type
+			preview.SenderID = u.LastMessage.SenderID.Hex()
+			preview.RecalledAt = u.LastMessage.RecalledAt
+			preview.RecalledBy = u.LastMessage.RecalledBy
+
 			if !u.LastMessage.CreatedAt.IsZero() {
 				preview.LastDate = u.LastMessage.CreatedAt
 			}
+			preview.LastMessageID = u.LastMessage.ID.Hex()
+
 		}
 		if u.UnreadCount != nil {
 			preview.UnreadCount = *u.UnreadCount
@@ -87,9 +93,14 @@ func (s *MongoChatStore) GetConversations(ctx context.Context, userID string, pa
 		if g.LastMessage != nil {
 			preview.LastMessage = g.LastMessage.Content
 			preview.LastMessageType = g.LastMessage.Type
+			preview.RecalledBy = g.LastMessage.RecalledBy
+
 			if !g.LastMessage.CreatedAt.IsZero() {
 				preview.LastDate = g.LastMessage.CreatedAt
 			}
+			preview.LastMessageID = g.LastMessage.ID.Hex()
+			preview.RecalledAt = g.LastMessage.RecalledAt
+
 		}
 		results = append(results, preview)
 	}

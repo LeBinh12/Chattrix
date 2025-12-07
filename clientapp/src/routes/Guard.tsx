@@ -1,5 +1,6 @@
 import type { JSX } from "react";
 import { Navigate } from "react-router-dom";
+import { toast } from "react-toastify";
 
 function PublicRoute({ children }: { children: JSX.Element }) {
   const token = localStorage.getItem("access_token");
@@ -27,6 +28,16 @@ function PrivateRoute({ children }: { children: JSX.Element }) {
   //   toast.info(`Bạn cần kết bạn ít nhất 5 người`);
   //   return <Navigate to="/suggestion" replace />;
   // }
+  return children;
+}
+
+export default function AdminGuard({ children }: { children: JSX.Element }) {
+  const isAdmin = localStorage.getItem("admin_auth") === "1";
+  if (!isAdmin) {
+    toast.info("Bạn cần phải đăng nhập");
+    return <Navigate to="/admin/login" replace />;
+  }
+
   return children;
 }
 

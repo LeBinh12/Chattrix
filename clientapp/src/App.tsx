@@ -5,7 +5,7 @@ import MainLayout from "./layouts/MainLayout";
 import HomeScreen from "./pages/HomeScreen";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
-import { PrivateRoute, PublicRoute } from "./routes/Guard";
+import AdminGuard, { PrivateRoute, PublicRoute } from "./routes/Guard";
 import RegisterScreen from "./pages/RegisterScreen";
 import SuggestionScreen from "./pages/SuggestionScreen";
 import { useLoadUser } from "./hooks/useLoadUser";
@@ -15,15 +15,19 @@ import { userAtom } from "./recoil/atoms/userAtom";
 import { useEffect } from "react";
 import { socketManager } from "./api/socket";
 import AdminLayout from "./layouts/AdminLayout";
-import AdminHomeScreen from "./pages/admin/AdminHomeScreen";
 import AuthOpenDictCallback from "./pages/AuthOpenDictCallback";
 import CompleteProfileScreen from "./pages/RegisterOAuth2Screen";
 import GroupScreen from "./pages/GroupScreen";
 import ContactsScreen from "./pages/ContactsScreen";
-import UserManagementScreen from "./pages/admin/UserManagementScreen";
-import GroupChanelManagerScreen from "./pages/admin/GroupChanelManagerScreen";
-import GroupDetailScreen from "./pages/admin/GroupDetailScreen";
-import UsersPage from "./pages/admin/UsersPage";
+import "ad99-ag-grid-table/style.css";
+import UserManagerScreen from "./pages/admin/UserManagerScreen";
+import DashboardScreen from "./pages/admin/DashboardScreen";
+import GroupManagerScreen from "./pages/admin/GroupManagerScreen";
+import ChatManagerScreen from "./pages/admin/ChatManagerScreen";
+import MediaManagerScreen from "./pages/admin/MediaManagerScreen";
+import SystemLogManagerScreen from "./pages/admin/SystemLogManagerScreen";
+import NotificationManagerScreen from "./pages/admin/NotificationManager";
+import LoginAdminScreen from "./pages/admin/LoginAdminScreen";
 
 function App() {
   useLoadUser();
@@ -84,21 +88,29 @@ function App() {
           path="/auth/opendict/callback"
           element={<AuthOpenDictCallback />}
         />
-
+        <Route path="/admin/login" element={<LoginAdminScreen />} />
         {/* Page Admin */}
-        <Route element={<AdminLayout />}>
-          <Route path="/admin" element={<AdminHomeScreen />} />
-          <Route path="/admin/dashboard" element={<AdminHomeScreen />} />
+        <Route
+          element={
+            <AdminGuard>
+              <AdminLayout />
+            </AdminGuard>
+          }
+        >
+          <Route path="/admin" element={<DashboardScreen />} />
+          <Route path="/admin/dashboard" element={<DashboardScreen />} />
+          <Route path="/admin/manager-user" element={<UserManagerScreen />} />
+          <Route path="/admin/manager-group" element={<GroupManagerScreen />} />
+          <Route path="/admin/manager-chat" element={<ChatManagerScreen />} />
+          <Route path="/admin/manager-media" element={<MediaManagerScreen />} />
           <Route
-            path="/admin/user-manager"
-            element={<UserManagementScreen />}
+            path="/admin/manager-system-logs"
+            element={<SystemLogManagerScreen />}
           />
           <Route
-            path="/admin/group-manager"
-            element={<GroupChanelManagerScreen />}
+            path="/admin/manager-notification"
+            element={<NotificationManagerScreen />}
           />
-          <Route path="/admin/group-detail" element={<GroupDetailScreen />} />
-          <Route path="/admin/user-page" element={<UsersPage />} />
         </Route>
       </Routes>
 

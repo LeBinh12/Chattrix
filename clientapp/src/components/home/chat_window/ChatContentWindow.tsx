@@ -1,7 +1,7 @@
 import { motion, AnimatePresence } from "framer-motion";
 import type { Messages } from "../../../types/Message";
-import { useEffect, useRef, useState } from "react";
-import { ChevronDown, MessageCircle } from "lucide-react";
+import { useEffect, useRef, useState, useCallback } from "react";
+import { ChevronDown, ChevronsDown, MessageCircle } from "lucide-react";
 import MessageItem from "../../chat/chat_content/MessageItem";
 import MediaPreview from "../../chat/chat_content/MediaPreview";
 
@@ -14,6 +14,8 @@ type Props = {
   isInitialLoading: boolean;
   highlightMessageId?: string | null;
   onClearHighlight?: () => void;
+  isShowingSearchCache?: boolean;
+  onClearSearchCache?: () => void;
 };
 
 export default function ChatContentWindow({
@@ -25,12 +27,26 @@ export default function ChatContentWindow({
   isInitialLoading,
   highlightMessageId,
   onClearHighlight,
+  isShowingSearchCache,
+  onClearSearchCache,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [showScrollButton, setShowScrollButton] = useState(false);
   const [previewMedia, setPreviewMedia] = useState<string | null>(null);
   const [newMessageIds, setNewMessageIds] = useState<Set<string>>(new Set());
   const messageRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
+  // ========== REFS ĐỂ QUẢN LÝ SCROLL ==========
+  const scrollBehaviorRef = useRef<"auto" | "highlight" | "loadmore">("auto");
+  const prevMessageCountRef = useRef(0);
+  const prevDisplayNameRef = useRef(display_name);
+  const lastMessageIdRef = useRef<string | null>(null);
+  const messageTimeoutsRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(
+    new Map()
+  );
+  const isUserScrollingRef = useRef(false);
+  const userScrollTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
+
+  const loadMoreScrollPositionRef = useRef<number>(0);
 
   const allMedia = messages.flatMap((msg) =>
     (msg.media_ids || [])
@@ -44,117 +60,216 @@ export default function ChatContentWindow({
       }))
   );
 
-  const prevMessageCount = useRef(0);
-  const prevDisplayName = useRef(display_name);
-  const lastMessageId = useRef<string | null>(null);
+  // ========== KIỂM TRA USER CÓ Ở BOTTOM KHÔNG ==========
+  const isAtBottom = useCallback(() => {
+    const container = containerRef.current;
+    if (!container) return false;
+    const threshold = 50;
+    const { scrollTop, scrollHeight, clientHeight } = container;
+    return scrollHeight - scrollTop - clientHeight < threshold;
+  }, []);
 
-  // Xử lý scroll đến tin nhắn được highlight
+  // ========== SCROLL TO BOTTOM ==========
+  const scrollToBottom = useCallback((smooth = false) => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    if (smooth) {
+      container.scrollTo({
+        top: container.scrollHeight,
+        behavior: "smooth",
+      });
+    } else {
+      setTimeout(() => {
+        if (containerRef.current) {
+          containerRef.current.scrollTop = containerRef.current.scrollHeight;
+        }
+      }, 50);
+    }
+    setShowScrollButton(false);
+  }, []);
+
+  // ========== HANDLE SCROLL EVENT ==========
+  const handleScroll = useCallback(async () => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const { scrollTop, scrollHeight, clientHeight } = container;
+
+    // Update scroll button visibility
+    const shouldShowButton = scrollHeight - scrollTop - clientHeight > 150;
+    setShowScrollButton(shouldShowButton);
+
+    // Detect user scrolling manually
+    if (scrollBehaviorRef.current === "auto") {
+      isUserScrollingRef.current = true;
+      clearTimeout(userScrollTimeoutRef.current);
+      userScrollTimeoutRef.current = setTimeout(() => {
+        isUserScrollingRef.current = false;
+      }, 150);
+    }
+
+    // ========== LOAD MORE MESSAGES ==========
+    if (
+      scrollTop < 50 &&
+      !isLoadingMore &&
+      scrollBehaviorRef.current === "auto"
+    ) {
+      scrollBehaviorRef.current = "loadmore";
+
+      // Lưu vị trí scroll hiện tại
+      loadMoreScrollPositionRef.current = container.scrollHeight - scrollTop;
+
+      await loadMoreMessages();
+    }
+  }, [isLoadingMore, loadMoreMessages]);
+
+  // ========== XỬ LÝ SAU KHI LOAD MORE XONG ==========
   useEffect(() => {
-    if (!highlightMessageId || !containerRef.current) return;
+    if (!isLoadingMore && scrollBehaviorRef.current === "loadmore") {
+      const container = containerRef.current;
+      if (container && loadMoreScrollPositionRef.current > 0) {
+        // Tính toán lại vị trí scroll để giữ nguyên view
+        requestAnimationFrame(() => {
+          if (containerRef.current) {
+            const newScrollTop =
+              containerRef.current.scrollHeight -
+              loadMoreScrollPositionRef.current;
+            containerRef.current.scrollTop = newScrollTop;
+          }
+        });
+      }
 
+      // Reset về auto sau khi restore position
+      setTimeout(() => {
+        scrollBehaviorRef.current = "auto";
+        loadMoreScrollPositionRef.current = 0;
+      }, 100);
+    }
+  }, [isLoadingMore]);
+
+  // ========== HIGHLIGHT MESSAGE ==========
+  useEffect(() => {
+    if (!highlightMessageId || !containerRef.current) {
+      if (!highlightMessageId && scrollBehaviorRef.current === "highlight") {
+        scrollBehaviorRef.current = "auto";
+      }
+      return;
+    }
+
+    scrollBehaviorRef.current = "highlight";
     const targetElement = messageRefs.current[highlightMessageId];
+
     if (targetElement) {
-      // Đợi render xong
       setTimeout(() => {
         targetElement.scrollIntoView({
           behavior: "smooth",
           block: "center",
         });
 
-        // Tự động xóa highlight sau 3 giây
         setTimeout(() => {
           onClearHighlight?.();
+          scrollBehaviorRef.current = "auto";
         }, 3000);
       }, 100);
     }
-  }, [highlightMessageId, messages, onClearHighlight]);
+  }, [highlightMessageId, onClearHighlight]);
 
-  const handleScroll = async () => {
-    if (!containerRef.current) return;
-    const container = containerRef.current;
-    const { scrollTop, scrollHeight, clientHeight } = container;
-
-    setShowScrollButton(scrollTop + clientHeight < scrollHeight - 100);
-
-    if (scrollTop < 50 && !isLoadingMore) {
-      const prevScrollHeight = container.scrollHeight;
-      const prevScrollTop = container.scrollTop;
-
-      await loadMoreMessages();
-
-      requestAnimationFrame(() => {
-        if (!containerRef.current) return;
-        const newScrollHeight = containerRef.current.scrollHeight;
-        containerRef.current.scrollTop =
-          newScrollHeight - prevScrollHeight + prevScrollTop;
-      });
-    }
-  };
-
-  const scrollToBottom = () => {
-    if (!containerRef.current) return;
-    requestAnimationFrame(() => {
-      containerRef.current!.scrollTop = containerRef.current!.scrollHeight;
-      setShowScrollButton(false);
-    });
-  };
-
+  // ========== XỬ LÝ KHI ĐỔI CUỘC TRÒ CHUYỆN ==========
   useEffect(() => {
+    if (prevDisplayNameRef.current !== display_name) {
+      prevDisplayNameRef.current = display_name;
+      prevMessageCountRef.current = messages.length;
+      lastMessageIdRef.current = messages[messages.length - 1]?.id || null;
+
+      // Clear highlight animations
+      setNewMessageIds(new Set());
+      messageTimeoutsRef.current.forEach(clearTimeout);
+      messageTimeoutsRef.current.clear();
+
+      // Reset scroll behavior
+      scrollBehaviorRef.current = "auto";
+
+      // Scroll to bottom khi đổi chat
+      scrollToBottom(false);
+    }
+  }, [display_name, messages, scrollToBottom]);
+
+  // ========== XỬ LÝ TIN NHẮN MỚI ==========
+  useEffect(() => {
+    // ✅ SKIP nếu đang load more hoặc highlight
+    if (scrollBehaviorRef.current !== "auto") return;
+
     const container = containerRef.current;
     if (!container) return;
 
-    if (prevDisplayName.current !== display_name) {
-      prevDisplayName.current = display_name;
-      prevMessageCount.current = messages.length;
-      lastMessageId.current = messages[messages.length - 1]?.id || null;
-      setNewMessageIds(new Set());
-
-      requestAnimationFrame(() => {
-        if (container && messages.length > 0) {
-          container.scrollTop = container.scrollHeight;
-        }
-      });
-      return;
-    }
-
     const currentLastMessageId = messages[messages.length - 1]?.id;
     const hasNewMessage =
-      messages.length > prevMessageCount.current &&
-      currentLastMessageId !== lastMessageId.current;
+      messages.length > prevMessageCountRef.current &&
+      currentLastMessageId !== lastMessageIdRef.current;
 
     if (hasNewMessage) {
       const newMessage = messages[messages.length - 1];
       const isMyMessage = newMessage?.sender_id === currentUserId;
+      const wasAtBottom = isAtBottom();
 
-      setNewMessageIds((prev) => {
-        const newSet = new Set(prev);
-        newSet.add(currentLastMessageId!);
-        return newSet;
-      });
+      // Add highlight animation
+      if (currentLastMessageId) {
+        const existingTimeout =
+          messageTimeoutsRef.current.get(currentLastMessageId);
+        if (existingTimeout) clearTimeout(existingTimeout);
 
-      setTimeout(() => {
-        setNewMessageIds((prev) => {
-          const newSet = new Set(prev);
-          newSet.delete(currentLastMessageId!);
-          return newSet;
-        });
-      }, 2000);
+        setNewMessageIds((prev) => new Set(prev).add(currentLastMessageId));
 
-      const isAtBottom =
-        container.scrollHeight - container.scrollTop - container.clientHeight <
-        100;
+        const timeout = setTimeout(() => {
+          setNewMessageIds((prev) => {
+            const newSet = new Set(prev);
+            newSet.delete(currentLastMessageId);
+            return newSet;
+          });
+          messageTimeoutsRef.current.delete(currentLastMessageId);
+        }, 2000);
 
-      if (isMyMessage || isAtBottom) {
-        requestAnimationFrame(() => {
-          container.scrollTop = container.scrollHeight;
-        });
+        messageTimeoutsRef.current.set(currentLastMessageId, timeout);
       }
 
-      lastMessageId.current = currentLastMessageId;
+      // ✅ CHỈ auto-scroll khi:
+      // 1. Là tin nhắn của mình, HOẶC
+      // 2. User đang ở bottom và không đang scroll
+      const shouldAutoScroll =
+        isMyMessage || (wasAtBottom && !isUserScrollingRef.current);
+
+      if (shouldAutoScroll) {
+        scrollToBottom(false);
+      }
+
+      lastMessageIdRef.current = currentLastMessageId;
     }
 
-    prevMessageCount.current = messages.length;
-  }, [messages, display_name, currentUserId]);
+    prevMessageCountRef.current = messages.length;
+  }, [messages, currentUserId, isAtBottom, scrollToBottom]);
+
+  // ========== INITIAL LOAD ==========
+  useEffect(() => {
+    if (isInitialLoading || !containerRef.current) return;
+
+    // Chỉ scroll xuống khi lần đầu load (prevCount = 0)
+    if (prevMessageCountRef.current === 0 && messages.length > 0) {
+      scrollToBottom(false);
+    }
+  }, [isInitialLoading, messages.length, scrollToBottom]);
+
+  // ========== CLEANUP ==========
+  useEffect(() => {
+    const timeouts = messageTimeoutsRef.current;
+    const userScrollTimeout = userScrollTimeoutRef.current;
+
+    return () => {
+      timeouts.forEach(clearTimeout);
+      timeouts.clear();
+      if (userScrollTimeout) clearTimeout(userScrollTimeout);
+    };
+  }, []);
 
   return (
     <>
@@ -196,7 +311,7 @@ export default function ChatContentWindow({
         ) : (
           <>
             {isLoadingMore && (
-              <div className="text-center text-[#5a7de1] py-2">
+              <div className="sticky top-0 z-10 flex justify-center py-2 bg-[#f5f7fb]/90 backdrop-blur-sm">
                 <motion.div
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
@@ -211,7 +326,7 @@ export default function ChatContentWindow({
                     }}
                     className="w-4 h-4 border-2 border-brand-500 border-t-transparent rounded-full"
                   />
-                  <span className="text-brand-700 font-medium">
+                  <span className="text-brand-700 font-medium text-sm">
                     Đang tải thêm...
                   </span>
                 </motion.div>
@@ -250,14 +365,13 @@ export default function ChatContentWindow({
                       <motion.div
                         key={msg.id}
                         ref={(el) => (messageRefs.current[msg.id] = el)}
-                        layout
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -10 }}
-                        transition={{ duration: 0.2 }}
+                        initial={{ opacity: 0, scale: 0.98 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.98 }}
+                        transition={{ duration: 0.15 }}
                         className="relative"
                       >
-                        {/* Hiệu ứng highlight cho tin nhắn mới */}
+                        {/* Highlight effect */}
                         {newMessageIds.has(msg.id) && (
                           <motion.div
                             initial={{ opacity: 0 }}
@@ -294,7 +408,7 @@ export default function ChatContentWindow({
       <AnimatePresence>
         {showScrollButton && (
           <motion.button
-            onClick={scrollToBottom}
+            onClick={() => scrollToBottom(true)}
             initial={{ opacity: 0, y: 40, scale: 0.8 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 40, scale: 0.8 }}
@@ -312,6 +426,32 @@ export default function ChatContentWindow({
               transition={{ duration: 1, repeat: Infinity }}
             >
               <ChevronDown className="w-4 h-4 sm:w-5 sm:h-5" />
+            </motion.div>
+          </motion.button>
+        )}
+
+        {/* Button to clear search cache */}
+        {isShowingSearchCache && (
+          <motion.button
+            onClick={onClearSearchCache}
+            initial={{ opacity: 0, y: -40, scale: 0.8 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -40, scale: 0.8 }}
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.9 }}
+            transition={{
+              type: "spring",
+              stiffness: 400,
+              damping: 25,
+            }}
+            className="absolute left-1/2 -translate-x-1/3 bottom-32 sm:bottom-40 bg-white text-[#ff6b6b] rounded-full shadow-lg p-2 z-20 border border-[#ffb3b3] hover:bg-[#fff5f5] transition-colors"
+            title="Quay lại tin nhắn chính"
+          >
+            <motion.div
+              animate={{ y: [0, 4, 0] }}
+              transition={{ duration: 1, repeat: Infinity }}
+            >
+              <ChevronsDown className="w-4 h-4 sm:w-5 sm:h-5" />
             </motion.div>
           </motion.button>
         )}

@@ -50,7 +50,9 @@ export type Messages = {
   media_ids: Media[],
   type: string,
   reply_to_id: string,
-  reply?: ReplyMessage;
+  reply?: ReplyMessage,
+  recalled_at: string,
+  recalled_by: string
 }
 
 

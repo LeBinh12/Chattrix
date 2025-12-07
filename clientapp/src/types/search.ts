@@ -14,6 +14,7 @@ export interface SearchData {
     count: number;
     data: Search[];
     limit: number;
+    next_cursor: string | number | null;
 }
 
 export interface SearchApiResponse {

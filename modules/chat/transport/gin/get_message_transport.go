@@ -50,6 +50,17 @@ func GetMessages(db *mongo.Database) gin.HandlerFunc {
 			}
 		}
 
+		afterTimeStr := ctx.Query("afterTime")
+		var afterTimePtr *time.Time
+		if afterTimeStr != "" {
+			parsedAfter, err := time.Parse(time.RFC3339, afterTimeStr)
+			if err == nil {
+				afterTimePtr = &parsedAfter
+			} else {
+				log.Printf(" invalid afterTime format: %v", err)
+			}
+		}
+
 		// Gọi hàm GetMessage
 
 		if receiverIDStr != "" {
@@ -73,7 +84,7 @@ func GetMessages(db *mongo.Database) gin.HandlerFunc {
 		store := storage.NewMongoChatStore(db)
 		business := biz.NewGetMessageBiz(store)
 
-		messages, err := business.GetMessage(ctx.Request.Context(), senderObjectID, receiverObjectID, groupObjectID, limit, beforeTimePtr)
+		messages, err := business.GetMessage(ctx.Request.Context(), senderObjectID, receiverObjectID, groupObjectID, limit, beforeTimePtr, afterTimePtr)
 
 		if err != nil {
 			ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})

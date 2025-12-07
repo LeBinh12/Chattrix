@@ -10,6 +10,10 @@ export const messagesCacheAtom = atom<MessagesCache>({
     default: {},
 });
 
+export const messagesSearchCacheAtom = atom<MessagesCache>({
+    key: "messagesSearchCacheAtom",
+    default: {},
+});
 
 export const messageIDAtom = atom<string>({
     key: "messageIDAtom",

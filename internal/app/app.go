@@ -37,7 +37,7 @@ func New(ctx context.Context, cfg config.AppConfig) (*Application, error) {
 		return nil, err
 	}
 
-	kafka.InitProducer(cfg.Kafka.Brokers)
+	kafka.InitAsyncProducer(cfg.Kafka.Brokers)
 
 	consumerCtx, cancel := context.WithCancel(context.Background())
 	kafkaErrCh := make(chan error, 1)

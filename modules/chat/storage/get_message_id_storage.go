@@ -204,6 +204,8 @@ func (s *MongoChatStore) GetMessageByID(
 			Status:     msg.Status,
 			IsRead:     msg.IsRead,
 			Type:       msg.Type,
+			RecalledAt: msg.RecalledAt,
+			RecalledBy: msg.RecalledBy,
 		}
 
 		if user, ok := userMap[msg.SenderID]; ok {
@@ -244,4 +246,13 @@ func (s *MongoChatStore) GetMessageByID(
 	}
 
 	return messageResponses, nil
+}
+
+func (s *MongoChatStore) GetMessageOneByID(ctx context.Context, id primitive.ObjectID) (*models.Message, error) {
+	var msg models.Message
+	err := s.db.Collection("messages").FindOne(ctx, bson.M{"_id": id}).Decode(&msg)
+	if err != nil {
+		return nil, err
+	}
+	return &msg, nil
 }

@@ -7,11 +7,12 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-var members []struct {
-	UserID primitive.ObjectID `bson:"user_id"`
-}
-
 func (s *MongoChatStore) GetGroupMembers(ctx context.Context, groupID primitive.ObjectID) ([]primitive.ObjectID, error) {
+
+	var members []struct {
+		UserID primitive.ObjectID `bson:"user_id"`
+	}
+
 	filter := bson.M{
 		"group_id": groupID,
 		"status":   "active",

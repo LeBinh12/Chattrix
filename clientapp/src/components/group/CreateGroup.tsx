@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { X, Search, Camera, Check } from "lucide-react";
 import { conversationApi } from "../../api/conversation";
 import { toast } from "react-toastify";
@@ -29,6 +29,16 @@ const CATEGORIES = [
   { id: "todo", label: "Todo" },
 ];
 
+const getFirstLetter = (name: string): string => {
+  if (!name) return "#";
+  const firstChar = name.trim()[0].toUpperCase();
+  const normalized = firstChar
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase();
+  return /[A-Z]/.test(normalized) ? normalized : "#";
+};
+
 export default function CreateGroupModal({
   isOpen,
   onClose,
@@ -46,6 +56,7 @@ export default function CreateGroupModal({
   const [tempQuery, setTempQuery] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [activeCategory, setActiveCategory] = useState("all");
+  const listRef = useRef<HTMLDivElement>(null);
 
   // Fetch users
   useEffect(() => {
@@ -59,7 +70,7 @@ export default function CreateGroupModal({
           const mappedUsers: User[] = res.data.data
             .filter((item) => !!item.user_id)
             .map((item) => ({
-              id: item.user_id,
+              id: item.user_id!,
               name: item.display_name,
               avatar: item.avatar || "https://via.placeholder.com/150",
               online: item.status === "online",
@@ -111,6 +122,29 @@ export default function CreateGroupModal({
     }
     setSelectedMembers(newSelected);
   };
+
+  const groupedUsers = useMemo(() => {
+    const groups = new Map<string, User[]>();
+    const keys: string[] = [];
+
+    users.forEach((user) => {
+      const letter = getFirstLetter(user.name);
+      if (!groups.has(letter)) {
+        groups.set(letter, []);
+        keys.push(letter);
+      }
+      groups.get(letter)!.push(user);
+    });
+
+    // Sắp xếp A-Z, # để cuối
+    keys.sort((a, b) => {
+      if (a === "#") return 1;
+      if (b === "#") return -1;
+      return a.localeCompare(b);
+    });
+
+    return { groups, keys };
+  }, [users]);
 
   const handleSubmit = async () => {
     if (!groupName.trim() || selectedMembers.size === 0) {
@@ -194,15 +228,11 @@ export default function CreateGroupModal({
             </div>
 
             {/* Content */}
-            <div className="flex-1 overflow-y-auto">
+            <div className="flex-1 ">
               {/* Group Info Section */}
               <div className="px-5 py-3 bg-gray-50 flex items-center gap-4 border-b border-gray-200">
-                {/* Group Image */}
                 <label className="cursor-pointer relative">
-                  <div
-                    className="w-10 h-10 rounded-md bg-gray-100 flex items-center justify-center 
-      overflow-hidden border border-gray-300 shadow-sm hover:shadow-md transition-all"
-                  >
+                  <div className="w-10 h-10 rounded-md bg-gray-100 flex items-center justify-center overflow-hidden border border-gray-300 shadow-sm hover:shadow-md transition-all">
                     {imagePreview ? (
                       <img
                         src={imagePreview}
@@ -221,17 +251,14 @@ export default function CreateGroupModal({
                   />
                 </label>
 
-                {/* Group Name */}
                 <input
                   type="text"
                   value={groupName}
                   onChange={(e) => setGroupName(e.target.value)}
                   placeholder="Tên nhóm..."
-                  className="flex-1 px-3 py-2 rounded-lg bg-white shadow-sm  
-      focus:outline-none focus:ring-2 focus:ring-blue-400 text-sm"
+                  className="flex-1 px-3 py-2 rounded-lg bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400 text-sm"
                 />
               </div>
-
               {/* Search Bar */}
               <div className="px-5 py-1">
                 <div className="relative">
@@ -249,7 +276,6 @@ export default function CreateGroupModal({
                   />
                 </div>
               </div>
-
               {/* Categories */}
               <div className="px-5 py-3 overflow-hidden">
                 <div className="border-b border-gray-300 pb-3">
@@ -270,79 +296,132 @@ export default function CreateGroupModal({
                   </div>
                 </div>
               </div>
-
               {/* Members List Header */}
-              <div className="px-5 ">
+              <div className="px-5">
                 <p className="text-xs font-bold text-gray-800">
                   Trò chuyện gần đây
                 </p>
               </div>
-
               {/* Loading */}
               {loading && (
                 <div className="text-center py-8">
                   <div className="inline-block w-8 h-8 border-3 border-gray-200 border-t-blue-500 rounded-full animate-spin"></div>
                 </div>
               )}
-
-              {/* Members List */}
+              {/* Members List - ĐÃ ĐƯỢC CẢI TIẾN */}
               {!loading && (
-                <div className="px-5 py-3">
-                  {users.map((user) => {
-                    const isSelected = selectedMembers.has(user.id);
-
-                    return (
-                      <div
-                        key={user.id}
-                        onClick={() => toggleMember(user.id)}
-                        className="
-flex items-center gap-3 py-2 cursor-pointer 
-hover:bg-blue-50 rounded-lg px-3 transition-all
-border border-transparent hover:border-blue-300
-"
-                      >
-                        <UserAvatar
-                          avatar={user.avatar}
-                          display_name={user.name}
-                          isOnline={user.online}
-                          size={48} // kích thước avatar
-                        />
-
-                        {/* User Info */}
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium text-gray-800 text-sm truncate">
-                            {user.name}
-                          </p>
-                        </div>
-
-                        {/* Checkbox */}
+                <div className="relative">
+                  {/* Danh sách có scroll */}
+                  <div
+                    ref={listRef}
+                    className="px-5 py-3 max-h-[45vh] overflow-y-auto scrollbar-hide"
+                  >
+                    {groupedUsers.keys.length === 0 ? (
+                      <div className="text-center py-8">
+                        <p className="text-gray-500 text-sm">
+                          Không tìm thấy người dùng nào
+                        </p>
+                      </div>
+                    ) : (
+                      groupedUsers.keys.map((letter) => (
                         <div
-                          className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all ${
-                            isSelected
-                              ? "bg-blue-500 border-blue-500"
-                              : "border-gray-300"
-                          }`}
+                          key={letter}
+                          id={`section-${letter}`}
+                          className="mb-4"
                         >
-                          {isSelected && (
-                            <Check size={14} className="text-white" />
-                          )}
+                          {/* Tiêu đề chữ cái - sticky */}
+                          <div className="py-2 text-xs font-bold text-gray-800 ">
+                            {letter === "#" ? "Khác" : letter}
+                          </div>
+
+                          {/* Danh sách user trong nhóm */}
+                          {groupedUsers.groups.get(letter)!.map((user) => {
+                            const isSelected = selectedMembers.has(user.id);
+
+                            return (
+                              <div
+                                key={user.id}
+                                onClick={() => toggleMember(user.id)}
+                                className="flex items-center gap-3 py-2 cursor-pointer 
+                                  hover:bg-blue-50 rounded-lg px-3 transition-all
+                                  border border-transparent hover:border-blue-300"
+                              >
+                                <UserAvatar
+                                  avatar={user.avatar}
+                                  display_name={user.name}
+                                  isOnline={user.online}
+                                  size={48}
+                                />
+                                <div className="flex-1 min-w-0">
+                                  <p className="font-medium text-gray-800 text-sm truncate">
+                                    {user.name}
+                                  </p>
+                                </div>
+                                <div
+                                  className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all ${
+                                    isSelected
+                                      ? "bg-blue-500 border-blue-500"
+                                      : "border-gray-300"
+                                  }`}
+                                >
+                                  {isSelected && (
+                                    <Check size={14} className="text-white" />
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ))
+                    )}
+                  </div>
+
+                  {/* Thanh chữ cái dọc bên phải - ĐẸP CHUẨN APP CHAT
+                  {groupedUsers.keys.length > 6 && (
+                    <div
+                      className="absolute right-1 top-0 bottom-0 w-8 flex flex-col justify-center items-center pointer-events-none"
+                      style={{ height: "100%" }} // Đảm bảo full chiều cao scroll area
+                    >
+                      <div className="flex flex-col justify-between h-full py-6 pointer-events-auto">
+                        {groupedUsers.keys.map((letter) => (
+                          <button
+                            key={letter}
+                            onClick={() => scrollToLetter(letter)}
+                            onMouseEnter={(e) =>
+                              (e.currentTarget.style.color = "#2563eb")
+                            }
+                            onMouseLeave={(e) =>
+                              (e.currentTarget.style.color = "#94a3b8")
+                            }
+                            className="text-[11px] font-bold text-slate-400 hover:text-blue-600 transition-colors duration-200 transform hover:scale-125"
+                            style={{
+                              lineHeight: "1",
+                              minHeight: "18px",
+                            }}
+                          >
+                            {letter === "#" ? "⋯" : letter}
+                          </button>
+                        ))}
+                      </div>
+
+                      Hiệu ứng nổi bật khi hover (tùy chọn thêm)
+                      <div className="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity pointer-events-none">
+                        <div className="bg-blue-500 text-white text-xs font-bold rounded-full w-10 h-10 flex items-center justify-center shadow-lg">
+                          <span
+                            id="active-letter-indicator"
+                            className="text-lg"
+                          >
+                            A
+                          </span>
                         </div>
                       </div>
-                    );
-                  })}
-
-                  {users.length === 0 && (
-                    <div className="text-center py-8">
-                      <p className="text-gray-500 text-sm">
-                        Không tìm thấy người dùng nào
-                      </p>
                     </div>
-                  )}
+                  )} */}
                 </div>
               )}
             </div>
 
-            {/* Footer */}
+            {/* Footer - giữ nguyên */}
             <div className="flex items-center justify-end gap-3 px-5 py-3 border-t border-gray-300 bg-white">
               <button
                 onClick={onClose}
@@ -358,7 +437,7 @@ border border-transparent hover:border-blue-300
                 className="text-sm px-6 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               >
                 {submitting && (
-                  <div className=" w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                 )}
                 <span>Tạo nhóm</span>
               </button>

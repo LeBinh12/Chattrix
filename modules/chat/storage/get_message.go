@@ -12,7 +12,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-func (s *MongoChatStore) GetMessage(ctx context.Context, SenderID, ReceiverID, GroupID primitive.ObjectID, limit int64, beforeTime *time.Time) ([]models.MessageResponse, error) {
+func (s *MongoChatStore) GetMessage(ctx context.Context, SenderID, ReceiverID, GroupID primitive.ObjectID, limit int64, beforeTime *time.Time, afterTime *time.Time) ([]models.MessageResponse, error) {
 	var filter bson.M
 
 	// Lọc theo group hoặc chat riêng
@@ -42,13 +42,17 @@ func (s *MongoChatStore) GetMessage(ctx context.Context, SenderID, ReceiverID, G
 		}
 	}
 
+	createdAtFilter := bson.M{}
+
 	if beforeTime != nil {
-		if groupCreatedAt, ok := filter["created_at"].(bson.M); ok {
-			groupCreatedAt["$lt"] = *beforeTime
-			filter["created_at"] = groupCreatedAt
-		} else {
-			filter["created_at"] = bson.M{"$lt": *beforeTime}
-		}
+		createdAtFilter["$lt"] = *beforeTime
+	}
+	if afterTime != nil {
+		createdAtFilter["$gt"] = *afterTime
+	}
+
+	if len(createdAtFilter) > 0 {
+		filter["created_at"] = createdAtFilter
 	}
 
 	opst := options.Find().
@@ -135,6 +139,8 @@ func (s *MongoChatStore) GetMessage(ctx context.Context, SenderID, ReceiverID, G
 			Status:     msg.Status,
 			IsRead:     msg.IsRead,
 			Type:       msg.Type,
+			RecalledAt: msg.RecalledAt,
+			RecalledBy: msg.RecalledBy,
 		}
 
 		if user, ok := userMap[msg.SenderID]; ok {

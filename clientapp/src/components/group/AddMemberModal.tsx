@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { X, UserPlus, Check } from "lucide-react";
 import { toast } from "react-toastify";
 import { groupApi } from "../../api/group";
@@ -30,27 +30,39 @@ export default function AddMemberModal({
   );
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  // const [page, setPage] = useState(1);
+  // const [hasMore, setHasMore] = useState(true);
 
   // Fetch users chưa trong nhóm
-  useEffect(() => {
-    if (!isOpen) return;
 
-    const fetchUsers = async () => {
+  const fetchUsers = useCallback(
+    async (pageToFetch = 1) => {
       try {
         setLoading(true);
-        const res = await groupApi.getNumber(groupId, 1, 50);
+        const res = await groupApi.getNumber(groupId, pageToFetch, 50);
+
         if (res.status === 200) {
-          setUsers(res.data);
+          const data = res.data || [];
+
+          if (pageToFetch === 1) {
+            setUsers(data);
+          } else {
+            setUsers((prev) => [...prev, ...data]);
+          }
         }
       } catch (error) {
         console.error("Lỗi tải danh sách user:", error);
       } finally {
         setLoading(false);
       }
-    };
+    },
+    [groupId]
+  );
 
-    fetchUsers();
-  }, [isOpen, groupId]);
+  useEffect(() => {
+    if (!isOpen) return;
+    fetchUsers(1);
+  }, [isOpen, fetchUsers]);
 
   // Reset khi đóng modal
   useEffect(() => {
@@ -84,9 +96,22 @@ export default function AddMemberModal({
           role: "member",
         });
       }
-      toast.success(`Đã thêm ${selectedMembers.size} thành viên vào nhóm!`);
+
+      // Lọc bỏ những user vừa thêm khỏi list hiện tại
+      setUsers((prev) => prev.filter((u) => !selectedMembers.has(u.id)));
+      const addedCount = selectedMembers.size;
+      setSelectedMembers(new Set());
+
+      toast.success(`Đã thêm ${addedCount} thành viên vào nhóm!`);
       onAddMembers?.();
-      onClose();
+
+      // Nếu không còn user nào -> thông báo / đóng modal (tuỳ bạn)
+      setTimeout(() => {
+        if (users.length - addedCount <= 0) {
+          toast.info("Đã thêm hết tất cả người dùng trong danh sách.");
+          // onClose(); // nếu muốn tự đóng modal, bỏ comment
+        }
+      }, 200);
     } catch (error) {
       console.error(error);
       toast.error("Thêm thành viên thất bại!");
@@ -179,7 +204,9 @@ export default function AddMemberModal({
           </button>
           <button
             onClick={handleSubmit}
-            disabled={selectedMembers.size === 0 || submitting}
+            disabled={
+              selectedMembers.size === 0 || submitting || users.length === 0
+            }
             className="flex-1 px-6 py-3 bg-blue-500 text-white rounded-2xl font-semibold disabled:opacity-50"
           >
             {submitting ? "Đang thêm..." : `Thêm (${selectedMembers.size})`}

@@ -7,11 +7,6 @@ import {
   FileText,
   X,
   Paperclip,
-  Users,
-  PenSquare,
-  MessageSquare,
-  Zap,
-  MoreHorizontal,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { toast } from "react-toastify";
@@ -56,10 +51,16 @@ export default function ChatInputWindow({
   const [uploading, setUploading] = useState(false);
   const pickerRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
+  const [editorHeight, setEditorHeight] = useState<"compact" | "expanded">(
+    "compact"
+  );
   // Recoil state để lấy thông tin reply
   const replyTo = useRecoilValue(replyMessageState);
   const setReplyTo = useSetRecoilState(replyMessageState);
+
+  const toggleEditorHeight = () => {
+    setEditorHeight((prev) => (prev === "compact" ? "expanded" : "compact"));
+  };
 
   const editor = useEditor({
     extensions: [
@@ -85,12 +86,15 @@ export default function ChatInputWindow({
         if (event.key === "Enter" && !event.shiftKey) {
           event.preventDefault();
 
-          const text = editor?.getText().trim();
           const html = editor?.getHTML().trim();
-          const hasText =
-            text && text !== "" && html !== "<p></p>" && html !== "<p><br></p>";
+          const hasText = !!editor?.getText().replace(/\s+/g, "").trim();
+          const isEmptyHtml = [
+            "<p></p>",
+            "<p><br></p>",
+            "<p>&nbsp;</p>",
+          ].includes(html);
 
-          if (!hasText && selectedFiles.length === 0) {
+          if (!hasText && isEmptyHtml && selectedFiles.length === 0) {
             return false;
           }
 
@@ -110,19 +114,14 @@ export default function ChatInputWindow({
   }, [hasLeftGroup, editor]);
 
   const hasValidContent = () => {
-    const textContent = showRichText
-      ? editor?.getText().trim()
-      : message.trim();
+    const text = editor?.getText().replace(/\s+/g, "").trim(); // xoá cả space và nbsp
+    const html = editor?.getHTML().trim();
 
-    const htmlContent = showRichText ? editor?.getHTML().trim() : "";
+    const emptyHtmlPatterns = ["<p></p>", "<p><br></p>", "<p>&nbsp;</p>"];
 
-    const hasText =
-      textContent &&
-      textContent !== "" &&
-      htmlContent !== "<p></p>" &&
-      htmlContent !== "<p><br></p>";
+    const hasRealText = text !== "" && !emptyHtmlPatterns.includes(html);
 
-    return hasText || selectedFiles.length > 0;
+    return hasRealText || selectedFiles.length > 0;
   };
 
   const handleEmojiClick = (emojiData: EmojiClickData) => {
@@ -133,9 +132,6 @@ export default function ChatInputWindow({
   };
 
   const handleSend = async () => {
-    if (message === "") {
-      return;
-    }
     if (!hasValidContent()) {
       return;
     }
@@ -232,10 +228,6 @@ export default function ChatInputWindow({
     return () => window.removeEventListener("keydown", handleKey);
   }, []);
 
-  const toggleHeight = () => {
-    setEditorHeight((prev) => (prev === 48 ? 280 : 48));
-  };
-
   const canSend = hasValidContent() && !hasLeftGroup;
 
   const toolbarButtons = [
@@ -257,36 +249,36 @@ export default function ChatInputWindow({
       label: "Đính kèm",
       action: () => fileInputRef.current?.click(),
     },
-    {
-      id: "members",
-      icon: <Users size={20} />,
-      label: "Thành viên",
-      action: () => toast.info("Tính năng đang phát triển!"),
-    },
-    {
-      id: "format",
-      icon: <PenSquare size={20} />,
-      label: "Định dạng",
-      action: () => setShowRichText((prev) => !prev),
-    },
-    {
-      id: "quick",
-      icon: <MessageSquare size={20} />,
-      label: "Tin nhắn nhanh",
-      action: () => toast.info("Tính năng đang phát triển!"),
-    },
-    {
-      id: "zap",
-      icon: <Zap size={20} />,
-      label: "Tính năng",
-      action: () => toast.info("Tính năng đang phát triển!"),
-    },
-    {
-      id: "more",
-      icon: <MoreHorizontal size={20} />,
-      label: "Khác",
-      action: () => toast.info("Tính năng đang phát triển!"),
-    },
+    // {
+    //   id: "members",
+    //   icon: <Users size={20} />,
+    //   label: "Thành viên",
+    //   action: () => toast.info("Tính năng đang phát triển!"),
+    // },
+    // {
+    //   id: "format",
+    //   icon: <PenSquare size={20} />,
+    //   label: "Định dạng",
+    //   action: () => setShowRichText((prev) => !prev),
+    // },
+    // {
+    //   id: "quick",
+    //   icon: <MessageSquare size={20} />,
+    //   label: "Tin nhắn nhanh",
+    //   action: () => toast.info("Tính năng đang phát triển!"),
+    // },
+    // {
+    //   id: "zap",
+    //   icon: <Zap size={20} />,
+    //   label: "Tính năng",
+    //   action: () => toast.info("Tính năng đang phát triển!"),
+    // },
+    // {
+    //   id: "more",
+    //   icon: <MoreHorizontal size={20} />,
+    //   label: "Khác",
+    //   action: () => toast.info("Tính năng đang phát triển!"),
+    // },
   ];
 
   return (
@@ -424,8 +416,12 @@ export default function ChatInputWindow({
 
         <div className="flex items-end gap-1.5 sm:gap-3">
           <div className="flex-1 min-w-0 border border-[#e6ebf5] rounded-2xl bg-white shadow-sm">
-            <div
-              className={`px-2 sm:px-3 py-2 min-h-[36px] ${
+            <motion.div
+              animate={{
+                minHeight: editorHeight === "compact" ? "50px" : "250px",
+              }}
+              transition={{ duration: 0.3, ease: "easeInOut" }}
+              className={`px-2 sm:px-3 py-2 overflow-y-auto ${
                 hasLeftGroup ? "text-gray-400" : "text-gray-700"
               }`}
             >
@@ -433,7 +429,7 @@ export default function ChatInputWindow({
                 editor={editor}
                 className="prose prose-sm max-w-full"
               />
-            </div>
+            </motion.div>
           </div>
 
           <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
@@ -478,7 +474,7 @@ export default function ChatInputWindow({
             transition={{ duration: 0.2 }}
             className="border border-[#e4e8f1] rounded-xl bg-[#f8f9ff]"
           >
-            <MenuBar editor={editor} toggleHeight={toggleHeight} />
+            <MenuBar editor={editor} toggleHeight={toggleEditorHeight} />
           </motion.div>
         </div>
       )}

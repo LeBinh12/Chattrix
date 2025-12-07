@@ -1,5 +1,5 @@
 import { ChevronDown, Search, Users } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { conversationApi } from "../../api/conversation";
 import { TING } from "../../assets/paths";
 import type { Conversation } from "../../types/conversation";
@@ -15,6 +15,7 @@ import TimeAgo from "javascript-time-ago";
 import vi from "javascript-time-ago/locale/vi.json";
 import CreateGroupModal from "../group/CreateGroup";
 import ChatSkeletonList from "../../skeleton/ChatSkeletonList";
+import { conversationListAtom } from "../../recoil/atoms/conversationListAtom";
 
 TimeAgo.addDefaultLocale(vi);
 const timeAgo = new TimeAgo("vi-VN");
@@ -32,13 +33,17 @@ interface ChannelListProps {
 type ConversationSocketData = {
   type?: string;
   message?: {
+    receiver_id?: string;
     group_id?: string;
     user_id?: string;
     display_name?: string;
     avatar?: string;
+    last_message_id: string;
     last_message?: string;
     last_message_type?: string;
     sender_id?: string;
+    recalled_by?: string;
+    recalled_at: string;
   };
   user_id?: string;
   status?: Conversation["status"];
@@ -47,7 +52,7 @@ type ConversationSocketData = {
 export default function ChannelList({ width }: ChannelListProps) {
   const user = useRecoilValue(userAtom);
   const [search, setSearch] = useState("");
-  const [results, setResults] = useState<Conversation[]>([]);
+  const [results, setResults] = useRecoilState(conversationListAtom);
   const [loading, setLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
   const [activeFilter, setActiveFilter] = useState("favorites");
@@ -56,37 +61,43 @@ export default function ChannelList({ width }: ChannelListProps) {
     useRecoilState(groupModalAtom);
   const [folderTypes, setFolderTypes] = useState<string[]>([]);
   const [isFolderOpen, setIsFolderOpen] = useState(false);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
 
+  const observer = useRef<IntersectionObserver | null>(null);
+  const isLoadingRef = useRef(false);
+
+  // Load dữ liệu ban đầu
   useEffect(() => {
     (async () => {
       setLoading(true);
       try {
         const res = await conversationApi.getConversation(1, 20, "");
+        console.log("res", res);
         setResults(res.data.data);
+        setPage(1);
+        setHasMore(res.data.data.length === 20);
       } catch {
         setResults([]);
       } finally {
         setLoading(false);
       }
     })();
-  }, []);
+  }, [setResults]);
 
+  // Socket listener
   useEffect(() => {
     if (!user?.data.id) return;
 
     socketManager.connect(user.data.id);
 
     const listener = async (data: ConversationSocketData) => {
+      // Xử lý tin nhắn mới
       if (data.type === "conversations" && data.message) {
         const msg = data.message;
         const isGroup =
           msg.group_id && msg.group_id !== "000000000000000000000000";
-
-        console.log("📩 Message:", {
-          isGroup,
-          group_id: msg.group_id,
-          user_id: msg.user_id,
-        }); // Debug
 
         if (isGroup && msg.sender_id !== user.data.id) {
           const res = await userApi.getSetting(msg.group_id, true);
@@ -96,20 +107,14 @@ export default function ChannelList({ width }: ChannelListProps) {
         setResults((prev) => {
           const existIndex = prev.findIndex((c) => {
             if (isGroup) {
-              const match = c.group_id === msg.group_id;
-              console.log(
-                `🔍 Checking group: ${c.group_id} === ${msg.group_id} => ${match}`
-              );
-              return match;
+              return c.group_id === msg.group_id;
             }
-            // Chat 1-1
-            const match =
+            return (
               c.user_id === msg.user_id &&
               (!c.group_id ||
                 c.group_id === "" ||
-                c.group_id === "000000000000000000000000");
-
-            return match;
+                c.group_id === "000000000000000000000000")
+            );
           });
 
           const oldConversation = existIndex >= 0 ? prev[existIndex] : null;
@@ -132,6 +137,7 @@ export default function ChannelList({ width }: ChannelListProps) {
               msg.last_message_type ||
               oldConversation?.last_message_type ||
               "text",
+            last_message_id: msg.last_message_id,
             last_date: new Date().toISOString(),
             unread_count:
               msg.sender_id !== user.data.id
@@ -142,17 +148,49 @@ export default function ChannelList({ width }: ChannelListProps) {
           };
 
           if (existIndex >= 0) {
-            // Cập nhật conversation có sẵn
             const newList = [...prev];
             newList.splice(existIndex, 1);
             return [updatedConversation, ...newList];
           }
 
-          // Thêm conversation mới
           return [updatedConversation, ...prev];
         });
       }
 
+      if (data.type === "recall-message" && data.message) {
+        const recalledMsg = data.message;
+        console.log("recalledMsg", recalledMsg);
+        setResults((prev) =>
+          prev.map((conv) => {
+            const isGroup =
+              conv.group_id && conv.group_id !== "000000000000000000000000";
+
+            // Kiểm tra conversation phù hợp
+            const match =
+              (isGroup && conv.group_id === recalledMsg.group_id) ||
+              (!isGroup &&
+                (conv.user_id === recalledMsg.receiver_id ||
+                  conv.user_id === recalledMsg.sender_id));
+
+            if (!match) return conv;
+
+            return {
+              ...conv,
+              last_message: "", // Xóa nội dung cũ
+              last_message_type: "text",
+              recalled_at: recalledMsg.recalled_at,
+              recalled_by: recalledMsg.recalled_by,
+              updated_at: new Date().toISOString(),
+              unread_count:
+                recalledMsg.recalled_by !== user.data.id
+                  ? (conv.unread_count || 0) + 1
+                  : conv.unread_count,
+            };
+          })
+        );
+      }
+
+      // Xử lý cập nhật status online/offline
       if (data.user_id && data.status) {
         setResults((prev) =>
           prev.map((conv) =>
@@ -166,7 +204,7 @@ export default function ChannelList({ width }: ChannelListProps) {
 
     socketManager.addListener(listener);
     return () => socketManager.removeListener(listener);
-  }, [user]);
+  }, [user, setResults]);
 
   const handleSearchKeyDown = async (
     e: React.KeyboardEvent<HTMLInputElement>
@@ -174,28 +212,162 @@ export default function ChannelList({ width }: ChannelListProps) {
     if (e.key !== "Enter") return;
     setHasSearched(true);
     setLoading(true);
+    setPage(1);
+    setHasMore(true);
+
     try {
-      const res = await conversationApi.getConversation(1, 10, search);
+      const res = await conversationApi.getConversation(1, 20, search);
       setResults(res.data.data);
+      setHasMore(res.data.data.length === 20);
     } catch {
       setResults([]);
+      setHasMore(false);
     } finally {
       setLoading(false);
     }
   };
 
   const toggleFolder = (value: string) => {
-    setFolderTypes(
-      (prev) =>
-        prev.includes(value)
-          ? prev.filter((v) => v !== value) // bỏ chọn
-          : [...prev, value] // chọn thêm
+    setFolderTypes((prev) =>
+      prev.includes(value) ? prev.filter((v) => v !== value) : [...prev, value]
     );
   };
 
   const truncateText = (text: string, max = 40) => {
     if (!text) return "";
     return text.length > max ? text.slice(0, max) + "..." : text;
+  };
+
+  const handleSelectConversation = (item: Conversation, isGroup: boolean) => {
+    if (item.sender_id != user?.data.id) {
+      socketManager.sendSeenMessage(
+        item.last_message_id,
+        isGroup ? item.group_id : item.user_id,
+        user?.data.id
+      );
+    }
+    setSelectedChat({
+      user_id: isGroup ? "" : item.user_id,
+      group_id: isGroup ? item.group_id : "",
+      avatar: item.avatar,
+      display_name: item.display_name,
+      status: item.status,
+      update_at: item.updated_at,
+    });
+  };
+
+  // Load more function
+  const loadMore = useCallback(async () => {
+    if (!hasMore || isLoadingRef.current) return;
+
+    isLoadingRef.current = true;
+    setLoadingMore(true);
+    const nextPage = page + 1;
+
+    try {
+      const res = await conversationApi.getConversation(nextPage, 20, search);
+      const newData = res.data.data;
+
+      setResults((prev) => [...prev, ...newData]);
+      setPage(nextPage);
+      setHasMore(newData.length === 20);
+    } catch (e) {
+      console.error("Load more error:", e);
+      setHasMore(false);
+    } finally {
+      setLoadingMore(false);
+      isLoadingRef.current = false;
+    }
+  }, [page, search, hasMore, setResults]);
+
+  // Callback ref cho lazy loading
+  const lastConversationRef = useCallback(
+    (node: HTMLButtonElement | null) => {
+      // Cleanup observer cũ
+      if (observer.current) {
+        observer.current.disconnect();
+      }
+
+      // Không setup observer nếu đang loading hoặc không còn dữ liệu
+      if (loadingMore || !hasMore || loading) return;
+
+      // Tạo observer mới
+      observer.current = new IntersectionObserver(
+        (entries) => {
+          if (entries[0].isIntersecting && hasMore && !isLoadingRef.current) {
+            loadMore();
+          }
+        },
+        {
+          root: null,
+          rootMargin: "100px", // Load trước khi scroll đến cuối 100px
+          threshold: 0.1,
+        }
+      );
+
+      // Observe node mới
+      if (node) {
+        observer.current.observe(node);
+      }
+    },
+    [loadingMore, hasMore, loading, loadMore]
+  );
+
+  // Cleanup observer khi unmount
+  useEffect(() => {
+    return () => {
+      if (observer.current) {
+        observer.current.disconnect();
+      }
+    };
+  }, []);
+  const stripHtml = (html: string) => {
+    return html.replace(/<[^>]+>/g, "").trim();
+  };
+
+  const formatMessagePreview = (item: Conversation, userId: string): string => {
+    // Nếu tin nhắn bị thu hồi
+    if (item.recalled_at) {
+      return item.recalled_by === userId
+        ? "Bạn đã thu hồi tin nhắn"
+        : "Tin nhắn đã bị thu hồi";
+    }
+
+    // Nếu không có tin nhắn
+    if (!item.last_message || item.last_message.trim() === "") {
+      return "Chưa có tin nhắn";
+    }
+
+    // Prefix "Bạn:" nếu là người gửi
+    const prefix = item.sender_id === userId ? "Bạn: " : "";
+    console.log("item", item);
+    // Xử lý theo loại tin nhắn
+    switch (item.last_message_type) {
+      case "image":
+        return `${prefix}[Hình ảnh]`;
+
+      case "video":
+        return `${prefix}[Video]`;
+
+      case "file":
+        return `${prefix} Đã gửi 1 file dữ liệu`;
+
+      case "audio":
+        return `${prefix}[Tin nhắn âm thanh]`;
+
+      case "sticker":
+        return `${prefix}[Sticker]`;
+
+      case "location":
+        return `${prefix}[Vị trí]`;
+
+      case "contact":
+        return `${prefix}[Liên hệ]`;
+
+      default:
+        // Text message
+        return `${prefix}${truncateText(stripHtml(item.last_message), 40)}`;
+    }
   };
 
   return (
@@ -332,84 +504,99 @@ export default function ChannelList({ width }: ChannelListProps) {
               Không tìm thấy cuộc trò chuyện nào
             </div>
           ) : (
-            results.map((item) => {
-              const isGroup =
-                item.group_id && item.group_id !== "000000000000000000000000";
-              const isSelected =
-                selectedChat?.group_id === item.group_id &&
-                selectedChat?.user_id === item.user_id;
-              const hasUnread = item.unread_count > 0;
-              const isOnline = item.status?.toLowerCase() === "online";
+            <>
+              {results.map((item, index) => {
+                const isGroup =
+                  item.group_id && item.group_id !== "000000000000000000000000";
+                const isSelected =
+                  selectedChat?.group_id === item.group_id &&
+                  selectedChat?.user_id === item.user_id;
+                const hasUnread = item.unread_count > 0;
+                const isOnline = item.status?.toLowerCase() === "online";
+                const isLastElement = index === results.length - 1;
 
-              return (
-                <button
-                  key={
-                    isGroup ? `group_${item.group_id}` : `user_${item.user_id}`
-                  }
-                  onClick={() =>
-                    setSelectedChat({
-                      user_id: isGroup ? "" : item.user_id,
-                      group_id: isGroup ? item.group_id : "",
-                      avatar: item.avatar,
-                      display_name: item.display_name,
-                      status: item.status,
-                      update_at: item.updated_at,
-                    })
-                  }
-                  className={`flex items-center gap-3 w-full text-left px-3.5 py-2.5 rounded-2xl transition-all border ${
-                    isSelected
-                      ? "bg-white shadow-lg border-[#bed3ff]"
-                      : "bg-white/70 border-transparent hover:border-[#d8def0] hover:bg-white"
-                  }`}
-                >
-                  <UserAvatar
-                    avatar={item.avatar}
-                    isOnline={!isGroup && isOnline}
-                    display_name={item.display_name}
-                  />
+                return (
+                  <button
+                    key={
+                      isGroup
+                        ? `group_${item.group_id}`
+                        : `user_${item.user_id}`
+                    }
+                    ref={isLastElement ? lastConversationRef : null}
+                    onClick={() =>
+                      handleSelectConversation(item, Boolean(isGroup))
+                    }
+                    className={`flex items-center gap-3 w-full text-left px-3.5 py-2.5 rounded-2xl transition-all border ${
+                      isSelected
+                        ? "bg-white shadow-lg border-[#bed3ff]"
+                        : "bg-white/70 border-transparent hover:border-[#d8def0] hover:bg-white"
+                    }`}
+                  >
+                    <UserAvatar
+                      avatar={item.avatar}
+                      isOnline={!isGroup && isOnline}
+                      display_name={item.display_name}
+                    />
 
-                  {width > 200 && (
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between mb-0.5">
-                        <p
-                          className={`text-[13px] font-semibold text-[#1f2a44] truncate ${
-                            hasUnread ? "text-[#0d56d4]" : ""
-                          }`}
-                        >
-                          {item.display_name}
-                        </p>
-                        {item.last_date && (
-                          <span className="text-[11px] text-[#95a1ba]">
-                            {timeAgo.format(new Date(item.last_date))}
-                          </span>
-                        )}
+                    {width > 200 && (
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between mb-0.5">
+                          <p
+                            className={`text-[13px] font-semibold text-[#1f2a44] truncate ${
+                              hasUnread ? "text-[#0d56d4]" : ""
+                            }`}
+                          >
+                            {item.display_name}
+                          </p>
+                          {item.last_date && (
+                            <span className="text-[11px] text-[#95a1ba]">
+                              {timeAgo.format(new Date(item.last_date))}
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="flex items-center justify-between gap-2">
+                          <p
+                            className={`text-[12px] truncate ${
+                              hasUnread
+                                ? "font-semibold text-[#1f2a44]"
+                                : item.recalled_at
+                                ? "text-[#9ba3b7] italic"
+                                : "text-[#6f7a95]"
+                            }`}
+                          >
+                            {formatMessagePreview(item, user?.data.id || "")}
+                          </p>
+
+                          {hasUnread && (
+                            <span className="bg-[#ff4d6b] text-white text-[10px] font-semibold px-1.5 py-0.5 rounded-full shadow">
+                              {item.unread_count}
+                            </span>
+                          )}
+                        </div>
                       </div>
+                    )}
+                  </button>
+                );
+              })}
 
-                      <div className="flex items-center justify-between gap-2">
-                        <p
-                          className={`text-[12px] text-[#6f7a95] truncate ${
-                            hasUnread ? "font-semibold text-[#1f2a44]" : ""
-                          }`}
-                          dangerouslySetInnerHTML={{
-                            __html: `${
-                              item.sender_id === user?.data.id ? "Bạn: " : ""
-                            }${truncateText(
-                              item.last_message || "Chưa có tin nhắn",
-                              40
-                            )}`,
-                          }}
-                        />
-                        {hasUnread && (
-                          <span className="bg-[#ff4d6b] text-white text-[10px] font-semibold px-1.5 py-0.5 rounded-full shadow">
-                            {item.unread_count}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </button>
-              );
-            })
+              {/* Loading indicator khi đang tải thêm */}
+              {loadingMore && (
+                <div className="text-center py-4">
+                  <div className="inline-block w-5 h-5 border-2 border-[#2162ff] border-t-transparent rounded-full animate-spin" />
+                  <p className="text-[#9ba3b7] text-xs mt-2">
+                    Đang tải thêm...
+                  </p>
+                </div>
+              )}
+
+              {/* Thông báo khi đã hết dữ liệu */}
+              {!hasMore && results.length > 0 && !loading && (
+                <div className="text-center py-3">
+                  <p className="text-[#9ba3b7] text-xs">Đã hiển thị tất cả</p>
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>
@@ -418,8 +605,11 @@ export default function ChannelList({ width }: ChannelListProps) {
         isOpen={isGroupModalOpen}
         onClose={() => setIsGroupModalOpen(false)}
         onCreateGroup={async () => {
+          setPage(1);
+          setHasMore(true);
           const res = await conversationApi.getConversation(1, 20, "");
           setResults(res.data.data);
+          setHasMore(res.data.data.length === 20);
         }}
       />
     </>

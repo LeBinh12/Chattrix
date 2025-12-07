@@ -3,6 +3,7 @@ package websocket
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 	"my-app/common/kafka"
 	"my-app/modules/chat/models"
@@ -92,6 +93,7 @@ func (h *Hub) Run() {
 							GroupID:         msg.GroupID.Hex(),
 							UserID:          "", // member nhận conversation
 							LastMessage:     msg.Content,
+							LastMessageID:   msg.ID.Hex(),
 							LastMessageType: string(msg.Type),
 							Avatar:          msg.Avatar,      // avatar nhóm
 							DisplayName:     msg.DisplayName, // tên nhóm
@@ -163,6 +165,7 @@ func (h *Hub) Run() {
 					SenderID:        msg.SenderID.Hex(),
 					UserID:          msg.ReceiverID.Hex(), // Người nhận
 					LastMessage:     msg.Content,
+					LastMessageID:   msg.ID.Hex(),
 					LastMessageType: string(msg.Type),
 					Avatar:          msg.Avatar,     // avatar của người nhận
 					DisplayName:     msg.SenderName, // tên người nhận
@@ -174,6 +177,7 @@ func (h *Hub) Run() {
 					SenderID:        msg.SenderID.Hex(),
 					UserID:          msg.SenderID.Hex(), // Người gửi
 					LastMessage:     msg.Content,
+					LastMessageID:   msg.ID.Hex(),
 					LastMessageType: string(msg.Type),
 					Avatar:          msg.SenderAvatar, // avatar của người gửi
 					DisplayName:     msg.SenderName,   // tên người gửi
@@ -211,6 +215,18 @@ func (h *Hub) Run() {
 				})
 				// Chỉ gửi cho receiver
 				if sessions, ok := h.Clients[msg.ReceiverID]; ok {
+					fmt.Println("data_Rêciver", msg)
+					for _, c := range sessions {
+						select {
+						case c.Send <- data:
+						default:
+							log.Printf("Buffer full — dropping update_seen for %s\n", c.UserID)
+						}
+					}
+				}
+
+				if sessions, ok := h.Clients[msg.SenderID]; ok {
+					fmt.Println("SenderID", msg)
 					for _, c := range sessions {
 						select {
 						case c.Send <- data:
@@ -235,6 +251,158 @@ func (h *Hub) Run() {
 						case c.Send <- data:
 						default:
 							log.Printf("Buffer full — dropping delete_for_me for %s", payload.UserID)
+						}
+					}
+				}
+
+			case "recall-message":
+				msg := event.Payload.(*models.MessageResponse)
+				data, _ := json.Marshal(map[string]interface{}{
+					"type":    "recall-message",
+					"message": msg,
+				})
+
+				// Nếu là nhắn nhóm
+				if msg.GroupID != primitive.NilObjectID {
+					members, err := storage.NewMongoChatStore(h.DB).GetGroupMembers(context.Background(), msg.GroupID)
+					if err != nil {
+						log.Println("Lỗi GetGroupMembers:", err)
+						break
+					}
+
+					for _, memberID := range members {
+
+						if sessions, ok := h.Clients[memberID.Hex()]; ok {
+							for _, c := range sessions {
+								select {
+								case c.Send <- data:
+								default:
+									log.Printf("Buffer full — dropping chat for %s", memberID.Hex())
+								}
+							}
+						}
+					}
+
+					break
+				}
+
+				// Nếu là nhắn 1-1
+				if sessions, ok := h.Clients[msg.ReceiverID.Hex()]; ok {
+					for _, receiver := range sessions {
+						select {
+						case receiver.Send <- data:
+						default:
+							log.Printf(" Buffer full — dropping message for receiver %s", msg.ReceiverID.Hex())
+						}
+					}
+				}
+
+				if sessions, ok := h.Clients[msg.SenderID.Hex()]; ok {
+					for _, sender := range sessions {
+						select {
+						case sender.Send <- data:
+						default:
+							log.Printf(" Buffer full — dropping message for sender %s", msg.SenderID.Hex())
+						}
+					}
+				}
+
+			case "pinned-message":
+				resSocket := event.Payload.(*models.MessageResponseSocket)
+
+				dataRecall, _ := json.Marshal(map[string]interface{}{
+					"type":    "pinned-message",
+					"message": resSocket,
+				})
+				// Nếu là nhắn nhóm
+				if resSocket.GroupID != primitive.NilObjectID {
+					members, err := storage.NewMongoChatStore(h.DB).GetGroupMembers(context.Background(), resSocket.GroupID)
+					if err != nil {
+						log.Println("Lỗi GetGroupMembers:", err)
+						break
+					}
+
+					for _, memberID := range members {
+
+						if sessions, ok := h.Clients[memberID.Hex()]; ok {
+							for _, c := range sessions {
+								// Gửi type recall-message
+								select {
+								case c.Send <- dataRecall:
+								default:
+									log.Printf("Buffer full — dropping recall for %s", memberID.Hex())
+								}
+							}
+						}
+					}
+
+					break
+				}
+
+				senderOID, _ := primitive.ObjectIDFromHex(resSocket.SenderID)
+				receiverOID, _ := primitive.ObjectIDFromHex(resSocket.ReceiverID)
+
+				users := []primitive.ObjectID{senderOID, receiverOID} // Nếu là nhắn 1-1
+
+				for _, uid := range users {
+					if sessions, ok := h.Clients[uid.Hex()]; ok {
+						for _, c := range sessions {
+							// Gửi type recall-message
+							select {
+							case c.Send <- dataRecall:
+							default:
+								log.Printf("Buffer full — dropping recall for %s", uid.Hex())
+							}
+						}
+					}
+				}
+
+			case "un-pinned-message":
+				resSocket := event.Payload.(*models.MessageResponseSocket)
+
+				dataRecall, _ := json.Marshal(map[string]interface{}{
+					"type":    "un-pinned-message",
+					"message": resSocket,
+				})
+				// Nếu là nhắn nhóm
+				if resSocket.GroupID != primitive.NilObjectID {
+					members, err := storage.NewMongoChatStore(h.DB).GetGroupMembers(context.Background(), resSocket.GroupID)
+					if err != nil {
+						log.Println("Lỗi GetGroupMembers:", err)
+						break
+					}
+
+					for _, memberID := range members {
+
+						if sessions, ok := h.Clients[memberID.Hex()]; ok {
+							for _, c := range sessions {
+								// Gửi type recall-message
+								select {
+								case c.Send <- dataRecall:
+								default:
+									log.Printf("Buffer full — dropping recall for %s", memberID.Hex())
+								}
+							}
+						}
+					}
+
+					break
+				}
+
+				senderOID, _ := primitive.ObjectIDFromHex(resSocket.SenderID)
+				receiverOID, _ := primitive.ObjectIDFromHex(resSocket.ReceiverID)
+
+				users := []primitive.ObjectID{senderOID, receiverOID} // Nếu là nhắn 1-1
+
+				for _, uid := range users {
+					if sessions, ok := h.Clients[uid.Hex()]; ok {
+						for _, c := range sessions {
+							// Gửi type recall-message
+							select {
+							case c.Send <- dataRecall:
+							default:
+								log.Printf("Buffer full — dropping recall for %s", uid.Hex())
+							}
 						}
 					}
 				}
@@ -265,7 +433,7 @@ func (h *Hub) BroadcastUserStatus(userID, status string) {
 	}
 
 	// Lưu DB + Kafka
-	kafka.SendMessage("user-status-topic", userID, string(data))
+	kafka.SendMessageAsync("user-status-topic", userID, string(data))
 }
 
 func (h *Hub) CheckOfflineTimeout() {

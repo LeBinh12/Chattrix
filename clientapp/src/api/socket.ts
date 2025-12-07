@@ -117,8 +117,6 @@ class SocketManager {
       },
     };
 
-    console.log("msg", msg)
-
     this.socket.send(JSON.stringify(msg));
   }
 
@@ -132,9 +130,70 @@ class SocketManager {
         receiver_id: selectedChat,        // mình đang xem
       },
     };
-    console.log("msg", msg)
     this.socket.send(JSON.stringify(msg));
   };
+
+  sendRecallMessage(message_id: string, sender_id: string, receiver_id?: string, group_id?: string) {
+    if (!this.socket || this.socket.readyState !== WebSocket.OPEN) return;
+    const msg = {
+      type: "recall-message",
+      message: {
+        sender_id: sender_id,
+        receiver_id: receiver_id || undefined,
+        group_id: group_id,
+        recalled_by: sender_id,
+        id: message_id,
+      },
+    };
+    this.socket.send(JSON.stringify(msg));
+  };
+
+  sendPinnedMessage(message_id: string, sender_id: string, receiver_id?: string, group_id?: string, content?: string,
+    sender_name?: string, pinned_by_name?: string, message_type?: string, created_at?: string
+  ) {
+    if (!this.socket || this.socket.readyState !== WebSocket.OPEN) return;
+    const msg = {
+      type: "pinned-message",
+      message: {
+        sender_id: sender_id,
+        receiver_id: receiver_id || undefined,
+        group_id: group_id,
+        id: message_id,
+      },
+      message_res: {
+        message_id: message_id,
+        content: content,
+        sender_id: sender_id,
+        sender_name: sender_name,
+        pinned_by_id: sender_id,
+        pinned_by_name: pinned_by_name,
+        message_type: message_type,
+        created_at: created_at
+      }
+    };
+    this.socket.send(JSON.stringify(msg));
+  };
+
+
+  sendUnPinnedMessage(message_id: string, sender_id: string, receiver_id?: string, group_id?: string, conversation_id?: string
+  ) {
+    if (!this.socket || this.socket.readyState !== WebSocket.OPEN) return;
+    const msg = {
+      type: "un-pinned-message",
+      message: {
+        sender_id: sender_id,
+        receiver_id: receiver_id || undefined,
+        group_id: group_id,
+        id: message_id,
+      },
+      message_res: {
+        message_id: message_id,
+        conversation_id: conversation_id
+      }
+    };
+    this.socket.send(JSON.stringify(msg));
+  };
+
 
 
   addListener(cb: MessageCallback) {

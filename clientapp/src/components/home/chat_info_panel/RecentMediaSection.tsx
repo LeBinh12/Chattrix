@@ -1,4 +1,6 @@
 import { Image, Play } from "lucide-react";
+import { useSetRecoilState } from "recoil";
+import { activePanelAtom } from "../../../recoil/atoms/uiAtom";
 
 interface MediaItem {
   id: string;
@@ -17,6 +19,8 @@ export default function RecentMediaSection({
   mediaItems,
   onMediaClick,
 }: RecentMediaSectionProps) {
+  const setActivePanel = useSetRecoilState(activePanelAtom);
+
   return (
     <div>
       <div className="flex items-center justify-between mb-2">
@@ -25,7 +29,10 @@ export default function RecentMediaSection({
           Ảnh/Video ({mediaItems.length})
         </h4>
         {mediaItems.length > 8 && (
-          <button className="text-[11px] text-[#4f6eda] hover:text-[#1f2a44] underline transition">
+          <button
+            onClick={() => setActivePanel("storage")}
+            className="text-[11px] text-[#4f6eda] no-underline hover:underline hover:text-[#1f2a44] transition cursor-pointer"
+          >
             Xem tất cả
           </button>
         )}

@@ -37,6 +37,7 @@ func NewChatBiz(store ChatStorage, es ChatESIndexer) *ChatBiz {
 
 func (biz *ChatBiz) HandleMessage(
 	ctx context.Context,
+	message_id primitive.ObjectID,
 	sender string,
 	receiver string,
 	content string,
@@ -70,7 +71,7 @@ func (biz *ChatBiz) HandleMessage(
 		Reply:      replyTo,
 	}
 
-	msg.ID = primitive.NewObjectID()
+	msg.ID = message_id
 
 	// kiểm tra sender
 	senderExists, err := biz.store.CheckUserExists(ctx, sender)

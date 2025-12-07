@@ -6,6 +6,7 @@ import (
 	"log"
 	"my-app/common/kafka"
 	"my-app/modules/chat/models"
+	"my-app/modules/chat/storage"
 	"sync"
 	"time"
 
@@ -13,8 +14,6 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 )
-
-// Đây là nơi xử lý Struct client, các method gửi/nhận tin
 
 type Client struct {
 	Hub       *Hub
@@ -28,13 +27,13 @@ type Client struct {
 }
 
 type WSMessage struct {
-	Type          string                       `json:"type"` // "chat" | "update_seen"
-	Message       *models.MessageResponse      `json:"message,omitempty"`
-	MessageStatus *models.MessageStatusRequest `json:"message_status,omitempty"`
-	DeleteMsg     *models.DeleteMessageForMe   `json:"delete_msg,omitempty"`
+	Type          string                        `json:"type"`
+	Message       *models.MessageResponse       `json:"message,omitempty"`
+	MessageStatus *models.MessageStatusRequest  `json:"message_status,omitempty"`
+	DeleteMsg     *models.DeleteMessageForMe    `json:"delete_msg,omitempty"`
+	MessageRes    *models.MessageResponseSocket `json:"message_res,omitempty"`
 }
 
-// ĐỌc dữ liệu lưu và DB và trả về cho client là đã gửi vào hub và hub sẽ xử lý gửi đi cho client
 func (c *Client) ReadPump(db *mongo.Database) {
 	defer func() {
 		log.Println(" ReadPump đóng cho user:", c.UserID)
@@ -43,222 +42,298 @@ func (c *Client) ReadPump(db *mongo.Database) {
 		c.Conn.Close()
 	}()
 
-	// setup Ping-Pong
-	c.Conn.SetReadLimit(1024 * 1024) // 1MB
+	c.Conn.SetReadLimit(1024 * 1024)
 	c.Conn.SetReadDeadline(time.Now().Add(60 * time.Second))
 	c.Conn.SetPongHandler(func(string) error {
 		c.LastSeen = time.Now()
 		c.Conn.SetReadDeadline(time.Now().Add(60 * time.Second))
-		log.Println(" Nhận được pong từ client:", c.UserID)
 		return nil
 	})
 
 	for {
 		var incoming WSMessage
 		if err := c.Conn.ReadJSON(&incoming); err != nil {
-			log.Println(" Read error:", err)
+			log.Println("❌ Read error:", err)
 			break
 		}
 
 		switch incoming.Type {
 		case "chat":
-			msg := incoming.Message
-			if msg == nil {
-				continue
-			}
-
-			// xủ lý nếu là nhắn tin Group
-			if msg.GroupID != primitive.NilObjectID {
-				msg.CreatedAt = time.Now()
-				msg.UpdatedAt = time.Now()
-				msg.ID = primitive.NewObjectID()
-
-				c.Hub.Broadcast <- HubEvent{
-					Type:    "chat",
-					Payload: msg,
-				}
-				msg.Status = models.StatusDelivered
-			} else {
-				if msg.SenderID == msg.ReceiverID {
-					log.Println("Error: Không được gửi tin nhắn cho chính mình")
-					break
-				}
-
-				// kiểm tra xem người dùng có ở trong soket không, nếu có thì là đang online
-				_, ok := c.Hub.Clients[msg.ReceiverID.Hex()]
-
-				if ok {
-					msg.Status = models.StatusDelivered
-				} else {
-					msg.Status = models.StatusSent
-				}
-
-				msg.ID = primitive.NewObjectID()
-				msg.CreatedAt = time.Now()
-				// Gửi broadcast chat ra hub
-				c.Hub.Broadcast <- HubEvent{
-					Type:    "chat",
-					Payload: msg,
-				}
-				// có thể serialize JSON thay vì chỉ Content
-				// Broadcast Gửi một tin nhắn tới tất cả người nhận cùng lúc
-				// Unicast là Gửi tin nhắn tới một người nhận riêng
-				// 	Multicast là Gửi tin nhắn tới một nhóm người nhận
-			}
-			var conversations = models.ConversationPreview{
-				UserID:          msg.ReceiverID.Hex(),
-				GroupID:         msg.GroupID.Hex(),
-				LastMessage:     msg.Content,
-				LastMessageType: string(msg.Type),
-				Avatar:          msg.Avatar,
-				DisplayName:     msg.DisplayName,
-				LastDate:        msg.CreatedAt,
-				SenderID:        msg.SenderID.Hex(),
-			}
-
-			// gửi broadcast conversation ra hub
-
-			c.Hub.Broadcast <- HubEvent{
-				Type:    "conversations",
-				Payload: &conversations,
-			}
-
-			msgCopy := msg
-			go func() {
-				data, err := json.Marshal(msg)
-
-				if err != nil {
-					log.Println("JSON marshal error:", err)
-					return
-				}
-
-				if err := kafka.SendMessage("chat-topic", msgCopy.SenderID.Hex(), string(data)); err != nil {
-					log.Println("Kafka send error:", err)
-				}
-				// kafka.EnqueueMessage("chat-topic", msgCopy.SenderID.Hex(), string(data))
-			}()
-
+			c.handleChatMessage(incoming.Message)
 		case "update_seen":
-
-			msg := incoming.MessageStatus
-			if msg == nil {
-				continue
-			}
-			fmt.Println("duwx lieuj tra ve:", msg)
-
-			if msg.ReceiverID == "" || msg.LastSeenMsgID == "" {
-				log.Println(" Thiếu dữ liệu update_seen")
-				continue
-			}
-
-			// Gửi broadcast lại cho những client khác
-
-			c.Hub.Broadcast <- HubEvent{Type: "update_seen", Payload: msg}
-
-			msgCopy := msg
-			go func() {
-				data, err := json.Marshal(msg)
-				fmt.Println("duwx lieuj tra ve:", data)
-				if err != nil {
-					log.Println("JSON marshal error:", err)
-					return
-				}
-
-				if err := kafka.SendMessage("update-status-message", msgCopy.SenderID, string(data)); err != nil {
-					log.Println("Kafka send error:", err)
-				}
-			}()
-
-			/// Xử lý thoát nhóm
+			c.handleUpdateSeen(incoming.MessageStatus)
 		case "member_left":
-			msg := incoming.Message
-			if msg == nil {
-				continue
-			}
-
-			c.Hub.Broadcast <- HubEvent{
-				Type:    "chat",
-				Payload: msg,
-			}
-
-			msgCopy := msg
-			go func() {
-				data, err := json.Marshal(msg)
-
-				if err != nil {
-					log.Println("JSON marshal error:", err)
-					return
-				}
-
-				if err := kafka.SendMessage("chat-topic", msgCopy.SenderID.Hex(), string(data)); err != nil {
-					log.Println("Kafka send error:", err)
-				}
-			}()
-
-			go func() {
-				data, err := json.Marshal(msg)
-
-				if err != nil {
-					log.Println("JSON marshal error:", err)
-					return
-				}
-				if err := kafka.SendMessage("group-out", msgCopy.SenderID.Hex(), string(data)); err != nil {
-					log.Println("Kafka send error:", err)
-				}
-			}()
-
-		// xử lý xóa tin nhắn chỉ mình mình không thấy tin nhắn đó
-
+			c.handleMemberLeft(incoming.Message)
 		case "delete_for_me":
-			delMsg := incoming.DeleteMsg
-			if delMsg == nil {
-				continue
-			}
-			// Convert UserID
-			userID, err := primitive.ObjectIDFromHex(delMsg.UserID)
-			if err != nil {
-				log.Println("UserID không hợp lệ:", err)
-				continue
-			}
-
-			// Convert MessageIDs
-			var messageIDs []primitive.ObjectID
-			for _, m := range delMsg.MessageIDs {
-				id, err := primitive.ObjectIDFromHex(m)
-				if err != nil {
-					log.Println("MessageID không hợp lệ:", m, err)
-					continue
-				}
-				messageIDs = append(messageIDs, id)
-			}
-
-			// Realtime: gửi event này về chính user (ẩn tin nhắn đó)
-			c.Hub.Broadcast <- HubEvent{
-				Type:    "delete_for_me",
-				Payload: delMsg,
-			}
-
-			// Gửi lên Kafka để consumer xử lý lưu vào DB
-			go func() {
-				data, err := json.Marshal(delMsg)
-				if err != nil {
-					log.Println("JSON marshal error:", err)
-					return
-				}
-
-				if err := kafka.SendMessage("delete-message-for-me-topic", userID.Hex(), string(data)); err != nil {
-					log.Println("Kafka send error:", err)
-				}
-			}()
-
+			c.handleDeleteForMe(incoming.DeleteMsg)
+		case "recall-message":
+			c.handleRecallMessage(incoming.Message)
+		case "pinned-message":
+			c.handlePinnedMessage(incoming.Message, incoming.MessageRes)
+		case "un-pinned-message":
+			c.handleUnPinnedMessage(incoming.Message, incoming.MessageRes)
 		}
-
 	}
 }
 
-// Lắng nghe xem có ai gửi tin nhắn xuống không nếu có trả về cho client đoạn tinh nhắn đó
+func (c *Client) handleUnPinnedMessage(msg *models.MessageResponse, res *models.MessageResponseSocket) {
+	if msg == nil {
+		return
+	}
+
+	res.ConversationID = storage.GetConversationID(msg.SenderID, msg.ReceiverID).Hex()
+	msg.CreatedAt = time.Now()
+	msg.UpdatedAt = time.Now()
+	msg.ID = primitive.NewObjectID()
+	msg.Status = models.StatusDelivered
+
+	msg.Content = fmt.Sprintf("Người dùng %s đã gỡ một tin nhắn ghim", res.PinnedByName)
+	msg.Type = "system"
+	msg.Status = "seen"
+	msg.IsRead = true
+	res.GroupID = msg.GroupID
+	res.ReceiverID = string(msg.ReceiverID.Hex())
+	// tin nhắn
+	go c.sendToKafkaWithRetry("chat-topic", msg.SenderID.Hex(), msg)
+	// Update DB before broadcast (nếu cần)
+	go c.sendToKafkaWithRetry("un-pinned-message-topic", msg.SenderID.Hex(), res)
+
+	c.Hub.Broadcast <- HubEvent{
+		Type:    "chat",
+		Payload: msg,
+	}
+
+	// Gửi sự kiện cho mọi client
+
+	c.Hub.Broadcast <- HubEvent{
+		Type:    "un-pinned-message",
+		Payload: res,
+	}
+}
+
+func (c *Client) handlePinnedMessage(msg *models.MessageResponse, res *models.MessageResponseSocket) {
+	if msg == nil {
+		return
+	}
+
+	res.ConversationID = storage.GetConversationID(msg.SenderID, msg.ReceiverID).Hex()
+	msg.CreatedAt = time.Now()
+	msg.UpdatedAt = time.Now()
+	msg.ID = primitive.NewObjectID()
+	msg.Status = models.StatusDelivered
+
+	msg.Content = fmt.Sprintf("Người dùng %s đã ghim 1 tin nhắn", res.PinnedByName)
+	msg.Type = "system"
+	msg.Status = "seen"
+	msg.IsRead = true
+
+	res.GroupID = msg.GroupID
+	res.ReceiverID = string(msg.ReceiverID.Hex())
+	// tin nhắn
+	go c.sendToKafkaWithRetry("chat-topic", msg.SenderID.Hex(), msg)
+	// Update DB before broadcast (nếu cần)
+	go c.sendToKafkaWithRetry("pinned-message-topic", msg.SenderID.Hex(), res)
+
+	c.Hub.Broadcast <- HubEvent{
+		Type:    "chat",
+		Payload: msg,
+	}
+
+	// Gửi sự kiện cho mọi client
+
+	c.Hub.Broadcast <- HubEvent{
+		Type:    "pinned-message",
+		Payload: res,
+	}
+}
+
+func (c *Client) handleRecallMessage(msg *models.MessageResponse) {
+	if msg == nil {
+		return
+	}
+
+	now := time.Now()
+
+	msg.RecalledAt = &now
+
+	// Update DB before broadcast (nếu cần)
+	go c.sendToKafkaWithRetry("recall-message-topic", msg.SenderID.Hex(), msg)
+
+	// Gửi sự kiện cho mọi client
+
+	c.Hub.Broadcast <- HubEvent{
+		Type:    "recall-message",
+		Payload: msg,
+	}
+}
+
+// ======================== FIX #4: Retry logic khi gửi Kafka ========================
+func (c *Client) handleChatMessage(msg *models.MessageResponse) {
+	if msg == nil {
+		return
+	}
+	newID := primitive.NewObjectID()
+	// Xử lý group message
+	if msg.GroupID != primitive.NilObjectID {
+		msg.CreatedAt = time.Now()
+		msg.UpdatedAt = time.Now()
+		msg.ID = newID
+		msg.Status = models.StatusDelivered
+
+		// FIX: Gửi Kafka với retry logic
+		msgCopy := *msg
+		go c.sendToKafkaWithRetry("chat-topic", msgCopy.SenderID.Hex(), msgCopy)
+
+		c.Hub.Broadcast <- HubEvent{
+			Type:    "chat",
+			Payload: msg,
+		}
+	} else {
+		// 1-1 message
+		if msg.SenderID == msg.ReceiverID {
+			log.Println(" Error: Không được gửi tin nhắn cho chính mình")
+			return
+		}
+
+		_, ok := c.Hub.Clients[msg.ReceiverID.Hex()]
+		if ok {
+			msg.Status = models.StatusDelivered
+		} else {
+			msg.Status = models.StatusSent
+		}
+
+		msg.ID = newID
+		msg.CreatedAt = time.Now()
+
+		// FIX: Gửi Kafka với retry logic
+		msgCopy := *msg
+		go c.sendToKafkaWithRetry("chat-topic", msgCopy.SenderID.Hex(), msgCopy)
+
+		c.Hub.Broadcast <- HubEvent{
+			Type:    "chat",
+			Payload: msg,
+		}
+	}
+
+	// Broadcast conversation preview
+	conversations := models.ConversationPreview{
+		UserID:          msg.ReceiverID.Hex(),
+		GroupID:         msg.GroupID.Hex(),
+		LastMessage:     msg.Content,
+		LastMessageID:   newID.Hex(),
+		LastMessageType: string(msg.Type),
+		Avatar:          msg.Avatar,
+		DisplayName:     msg.DisplayName,
+		LastDate:        msg.CreatedAt,
+		SenderID:        msg.SenderID.Hex(),
+	}
+
+	c.Hub.Broadcast <- HubEvent{
+		Type:    "conversations",
+		Payload: &conversations,
+	}
+}
+
+func (c *Client) handleUpdateSeen(msg *models.MessageStatusRequest) {
+	if msg == nil {
+		return
+	}
+
+	if msg.ReceiverID == "" || msg.LastSeenMsgID == "" {
+		log.Println("⚠️ Thiếu dữ liệu update_seen")
+		return
+	}
+
+	msgCopy := *msg
+	go c.sendToKafkaWithRetry("update-status-message", msgCopy.SenderID, msgCopy)
+
+	c.Hub.Broadcast <- HubEvent{Type: "update_seen", Payload: msg}
+}
+
+func (c *Client) handleMemberLeft(msg *models.MessageResponse) {
+	if msg == nil {
+		return
+	}
+
+	c.Hub.Broadcast <- HubEvent{
+		Type:    "chat",
+		Payload: msg,
+	}
+
+	msgCopy := *msg
+	go c.sendToKafkaWithRetry("chat-topic", msgCopy.SenderID.Hex(), msgCopy)
+	go c.sendToKafkaWithRetry("group-out", msgCopy.SenderID.Hex(), msgCopy)
+}
+
+func (c *Client) handleDeleteForMe(delMsg *models.DeleteMessageForMe) {
+	if delMsg == nil {
+		return
+	}
+
+	userID, err := primitive.ObjectIDFromHex(delMsg.UserID)
+	if err != nil {
+		log.Println("❌ UserID không hợp lệ:", err)
+		return
+	}
+
+	var messageIDs []primitive.ObjectID
+	for _, m := range delMsg.MessageIDs {
+		id, err := primitive.ObjectIDFromHex(m)
+		if err != nil {
+			log.Println("❌ MessageID không hợp lệ:", m, err)
+			continue
+		}
+		messageIDs = append(messageIDs, id)
+	}
+
+	c.Hub.Broadcast <- HubEvent{
+		Type:    "delete_for_me",
+		Payload: delMsg,
+	}
+
+	go c.sendToKafkaWithRetry("delete-message-for-me-topic", userID.Hex(), *delMsg)
+}
+
+// ======================== Retry logic với exponential backoff ========================
+func (c *Client) sendToKafkaWithRetry(topic, key string, payload interface{}) {
+	data, err := json.Marshal(payload)
+	if err != nil {
+		log.Printf(" JSON marshal error: %v", err)
+		return
+	}
+
+	maxRetries := 5
+	for retry := 0; retry < maxRetries; retry++ {
+		err = kafka.SendMessageAsync(topic, key, string(data))
+		if err == nil {
+			if retry > 0 {
+				log.Printf(" Retry success after %d attempts: topic=%s", retry, topic)
+			}
+			return
+		}
+
+		// Thất bại → retry với exponential backoff
+		if retry < maxRetries-1 {
+			backoff := time.Duration(1<<uint(retry)) * 100 * time.Millisecond // 100ms, 200ms, 400ms, 800ms, 1.6s
+			log.Printf(" Retry %d/%d after %v: topic=%s, error=%v", retry+1, maxRetries, backoff, topic, err)
+			time.Sleep(backoff)
+		}
+	}
+
+	// CRITICAL: Sau 5 lần retry vẫn fail
+	log.Printf("❌ CRITICAL: Failed to send to Kafka after %d retries: topic=%s, key=%s", maxRetries, topic, key)
+	c.logFailedMessage(topic, key, string(data))
+}
+
+// Ghi message thất bại vào file để recovery sau
+func (c *Client) logFailedMessage(topic, key, data string) {
+	logEntry := fmt.Sprintf("[%s] topic=%s key=%s data=%s\n",
+		time.Now().Format(time.RFC3339), topic, key, data)
+
+	log.Printf("💾 Logged failed message: %s", logEntry)
+}
+
 func (c *Client) WritePump() {
-	// Thêm ticker để gửi ping định kỳ (ví dụ: 30 giây)
 	pingTicker := time.NewTicker(40 * time.Second)
 
 	defer func() {
@@ -271,19 +346,17 @@ func (c *Client) WritePump() {
 		select {
 		case msg, ok := <-c.Send:
 			if !ok {
-				// channel bị đóng và ngắt kết nối
-				c.Conn.WriteMessage(1, []byte("channel closed"))
+				c.Conn.WriteMessage(websocket.CloseMessage, []byte("channel closed"))
 				return
 			}
 
-			// Gửi xuống client
-			if err := c.Conn.WriteMessage(1, msg); err != nil {
-				log.Println("Write error:", err)
+			if err := c.Conn.WriteMessage(websocket.TextMessage, msg); err != nil {
+				log.Println("❌ Write error:", err)
 				return
 			}
+
 		case <-pingTicker.C:
 			if err := c.Conn.WriteMessage(websocket.PingMessage, nil); err != nil {
-				// Nếu là lỗi tạm thì bỏ qua, đừng đóng liền
 				if websocket.IsUnexpectedCloseError(err) {
 					return
 				}

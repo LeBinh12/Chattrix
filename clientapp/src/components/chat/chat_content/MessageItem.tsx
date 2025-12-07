@@ -6,7 +6,6 @@ import {
   FileText,
   MoreVertical,
   Play,
-  Share,
   Copy,
   Pin,
   Star,
@@ -28,9 +27,11 @@ import { API_ENDPOINTS } from "../../../config/api";
 import { socketManager } from "../../../api/socket";
 import { LOGO } from "../../../assets/paths";
 import { toast } from "react-toastify";
-import { useSetRecoilState } from "recoil";
+import { useRecoilValue, useSetRecoilState } from "recoil";
 import { replyMessageState } from "../../../recoil/atoms/uiAtom";
 import { messageIDAtom } from "../../../recoil/atoms/messageAtom";
+import { userAtom } from "../../../recoil/atoms/userAtom";
+import SystemGroup from "./logic/SystemGroup";
 
 type StatusConfig = {
   icon: typeof Check;
@@ -57,6 +58,7 @@ const statusMap: Record<string, StatusConfig> = {
 
 export default function MessageItem({
   msg,
+  index,
   currentUserId,
   onPreviewMedia,
   messages,
@@ -65,6 +67,7 @@ export default function MessageItem({
   isHighlighted = false,
 }: Props) {
   const isMine = msg.sender_id === currentUserId;
+
   const isLastMineMessage =
     isMine &&
     messages &&
@@ -78,8 +81,9 @@ export default function MessageItem({
   // Recoil state để set reply
   const setReplyTo = useSetRecoilState(replyMessageState);
   const setMessageID = useSetRecoilState(messageIDAtom);
-  const hasMedia = (msg.media_ids || []).length > 0;
 
+  const hasMedia = (msg.media_ids || []).length > 0;
+  const user = useRecoilValue(userAtom);
   // Hàm xử lý reply - Lưu toàn bộ thông tin vào Recoil
   const handleReply = () => {
     // Lấy URL đầu tiên nếu có media
@@ -196,8 +200,28 @@ export default function MessageItem({
   };
 
   const handlePin = () => {
+    console.log("message_id", msg.id);
+    console.log("content", msg.content);
+    console.log("sender_id", msg.sender_id);
+    console.log("sender_name", msg.sender_name);
+    console.log("pinned_by_id", currentUserId);
+    console.log("pinned_by_name", msg.id);
+    console.log("message_type", msg.type);
+    console.log("created_at", msg.created_at);
+
     console.log("Ghim tin nhắn:", msg.id);
-    toast.info("Tin năng đang phát triễn");
+
+    socketManager.sendPinnedMessage(
+      msg.id,
+      currentUserId ?? "",
+      msg.receiver_id,
+      msg.group_id,
+      msg.content,
+      msg.sender_name,
+      user?.data.display_name,
+      msg.type,
+      msg.created_at
+    );
     setShowMenu(false);
   };
 
@@ -221,7 +245,13 @@ export default function MessageItem({
 
   const handleRecall = () => {
     console.log("Thu hồi tin nhắn:", msg.id);
-    toast.info("Tin năng đang phát triễn");
+    socketManager.sendRecallMessage(
+      msg.id,
+      currentUserId ?? "",
+      msg.receiver_id,
+      msg.group_id
+    );
+    // toast.info("Tin năng đang phát triễn");
     setShowMenu(false);
   };
 
@@ -236,6 +266,42 @@ export default function MessageItem({
     temp.innerHTML = html;
     return temp.textContent || temp.innerText || "";
   };
+
+  // --- CHECK IF MESSAGE IS RECALLED ---
+  if (msg.recalled_at) {
+    return (
+      <div
+        className={`flex gap-2.5 ${
+          isMine ? "justify-end" : "justify-start"
+        } relative`}
+      >
+        {!isMine ? (
+          <AvatarPreview
+            src={
+              msg.sender_avatar && msg.sender_avatar !== "null"
+                ? `${API_ENDPOINTS.UPLOAD_MEDIA}/${msg.sender_avatar}`
+                : LOGO
+            }
+            alt={display_name}
+            size={size === "small" ? 30 : 32}
+          />
+        ) : (
+          <div className="w-7" />
+        )}
+
+        <div
+          className={`px-3 py-2 rounded-lg border text-sm italic
+          ${
+            isMine
+              ? "bg-[#e6edff] border-[#d0dbff] text-[#5b6da0]"
+              : "bg-[#f5f6f7] border-[#e4e8f1] text-[#707b97]"
+          }`}
+        >
+          {isMine ? "Bạn đã thu hồi một tin nhắn" : "Tin nhắn đã bị thu hồi"}
+        </div>
+      </div>
+    );
+  }
 
   // Render reply preview trong message bubble (khi tin nhắn này reply tin khác)
   const renderReplyPreview = () => {
@@ -311,19 +377,22 @@ export default function MessageItem({
   };
 
   if (msg.type === "system") {
-    return (
-      <motion.div
-        key={msg.id}
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        exit={{ opacity: 0, scale: 0.95 }}
-        className="flex justify-center my-4"
-      >
-        <div className="px-4 py-2 rounded-full bg-white border border-[#e4e8f1] text-xs text-[#707b97] shadow-sm">
-          {msg.content}
-        </div>
-      </motion.div>
-    );
+    const systemGroup = [];
+    let currentIndex = index;
+
+    while (
+      currentIndex < messages.length &&
+      messages[currentIndex].type === "system"
+    ) {
+      systemGroup.push(messages[currentIndex]);
+      currentIndex++;
+    }
+
+    const isFirstInGroup = index === 0 || messages[index - 1].type !== "system";
+
+    if (!isFirstInGroup) return null;
+
+    return <SystemGroup systemGroup={systemGroup} />;
   }
 
   const bubbleStyles = isMine
@@ -483,29 +552,50 @@ export default function MessageItem({
             isMine ? "items-end" : "items-start"
           } max-w-[85%] sm:max-w-[75%] md:max-w-[68%] gap-1 relative`}
         >
+          {!isMine && (
+            <div className="text-xs font-semibold text-gray-600 ml-1 mb-1">
+              {msg.sender_name}
+            </div>
+          )}
+
           {/* Hover actions */}
           {isHovered && !showMenu && (
             <motion.div
-              initial={{ opacity: 0, scale: 0.9, y: -5 }}
+              initial={{ opacity: 0, scale: 0.9, y: -3 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.9, y: -5 }}
+              exit={{ opacity: 0, scale: 0.9, y: -3 }}
               className={`
-      absolute  flex items-center gap-2 px-2 py-1 
-      bg-white shadow border border-gray-200 rounded-full
-      ${isMine ? "left-0 -translate-x-full" : "right-0 translate-x-full"}
+      absolute top-1/2 -translate-y-1/2 flex items-center gap-1 
+      px-1.5 py-1 z-20
+
+      ${isMine ? "right-full mr-1" : "left-full ml-1"}
     `}
             >
+              {/* Reply button */}
+              <button
+                onClick={handleReply}
+                className="
+        w-7 h-7 flex items-center justify-center rounded-full
+        bg-white border border-gray-300
+        hover:bg-gray-200 transition-colors
+        shadow-sm
+      "
+                title="Trả lời"
+              >
+                <Reply className="w-3.5 h-3.5 text-[#6b7a8f]" />
+              </button>
+
+              {/* More button */}
               <button
                 onClick={() => setShowMenu(true)}
-                className="p-1.5 rounded-full hover:bg-gray-100 text-gray-600"
+                className="
+        w-7 h-7 flex items-center justify-center rounded-full
+        bg-white border border-gray-300
+        hover:bg-gray-200 transition-colors
+        shadow-sm
+      "
               >
-                <MoreVertical className="w-4 h-4" />
-              </button>
-              <button
-                onClick={() => console.log("Share message:", msg.id)}
-                className="p-1.5 rounded-full hover:bg-gray-100 text-gray-600"
-              >
-                <Share className="w-4 h-4" />
+                <MoreVertical className="w-3.5 h-3.5 text-[#6b7a8f]" />
               </button>
             </motion.div>
           )}
@@ -518,8 +608,8 @@ export default function MessageItem({
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
               className={` absolute z-50 w-56 bg-white            
-                    ${isMine ? "right-0" : "left-0"}
-            rounded shadow-2xl overflow-hidden border border-gray-200`}
+    ${isMine ? "left-0 -translate-x-full" : "right-0 translate-x-full"}
+rounded shadow-2xl overflow-hidden border border-gray-200`}
             >
               {isMine ? (
                 <div className="py-1">

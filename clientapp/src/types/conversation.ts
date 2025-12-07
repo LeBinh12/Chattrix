@@ -16,9 +16,12 @@ export interface Conversation {
     display_name: string,
     avatar: string,
     last_message: string,
+    last_message_id: string,
     last_date: string,
     unread_count: number,
     status: string,
     updated_at: string,
     last_message_type: string,
+    recalled_at?: string,
+    recalled_by?: string,
 }

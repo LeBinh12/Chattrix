@@ -1,104 +1,244 @@
-import { motion } from "framer-motion";
-import {
-  Home,
-  Users,
-  Settings,
-  LogOut,
-  Group,
-  MessageCircleIcon,
-  Image,
-  Logs,
-  BellElectric,
-} from "lucide-react";
-import { NavLink, useLocation } from "react-router-dom";
+import * as React from "react";
+import GlobalStyles from "@mui/joy/GlobalStyles";
+import Avatar from "@mui/joy/Avatar";
+import Box from "@mui/joy/Box";
+import Divider from "@mui/joy/Divider";
+import IconButton from "@mui/joy/IconButton";
+import Input from "@mui/joy/Input";
+import List from "@mui/joy/List";
+import ListItem from "@mui/joy/ListItem";
+import ListItemButton, { listItemButtonClasses } from "@mui/joy/ListItemButton";
+import ListItemContent from "@mui/joy/ListItemContent";
+import Typography from "@mui/joy/Typography";
+import Sheet from "@mui/joy/Sheet";
+import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
+import HomeRoundedIcon from "@mui/icons-material/HomeRounded";
+import DashboardRoundedIcon from "@mui/icons-material/DashboardRounded";
+import ShoppingCartRoundedIcon from "@mui/icons-material/ShoppingCartRounded";
+import QuestionAnswerRoundedIcon from "@mui/icons-material/QuestionAnswerRounded";
+import SettingsRoundedIcon from "@mui/icons-material/SettingsRounded";
+import LogoutRoundedIcon from "@mui/icons-material/LogoutRounded";
 
-interface SidebarProps {
-  isCollapsed: boolean;
-  setTitle: (title: string) => void;
-}
+import ColorSchemeToggle from "./message/ColorSchemeToggle";
+import { closeSidebar } from "../../utils/sidebar";
+import { toast } from "react-toastify";
+import { useNavigate } from "react-router-dom";
 
-const menuItems = [
-  { icon: Home, label: "Dashboard Nhân sự", href: "/admin" },
-  { icon: Users, label: "Quản lý người dùng", href: "/admin/user-page" },
-  { icon: Group, label: "Nhóm & Kênh thoại", href: "/admin/group-manager" },
-  {
-    icon: MessageCircleIcon,
-    label: "Giám sát trò chuyện",
-    href: "/admin/settings",
-  },
-  { icon: Image, label: " Media & Files", href: "/admin/settings" },
-  { icon: Logs, label: "Nhật ký hệ thống", href: "/admin/settings" },
-  { icon: BellElectric, label: "Trung tâm thông báo", href: "/admin/settings" },
-  { icon: Settings, label: "Cài đặt", href: "/admin/settings" },
-];
+export default function Sidebar() {
+  const navigate = useNavigate();
 
-export default function Sidebar({ isCollapsed, setTitle }: SidebarProps) {
-  const location = useLocation();
+  const handleLogout = () => {
+    localStorage.removeItem("admin_auth"); // xóa token
+    toast.info("Bạn đã đăng xuất!");
+    navigate("/admin/login");
+  };
 
   return (
-    <motion.aside
-      animate={{ width: isCollapsed ? 80 : 256 }}
-      className="bg-gradient-to-b from-blue-800 to-blue-900 text-white flex flex-col overflow-hidden"
+    <Sheet
+      className="Sidebar"
+      sx={{
+        position: { xs: "fixed", md: "sticky" },
+        transform: {
+          xs: "translateX(calc(100% * (var(--SideNavigation-slideIn, 0) - 1)))",
+          md: "none",
+        },
+        transition: "transform 0.4s, width 0.4s",
+        zIndex: 10000,
+        height: "100dvh",
+        width: "var(--Sidebar-width)",
+        top: 0,
+        p: 2,
+        flexShrink: 0,
+        display: "flex",
+        flexDirection: "column",
+        gap: 2,
+        borderRight: "1px solid",
+        borderColor: "divider",
+      }}
     >
-      {/* Logo */}
-      <div className="p-6 flex justify-center">
-        <div
-          className={`flex items-center ${
-            isCollapsed ? "justify-center" : "gap-3"
-          } border-b border-blue-700/50 pb-2 w-full max-w-[220px]`}
-        >
-          <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center flex-shrink-0">
-            <span className="text-blue-800 font-bold text-xl">C</span>
-          </div>
-          {!isCollapsed && (
-            <div>
-              <h1 className="text-xl font-bold">Trò Chuyện</h1>
-              <p className="text-blue-200 text-xs">Hệ Thống Nhắn Tin</p>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Menu */}
-      <nav className="flex-1 p-4 flex flex-col items-center">
-        {menuItems.map((item, i) => {
-          const isActive = location.pathname === item.href;
-          return (
-            <NavLink
-              onClick={() => setTitle(item.label)}
-              key={i}
-              to={item.href}
-              className={`flex items-center rounded-lg mb-2 transition-all group w-full max-w-[220px] ${
-                isActive
-                  ? "bg-white/20 backdrop-blur-sm border border-white/30 shadow-lg"
-                  : "hover:bg-white/10"
-              } ${isCollapsed ? "justify-center py-4" : "gap-4 px-4 py-3"}`}
-              title={isCollapsed ? item.label : undefined}
-            >
-              <item.icon size={20} />
-              {!isCollapsed && (
-                <span className="text-sm font-medium">{item.label}</span>
-              )}
-            </NavLink>
-          );
+      <GlobalStyles
+        styles={(theme) => ({
+          ":root": {
+            "--Sidebar-width": "220px",
+            [theme.breakpoints.up("lg")]: {
+              "--Sidebar-width": "240px",
+            },
+          },
         })}
-      </nav>
+      />
+      <Box
+        className="Sidebar-overlay"
+        sx={{
+          position: "fixed",
+          zIndex: 9998,
+          top: 0,
+          left: 0,
+          width: "100vw",
+          height: "100vh",
+          opacity: "var(--SideNavigation-slideIn)",
+          backgroundColor: "var(--joy-palette-background-backdrop)",
+          transition: "opacity 0.4s",
+          transform: {
+            xs: "translateX(calc(100% * (var(--SideNavigation-slideIn, 0) - 1) + var(--SideNavigation-slideIn, 0) * var(--Sidebar-width, 0px)))",
+            lg: "translateX(-100%)",
+          },
+        }}
+        onClick={() => closeSidebar()}
+      />
+      <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
+        <IconButton variant="soft" color="primary" size="sm">
+          <Typography level="title-sm" fontWeight="lg">
+            C
+          </Typography>
+        </IconButton>
 
-      {/* Logout */}
-      <div className="p-4 flex justify-center">
-        <NavLink
-          to="/logout"
-          className={`flex items-center rounded-lg transition-all w-full max-w-[220px] border-t border-white/30 ${
-            isCollapsed
-              ? "justify-center py-4"
-              : "gap-4 px-4 py-3 hover:bg-white/10"
-          }`}
-          title={isCollapsed ? "Đăng xuất" : undefined}
+        <Typography level="title-lg">Chat System</Typography>
+        <ColorSchemeToggle sx={{ ml: "auto" }} />
+      </Box>
+      <Input
+        size="sm"
+        startDecorator={<SearchRoundedIcon />}
+        placeholder="Search"
+      />
+      <Box
+        sx={{
+          minHeight: 0,
+          overflow: "hidden auto",
+          flexGrow: 1,
+          display: "flex",
+          flexDirection: "column",
+          [`& .${listItemButtonClasses.root}`]: {
+            gap: 1.5,
+          },
+        }}
+      >
+        <List
+          size="sm"
+          sx={{
+            gap: 1,
+            "--List-nestedInsetStart": "30px",
+            "--ListItem-radius": (theme) => theme.vars.radius.sm,
+          }}
         >
-          <LogOut size={20} />
-          {!isCollapsed && <span className="font-medium">Đăng xuất</span>}
-        </NavLink>
-      </div>
-    </motion.aside>
+          <ListItem>
+            <ListItemButton role="menuitem" component="a" href="/admin">
+              <HomeRoundedIcon />
+              <ListItemContent>
+                <Typography level="title-sm">Dashboard</Typography>
+              </ListItemContent>
+            </ListItemButton>
+          </ListItem>
+          <ListItem>
+            <ListItemButton
+              role="menuitem"
+              component="a"
+              href="/admin/manager-user"
+            >
+              <DashboardRoundedIcon />
+              <ListItemContent>
+                <Typography level="title-sm">User Management</Typography>
+              </ListItemContent>
+            </ListItemButton>
+          </ListItem>
+          <ListItem>
+            <ListItemButton
+              role="menuitem"
+              component="a"
+              href="/admin/manager-group"
+            >
+              <ShoppingCartRoundedIcon />
+              <ListItemContent>
+                <Typography level="title-sm">Group & Channel</Typography>
+              </ListItemContent>
+            </ListItemButton>
+          </ListItem>
+          <ListItem>
+            <ListItemButton
+              role="menuitem"
+              component="a"
+              href="/admin/manager-chat"
+            >
+              <QuestionAnswerRoundedIcon />
+              <ListItemContent>
+                <Typography level="title-sm">Chat Monitoring</Typography>
+              </ListItemContent>
+            </ListItemButton>
+          </ListItem>
+          <ListItem>
+            <ListItemButton
+              role="menuitem"
+              component="a"
+              href="/admin/manager-media"
+            >
+              <QuestionAnswerRoundedIcon />
+              <ListItemContent>
+                <Typography level="title-sm">Media & Files</Typography>
+              </ListItemContent>
+            </ListItemButton>
+          </ListItem>
+          <ListItem>
+            <ListItemButton
+              role="menuitem"
+              component="a"
+              href="/admin/manager-system-logs"
+            >
+              <QuestionAnswerRoundedIcon />
+              <ListItemContent>
+                <Typography level="title-sm">System Logs</Typography>
+              </ListItemContent>
+            </ListItemButton>
+          </ListItem>
+          <ListItem>
+            <ListItemButton
+              role="menuitem"
+              component="a"
+              href="/admin/manager-notification"
+            >
+              <QuestionAnswerRoundedIcon />
+              <ListItemContent>
+                <Typography level="title-sm">Notification Center</Typography>
+              </ListItemContent>
+            </ListItemButton>
+          </ListItem>
+        </List>
+        <List
+          size="sm"
+          sx={{
+            mt: "auto",
+            flexGrow: 0,
+            "--ListItem-radius": (theme) => theme.vars.radius.sm,
+            "--List-gap": "8px",
+            mb: 2,
+          }}
+        >
+          <ListItem>
+            <ListItemButton>
+              <SettingsRoundedIcon />
+              System settings
+            </ListItemButton>
+          </ListItem>
+        </List>
+      </Box>
+      <Divider />
+      <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
+        <Avatar
+          variant="outlined"
+          size="sm"
+          src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=286"
+        />
+        <Box sx={{ minWidth: 0, flex: 1 }}>
+          <Typography level="title-sm">Admin</Typography>
+          <Typography level="body-xs">Admin@gmail.com</Typography>
+        </Box>
+        <IconButton
+          onClick={() => handleLogout()}
+          size="sm"
+          variant="plain"
+          color="neutral"
+        >
+          <LogoutRoundedIcon />
+        </IconButton>
+      </Box>
+    </Sheet>
   );
 }

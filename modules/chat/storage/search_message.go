@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"my-app/modules/chat/models"
 	"regexp"
+	"strconv"
 	"strings"
 )
 
@@ -18,27 +19,26 @@ func stripHTML(input string) string {
 // SearchMessages tìm kiếm tin nhắn theo content, 1-1 hoặc group
 func (s *ESChatStore) SearchMessages(
 	ctx context.Context,
-	content string, // search text
-	myID string, // ID của tôi
-	otherID string, // ID người kia (chat 1-1)
-	groupID string, // group_id nếu là nhóm
+	content string,
+	myID string,
+	otherID string,
+	groupID string,
 	limit int,
-) ([]models.ESMessage, error) {
+	cursorTime string, // <<< thêm cursor
+) ([]models.ESMessage, string, error) {
 
 	if limit <= 0 {
 		limit = 20
 	}
 
-	cleanContent := stripHTML(content)
-	cleanContent = strings.TrimSpace(cleanContent)
+	// remove HTML
+	cleanContent := strings.TrimSpace(stripHTML(content))
 
-	// ============== Query với wildcard và prefix ==============
-	// Sử dụng multi_match với nhiều loại query khác nhau
+	// ================== QUERY MATCH ==================
 	mustQueries := []interface{}{
 		map[string]interface{}{
 			"bool": map[string]interface{}{
 				"should": []interface{}{
-					// 1. Wildcard query - tìm từ có chứa keyword ở bất kỳ đâu
 					map[string]interface{}{
 						"wildcard": map[string]interface{}{
 							"content_raw": map[string]interface{}{
@@ -47,16 +47,14 @@ func (s *ESChatStore) SearchMessages(
 							},
 						},
 					},
-					// 2. Prefix query - tìm từ bắt đầu bằng keyword
 					map[string]interface{}{
 						"prefix": map[string]interface{}{
 							"content_raw": map[string]interface{}{
 								"value": strings.ToLower(cleanContent),
-								"boost": 2.0, // Ưu tiên cao hơn
+								"boost": 2.0,
 							},
 						},
 					},
-					// 3. Match phrase prefix - tìm cụm từ bắt đầu với keyword
 					map[string]interface{}{
 						"match_phrase_prefix": map[string]interface{}{
 							"content_raw": map[string]interface{}{
@@ -65,13 +63,12 @@ func (s *ESChatStore) SearchMessages(
 							},
 						},
 					},
-					// 4. Match query - tìm chính xác
 					map[string]interface{}{
 						"match": map[string]interface{}{
 							"content_raw": map[string]interface{}{
 								"query":     cleanContent,
-								"boost":     3.0,    // Ưu tiên cao nhất
-								"fuzziness": "AUTO", // Cho phép sai sót nhỏ
+								"boost":     3.0,
+								"fuzziness": "AUTO",
 							},
 						},
 					},
@@ -85,7 +82,7 @@ func (s *ESChatStore) SearchMessages(
 		"must": mustQueries,
 	}
 
-	// ============= Trường hợp GROUP CHAT =============
+	// ================== FILTER USER OR GROUP ==================
 	if groupID != "" {
 		boolQuery["filter"] = []interface{}{
 			map[string]interface{}{
@@ -95,10 +92,6 @@ func (s *ESChatStore) SearchMessages(
 			},
 		}
 	} else {
-		// ============= TRƯỜNG HỢP CHAT 1-1 =============
-		// Lấy tin nhắn 2 chiều:
-		// 1: sender = tôi, receiver = họ
-		// 2: sender = họ, receiver = tôi
 		boolQuery["should"] = []interface{}{
 			map[string]interface{}{
 				"bool": map[string]interface{}{
@@ -136,57 +129,72 @@ func (s *ESChatStore) SearchMessages(
 		boolQuery["minimum_should_match"] = 1
 	}
 
-	// ============== Assemble final query ==============
-	query := map[string]interface{}{
-		"size": limit,
-		"sort": []interface{}{
-			map[string]interface{}{
-				"_score": map[string]interface{}{ // Sắp xếp theo độ liên quan trước
-					"order": "desc",
-				},
-			},
-			map[string]interface{}{
-				"created_at": map[string]interface{}{
-					"order": "desc",
-				},
+	// ================== SORT ==================
+	sortFields := []interface{}{
+		map[string]interface{}{
+			"created_at": map[string]interface{}{
+				"order": "desc",
 			},
 		},
+	}
+
+	query := map[string]interface{}{
+		"size": limit,
+		"sort": sortFields,
 		"query": map[string]interface{}{
 			"bool": boolQuery,
 		},
 	}
 
+	// ================== search_after ==================
+	if cursorTime != "" {
+		query["search_after"] = []interface{}{cursorTime}
+	}
+
 	body, _ := json.Marshal(query)
 
-	// ES search
 	res, err := s.client.Search(
 		s.client.Search.WithContext(ctx),
 		s.client.Search.WithIndex("messages"),
 		s.client.Search.WithBody(bytes.NewReader(body)),
 	)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 	defer res.Body.Close()
 
-	// Parse response
 	var result struct {
 		Hits struct {
 			Hits []struct {
+				Sort   []interface{}    `json:"sort"`
 				Source models.ESMessage `json:"_source"`
 			} `json:"hits"`
 		} `json:"hits"`
 	}
 
 	if err := json.NewDecoder(res.Body).Decode(&result); err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
-	// Convert to array
+	// ================== PARSE RESULT ==================
 	messages := make([]models.ESMessage, 0, len(result.Hits.Hits))
+	var nextCursor string
+
 	for _, hit := range result.Hits.Hits {
 		messages = append(messages, hit.Source)
+
+		if len(hit.Sort) > 0 {
+			switch v := hit.Sort[0].(type) {
+			case string:
+				nextCursor = v
+			case float64:
+				// Chuyển timestamp số sang string
+				nextCursor = strconv.FormatFloat(v, 'f', 0, 64)
+			default:
+				nextCursor = ""
+			}
+		}
 	}
 
-	return messages, nil
+	return messages, nextCursor, nil
 }

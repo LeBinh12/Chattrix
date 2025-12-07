@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { useRecoilState } from "recoil";
 import { mediaViewerAtom } from "../../recoil/atoms/mediaViewerAtom";
+import { API_ENDPOINTS } from "../../config/api";
 
 export default function MediaViewerModal() {
   // Sử dụng Recoil để quản lý state
@@ -32,28 +33,6 @@ export default function MediaViewerModal() {
     setRotation(0);
     setIsPlaying(false);
   }, [currentIndex]);
-
-  // Keyboard navigation
-  useEffect(() => {
-    if (!isOpen) return;
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      switch (e.key) {
-        case "Escape":
-          handleClose();
-          break;
-        case "ArrowLeft":
-          handlePrevious();
-          break;
-        case "ArrowRight":
-          handleNext();
-          break;
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [handleClose, handleNext, handlePrevious, isOpen]);
 
   const handleClose = useCallback(() => {
     setMediaViewerState({
@@ -97,10 +76,32 @@ export default function MediaViewerModal() {
 
   const handleDownload = () => {
     const link = document.createElement("a");
-    link.href = `http://localhost:3000/v1/upload/media/${currentMedia.url}`;
+    link.href = `${API_ENDPOINTS.STREAM_MEDIA}/${currentMedia.url}`;
     link.download = currentMedia.filename;
     link.click();
   };
+
+  // Keyboard navigation
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      switch (e.key) {
+        case "Escape":
+          handleClose();
+          break;
+        case "ArrowLeft":
+          handlePrevious();
+          break;
+        case "ArrowRight":
+          handleNext();
+          break;
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [handleClose, handleNext, handlePrevious, isOpen]);
 
   if (!isOpen || !currentMedia) return null;
 
