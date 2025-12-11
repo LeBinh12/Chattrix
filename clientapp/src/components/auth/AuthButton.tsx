@@ -9,7 +9,7 @@ export default function AuthButton({ children, ...props }: AuthButtonProps) {
     <button
       {...props}
       className="w-full bg-[#2665b1] text-white py-2 px-4 rounded-lg 
-                 hover:bg-[#1f5291] shadow-md transition"
+                 hover:bg-[#1f5291] shadow-md transition cursor-pointer"
     >
       {children}
     </button>

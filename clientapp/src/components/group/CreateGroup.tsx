@@ -5,6 +5,9 @@ import { toast } from "react-toastify";
 import { groupApi } from "../../api/group";
 import { motion, AnimatePresence } from "framer-motion";
 import UserAvatar from "../UserAvatar";
+import { socketManager } from "../../api/socket";
+import { useRecoilState, useRecoilValue } from "recoil";
+import { userAtom } from "../../recoil/atoms/userAtom";
 
 // Types
 interface User {
@@ -17,7 +20,6 @@ interface User {
 interface CreateGroupModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onCreateGroup: () => void;
 }
 
 const CATEGORIES = [
@@ -42,8 +44,8 @@ const getFirstLetter = (name: string): string => {
 export default function CreateGroupModal({
   isOpen,
   onClose,
-  onCreateGroup,
 }: CreateGroupModalProps) {
+  const userRecoil = useRecoilValue(userAtom)
   const [groupName, setGroupName] = useState("");
   const [groupImage, setGroupImage] = useState("");
   const [imagePreview, setImagePreview] = useState("");
@@ -165,20 +167,17 @@ export default function CreateGroupModal({
       }
 
       const res = await groupApi.addGroup(formData);
-      if (res.status === 200) {
-        const groupId = res.data || res.data;
+      if (res.status === 200) {        
         const memberIds = Array.from(selectedMembers);
 
-        for (const userId of memberIds) {
-          await groupApi.addMember({
-            group_id: groupId,
-            user_id: userId,
-            role: "member",
-          });
-        }
-
+        const members = memberIds.map(id => ({
+          user_id: id,
+          role: "member"
+        }));
+        
+        socketManager.sendAddGroupMember(userRecoil?.data.id ?? "", userRecoil?.data.display_name ?? "",
+          res.data.id, res.data.name, res.data.image, members)
         toast.success("Tạo nhóm thành công!");
-        onCreateGroup?.();
         onClose();
       } else {
         toast.error("Không thể tạo nhóm!");

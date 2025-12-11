@@ -32,6 +32,7 @@ import { replyMessageState } from "../../../recoil/atoms/uiAtom";
 import { messageIDAtom } from "../../../recoil/atoms/messageAtom";
 import { userAtom } from "../../../recoil/atoms/userAtom";
 import SystemGroup from "./logic/SystemGroup";
+import LongMessageContent from "./LongMessageContent";
 
 type StatusConfig = {
   icon: typeof Check;
@@ -84,6 +85,7 @@ export default function MessageItem({
 
   const hasMedia = (msg.media_ids || []).length > 0;
   const user = useRecoilValue(userAtom);
+
   // Hàm xử lý reply - Lưu toàn bộ thông tin vào Recoil
   const handleReply = () => {
     // Lấy URL đầu tiên nếu có media
@@ -195,22 +197,19 @@ export default function MessageItem({
   };
 
   const handleCopy = () => {
-    navigator.clipboard.writeText(msg.content);
+    const plainText = getTextContent(msg.content);
+    navigator.clipboard.writeText(plainText);
+    toast.success("Đã copy tin nhắn!");
     setShowMenu(false);
   };
 
+  const getTextContent = (html: string) => {
+    const temp = document.createElement("div");
+    temp.innerHTML = html;
+    return temp.textContent || temp.innerText || "";
+  };
+
   const handlePin = () => {
-    console.log("message_id", msg.id);
-    console.log("content", msg.content);
-    console.log("sender_id", msg.sender_id);
-    console.log("sender_name", msg.sender_name);
-    console.log("pinned_by_id", currentUserId);
-    console.log("pinned_by_name", msg.id);
-    console.log("message_type", msg.type);
-    console.log("created_at", msg.created_at);
-
-    console.log("Ghim tin nhắn:", msg.id);
-
     socketManager.sendPinnedMessage(
       msg.id,
       currentUserId ?? "",
@@ -244,7 +243,6 @@ export default function MessageItem({
   };
 
   const handleRecall = () => {
-    console.log("Thu hồi tin nhắn:", msg.id);
     socketManager.sendRecallMessage(
       msg.id,
       currentUserId ?? "",
@@ -258,13 +256,6 @@ export default function MessageItem({
   const handleDeleteForMe = () => {
     onDeleteMessage(msg.id);
     setShowMenu(false);
-  };
-
-  // Strip HTML để hiển thị text thuần
-  const getTextContent = (html: string) => {
-    const temp = document.createElement("div");
-    temp.innerHTML = html;
-    return temp.textContent || temp.innerText || "";
   };
 
   // --- CHECK IF MESSAGE IS RECALLED ---
@@ -565,7 +556,7 @@ export default function MessageItem({
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.9, y: -3 }}
               className={`
-      absolute top-1/2 -translate-y-1/2 flex items-center gap-1 
+      absolute bottom-1 -translate-y-1/2 flex items-center gap-1 
       px-1.5 py-1 z-20
 
       ${isMine ? "right-full mr-1" : "left-full ml-1"}
@@ -801,11 +792,10 @@ rounded shadow-2xl overflow-hidden border border-gray-200`}
             {renderReplyPreview()}
 
             {msg.type !== "file" && editor && (
-              <EditorContent
-                editor={editor}
-                className={`prose prose-sm max-w-none text-[13px] ${
-                  isMine ? "text-[#0f3d8c]" : "text-[#1f2a44]"
-                }`}
+              <LongMessageContent
+                content={msg.content}
+                isMine={isMine}
+                maxLength={1000} // Ngưỡng để xem là tin nhắn dài
               />
             )}
             {renderMedia()}

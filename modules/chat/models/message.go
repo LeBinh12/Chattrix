@@ -37,12 +37,6 @@ type Message struct {
 	DeletedFor []primitive.ObjectID `bson:"deleted_for,omitempty" json:"deleted_for"` // lưu user nào đã xóa
 	Reply      ReplyMessageMini     `bson:"reply,omitempty" json:"reply,omitempty"`
 
-	///Hôm nay xử lý
-	//     // Ghim
-	// IsPinned    bool                 `bson:"is_pinned,omitempty" json:"is_pinned,omitempty"`
-	// PinnedBy    primitive.ObjectID   `bson:"pinned_by,omitempty" json:"pinned_by,omitempty"`
-	// PinnedAt    *time.Time           `bson:"pinned_at,omitempty" json:"pinned_at,omitempty"`
-
 	// // Thu hồi
 	RecalledAt *time.Time          `bson:"recalled_at,omitempty" json:"recalled_at,omitempty"`
 	RecalledBy *primitive.ObjectID `bson:"recalled_by,omitempty" json:"recalled_by,omitempty"`

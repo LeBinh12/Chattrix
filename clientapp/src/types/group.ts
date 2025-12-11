@@ -1,5 +1,11 @@
 import type { User } from "./user";
 
+export interface CreateGroupResponse {
+    status: number;
+    message: string;
+    data: Group;
+}
+
 export interface GetAllGroupResponse {
     status: number;
     message: string;

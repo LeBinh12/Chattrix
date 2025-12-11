@@ -2,6 +2,7 @@ package models
 
 import (
 	"my-app/common"
+	"my-app/modules/chat/models"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -41,4 +42,11 @@ type UserInfoInGroup struct {
 	JoinedAt    time.Time          `json:"joined_at" bson:"joined_at"`
 	Role        string             `json:"role" bson:"role"`
 	Status      string             `json:"status" bson:"status"`
+}
+
+type KafkaGroupMemberEvent struct {
+	GroupID primitive.ObjectID `json:"group_id"`
+	Members []models.Member    `json:"members"`
+	Inviter string             `json:"inviter_id"` // Người tạo nhóm / mời
+	Created time.Time          `json:"created_at"`
 }

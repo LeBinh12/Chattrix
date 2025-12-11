@@ -64,6 +64,7 @@ func LoadAppConfig() AppConfig {
 					"recall-message-topic",
 					"pinned-message-topic",
 					"un-pinned-message-topic",
+					"add-group-member",
 				}, ",")),
 			),
 		},

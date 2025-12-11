@@ -78,7 +78,7 @@ export default function ChatInfoHeader({
 
       await userApi.upsertSetting({
         user_id: user?.data.id,
-        target_id: targetId,
+        target_id: targetId ?? "",
         is_group: isGroupChat,
         is_muted: false,
         mute_until: undefined,
@@ -107,7 +107,7 @@ export default function ChatInfoHeader({
     try {
       await userApi.upsertSetting({
         user_id: user?.data.id,
-        target_id: targetId,
+        target_id: targetId ?? "",
         is_group: isGroupChat,
         is_muted: true,
         mute_until: muteUntil,

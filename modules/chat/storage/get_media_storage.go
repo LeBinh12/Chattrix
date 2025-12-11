@@ -113,9 +113,6 @@ func (s *MongoChatStore) GetMediaList(
 			continue
 		}
 
-		// In ra mỗi media
-		fmt.Printf("✔ Decoded media: %+v\n", item)
-
 		results = append(results, models.MediaItemResponse{
 			ID:        item.MediaID,
 			MessageID: item.MessageID,

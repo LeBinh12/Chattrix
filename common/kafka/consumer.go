@@ -13,6 +13,7 @@ import (
 	StorageUser "my-app/modules/user/storage"
 
 	BizGroup "my-app/modules/group/biz"
+	ModelsGroup "my-app/modules/group/models"
 	StorageGroup "my-app/modules/group/storage"
 
 	"sync"
@@ -320,7 +321,62 @@ func (c *chatConsumer) processMessage(sess sarama.ConsumerGroupSession, msg *sar
 		c.processPinnedMessage(ctx, sess, msg)
 	case "un-pinned-message-topic":
 		c.processUnPinnedMessage(ctx, sess, msg)
+	case "add-group-member":
+		c.processGroupMember(ctx, sess, msg)
 	}
+}
+
+func (c *chatConsumer) processGroupMember(ctx context.Context, sess sarama.ConsumerGroupSession, msg *sarama.ConsumerMessage) {
+	var payload models.GroupMemberRequest
+
+	if err := json.Unmarshal(msg.Value, &payload); err != nil {
+		log.Printf("[group-member] Unmarshal error: %v | payload: %s", err, string(msg.Value))
+		sess.MarkMessage(msg, "")
+		return
+	}
+
+	// Biz / Storage
+	groupStore := StorageGroup.NewMongoStoreGroup(c.db)
+	groupBiz := BizGroup.CreateGroupMemberStorage(groupStore)
+	fmt.Println("add-group-member Kaffka", payload)
+
+	// Lặp qua tất cả member
+	for _, m := range payload.Members {
+		groupMember := ModelsGroup.GroupMember{
+			GroupID:  payload.GroupID,
+			UserID:   m.UserID,
+			Role:     m.Role,
+			Status:   "active", // hoặc giá trị mặc định khác nếu cần
+			JoinedAt: time.Now(),
+		}
+
+		// Retry 3 lần nếu gặp lỗi
+		var insertErr error
+		for attempt := 0; attempt < 3; attempt++ {
+			insertErr = groupBiz.CreateGroupNumber(ctx, &groupMember)
+			if insertErr == nil {
+				break // thành công → thoát vòng retry
+			}
+
+			log.Printf("[group-member] Retry %d/3 for user %s: %v", attempt+1, m.UserID.Hex(), insertErr)
+			if attempt < 2 {
+				time.Sleep(time.Duration(attempt+1) * 200 * time.Millisecond)
+			}
+		}
+
+		if insertErr != nil {
+			log.Printf("[group-member] FAILED after retries for user %s: %v", m.UserID.Hex(), insertErr)
+			// Tùy bạn có commit hay không, nếu muốn message được re-deliver thì không commit
+			continue
+		}
+	}
+
+	// Nếu tất cả thành công → commit Kafka
+	c.commitQueue <- &commitTask{
+		session: sess,
+		message: msg,
+	}
+	log.Printf("[group-member] Processed %d members for GroupID %s", len(payload.Members), payload.GroupID)
 }
 
 func (c *chatConsumer) processUnPinnedMessage(ctx context.Context, sess sarama.ConsumerGroupSession, msg *sarama.ConsumerMessage) {

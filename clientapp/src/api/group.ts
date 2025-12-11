@@ -1,4 +1,4 @@
-import type { GetAllGroupResponse, GetAllNotNumberGroup } from "../types/group";
+import type { CreateGroupResponse, GetAllGroupResponse, GetAllNotNumberGroup } from "../types/group";
 import axiosClient from "../utils/axiosClient";
 
 export const groupApi = {
@@ -7,8 +7,8 @@ export const groupApi = {
         return response.data
     },
 
-    addGroup: async (formData: FormData) => {
-        const response = await axiosClient.post(`/group/add`, formData, {
+    addGroup: async (formData: FormData): Promise<CreateGroupResponse> => {
+        const response = await axiosClient.post<CreateGroupResponse>(`/group/add`, formData, {
             headers: { "Content-Type": "multipart/form-data" },
         });
         return response.data;

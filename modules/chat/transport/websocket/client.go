@@ -32,6 +32,7 @@ type WSMessage struct {
 	MessageStatus *models.MessageStatusRequest  `json:"message_status,omitempty"`
 	DeleteMsg     *models.DeleteMessageForMe    `json:"delete_msg,omitempty"`
 	MessageRes    *models.MessageResponseSocket `json:"message_res,omitempty"`
+	GroupMember   *models.GroupMemberRequest    `json:"group_member,omitempty"`
 }
 
 func (c *Client) ReadPump(db *mongo.Database) {
@@ -72,8 +73,54 @@ func (c *Client) ReadPump(db *mongo.Database) {
 			c.handlePinnedMessage(incoming.Message, incoming.MessageRes)
 		case "un-pinned-message":
 			c.handleUnPinnedMessage(incoming.Message, incoming.MessageRes)
+		case "add-group-member":
+			c.handleGroupMember(incoming.GroupMember)
 		}
 	}
+}
+
+func (c *Client) handleGroupMember(res *models.GroupMemberRequest) {
+	if res == nil {
+		return
+	}
+
+	var msg models.MessageResponse
+
+	msg.CreatedAt = time.Now()
+	msg.UpdatedAt = time.Now()
+	msg.ID = primitive.NewObjectID()
+	msg.Status = models.StatusDelivered
+
+	msg.Content = fmt.Sprintf("Người dùng %s đã tạo nhóm %s", res.DisplayName, res.GroupName)
+	msg.Type = "system"
+	msg.Status = "seen"
+	msg.IsRead = true
+	msgCopy := msg
+	msg.GroupID = res.GroupID
+	msg.SenderID = res.SenderID
+
+	go c.sendToKafkaWithRetry("add-group-member", res.SenderID.Hex(), res)
+	go c.sendToKafkaWithRetry("chat-topic", msg.SenderID.Hex(), msg)
+
+	c.Hub.Broadcast <- HubEvent{
+		Type: "group_member_added",
+		Payload: map[string]interface{}{
+			"group_id":     res.GroupID.Hex(),
+			"display_name": res.GroupName,
+			"avatar":       res.Avatar,
+			"sender_id":    res.SenderID.Hex(),
+
+			// message preview cho conversation list
+			"last_message_id":   msgCopy.ID.Hex(),
+			"last_message":      msgCopy.Content,
+			"last_message_type": msgCopy.LastMessageType,
+			"last_date":         msgCopy.CreatedAt,
+			"status":            msgCopy.Status, // seen/delivered
+			"updated_at":        msgCopy.UpdatedAt,
+
+			// danh sách member
+			"members": res.Members, // []Member { user_id, role }
+		}}
 }
 
 func (c *Client) handleUnPinnedMessage(msg *models.MessageResponse, res *models.MessageResponseSocket) {

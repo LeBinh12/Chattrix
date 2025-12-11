@@ -74,7 +74,6 @@ export default function ChannelList({ width }: ChannelListProps) {
       setLoading(true);
       try {
         const res = await conversationApi.getConversation(1, 20, "");
-        console.log("res", res);
         setResults(res.data.data);
         setPage(1);
         setHasMore(res.data.data.length === 20);
@@ -104,6 +103,11 @@ export default function ChannelList({ width }: ChannelListProps) {
           if (!res.data.is_muted) ding.play();
         }
 
+          if (msg.sender_id === user.data.id) {
+            msg.updated_at = new Date().toISOString();
+            msg.last_date = msg.updated_at;
+        }
+        
         setResults((prev) => {
           const existIndex = prev.findIndex((c) => {
             if (isGroup) {
@@ -165,7 +169,7 @@ export default function ChannelList({ width }: ChannelListProps) {
             const isGroup =
               conv.group_id && conv.group_id !== "000000000000000000000000";
 
-            // Kiểm tra conversation phù hợp
+            // Conversation khớp?
             const match =
               (isGroup && conv.group_id === recalledMsg.group_id) ||
               (!isGroup &&
@@ -174,21 +178,59 @@ export default function ChannelList({ width }: ChannelListProps) {
 
             if (!match) return conv;
 
+            // ❗ Chỉ update nếu tin bị recall chính là last_message
+            if (recalledMsg.id !== conv.last_message_id) {
+              return conv; // Không thay đổi gì
+            }
+
             return {
               ...conv,
-              last_message: "", // Xóa nội dung cũ
+              last_message: "", // hoặc "Tin nhắn đã bị thu hồi"
               last_message_type: "text",
               recalled_at: recalledMsg.recalled_at,
               recalled_by: recalledMsg.recalled_by,
               updated_at: new Date().toISOString(),
-              unread_count:
-                recalledMsg.recalled_by !== user.data.id
-                  ? (conv.unread_count || 0) + 1
-                  : conv.unread_count,
+              unread_count: conv.unread_count, // Không tăng unread
             };
           })
         );
       }
+
+      if (data.type === "group_member_added" && data.message) {
+  const msg = data.message;
+        console.log("msggroup_member_added", msg)
+  setResults((prev) => {
+    // Check xem group đã có trong danh sách chưa
+    const existIndex = prev.findIndex(
+      (c) => c.group_id === msg.group_id
+    );
+
+    const newConversation: Conversation = {
+      user_id: "",
+      group_id: msg.group_id,
+      display_name: msg.display_name ?? "",
+      avatar: msg.avatar || "/assets/group.png",
+      last_message: msg.last_message ?? "",
+      last_message_type: msg.last_message_type || "text",
+      last_message_id: msg.last_message_id,
+      last_date: msg.last_date || new Date().toISOString(),
+      unread_count: 0,
+      status: "group",
+      updated_at: msg.updated_at || new Date().toISOString(),
+    };
+
+    // Nếu đã tồn tại → cập nhật lên đầu
+    if (existIndex >= 0) {
+      const newList = [...prev];
+      newList.splice(existIndex, 1);
+      return [newConversation, ...newList];
+    }
+
+    // Nếu chưa → thêm mới lên đầu
+    return [newConversation, ...prev];
+  });
+}
+
 
       // Xử lý cập nhật status online/offline
       if (data.user_id && data.status) {
@@ -340,7 +382,6 @@ export default function ChannelList({ width }: ChannelListProps) {
 
     // Prefix "Bạn:" nếu là người gửi
     const prefix = item.sender_id === userId ? "Bạn: " : "";
-    console.log("item", item);
     // Xử lý theo loại tin nhắn
     switch (item.last_message_type) {
       case "image":
@@ -604,13 +645,6 @@ export default function ChannelList({ width }: ChannelListProps) {
       <CreateGroupModal
         isOpen={isGroupModalOpen}
         onClose={() => setIsGroupModalOpen(false)}
-        onCreateGroup={async () => {
-          setPage(1);
-          setHasMore(true);
-          const res = await conversationApi.getConversation(1, 20, "");
-          setResults(res.data.data);
-          setHasMore(res.data.data.length === 20);
-        }}
       />
     </>
   );

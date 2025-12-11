@@ -27,7 +27,7 @@ func WebSocketHandler(db *mongo.Database, hub *Hub) gin.HandlerFunc {
 		}
 
 		// để mặc kịch thước channel là 256 thì khi nhiều tin nhắn quá sẽ bị tràn làm mất dữ liệu
-		client := &Client{Hub: hub, Conn: conn, Send: make(chan []byte, 10000), UserID: userID}
+		client := &Client{Hub: hub, Conn: conn, Send: make(chan []byte, 256), UserID: userID}
 		hub.Register <- client
 
 		// goroutine xử lý đọc / ghi

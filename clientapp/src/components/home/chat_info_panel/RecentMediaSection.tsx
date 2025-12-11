@@ -1,6 +1,7 @@
 import { Image, Play } from "lucide-react";
 import { useSetRecoilState } from "recoil";
 import { activePanelAtom } from "../../../recoil/atoms/uiAtom";
+import { API_ENDPOINTS } from "../../../config/api";
 
 interface MediaItem {
   id: string;
@@ -55,7 +56,7 @@ export default function RecentMediaSection({
                 </>
               ) : (
                 <img
-                  src={`http://localhost:3000/v1/upload/media/${media.url}`}
+                  src={`${API_ENDPOINTS.STREAM_MEDIA}/${media.id}`}
                   alt={media.filename}
                   className="w-full h-full object-cover"
                 />

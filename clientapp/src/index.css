@@ -275,7 +275,7 @@
     background-color: transparent;
     padding: 0;
     color: inherit;
-  }
+  }  
 
   /* Placeholder */
   .prose .ProseMirror p.is-editor-empty:first-child::before {

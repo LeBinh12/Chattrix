@@ -9,7 +9,6 @@ class SocketManager {
   private heartbeatInterval: number | null = null;
   // private userId: string | null = null;
   private listeners: MessageCallback[] = [];
-
   connect(userId: string) {
     if (this.socket && this.socket.readyState !== WebSocket.CLOSED) return;
     console.log("người dùng trước socket:", userId)
@@ -85,9 +84,26 @@ class SocketManager {
         reply: reply
       },
     };
-    console.log("msg", msg)
     this.socket.send(JSON.stringify(msg));
   }
+
+  sendAddGroupMember(senderId: string, display_name: string, groupID: string, groupName: string,
+    groupAvatar: string, members: { user_id: string; role: string }[]) {
+    if (!this.socket || this.socket.readyState !== WebSocket.OPEN) return;
+    const msg: MessagePayload = {
+      type: "add-group-member",
+      group_member: {
+        sender_id: senderId,
+        group_id: groupID,
+        display_name: display_name,
+        group_name: groupName,
+        group_avatar: groupAvatar,
+        members: members
+      },
+    };
+    this.socket.send(JSON.stringify(msg));
+  }
+
 
   sendMemberLeft(senderId?: string, groupID?: string, displayName?: string, avatar?: string) {
     if (!this.socket || this.socket.readyState !== WebSocket.OPEN) return;

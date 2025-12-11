@@ -407,6 +407,46 @@ func (h *Hub) Run() {
 					}
 				}
 
+			case "group_member_added":
+				payload := event.Payload.(map[string]interface{})
+				members := payload["members"].([]models.Member)
+				data, _ := json.Marshal(map[string]interface{}{
+					"type":    "group_member_added",
+					"message": payload,
+				})
+
+				senderID := ""
+				if sid, ok := payload["sender_id"].(string); ok {
+					senderID = sid
+				}
+
+				if sessions, ok := h.Clients[senderID]; ok {
+					fmt.Println("uid", senderID)
+
+					for _, c := range sessions {
+						select {
+						case c.Send <- data:
+						default:
+							log.Println("buffer full, dropping message for", senderID)
+						}
+					}
+				}
+
+				for _, mem := range members {
+					uid := mem.UserID.Hex()
+					fmt.Println("uid", uid)
+					// Nếu user đang online → gửi realtime
+					if sessions, ok := h.Clients[uid]; ok {
+
+						for _, c := range sessions {
+							select {
+							case c.Send <- data:
+							default:
+								log.Println("buffer full, dropping message for", uid)
+							}
+						}
+					}
+				}
 			}
 		}
 	}

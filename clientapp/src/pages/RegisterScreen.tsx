@@ -134,11 +134,11 @@ export default function RegisterScreen() {
   return (
     <div className="w-full">
       {/* Header với Progress */}
-      <div className="text-center mb-6">
+      <div className="text-center">
         <motion.h2
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="text-3xl font-bold text-white mb-2"
+          className="text-3xl font-bold text-black mb-2"
         >
           Đăng Ký Tài Khoản
         </motion.h2>
@@ -146,7 +146,7 @@ export default function RegisterScreen() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.1 }}
-          className="text-white/80 text-sm"
+          className="text-black/80 text-sm"
         >
           Tạo tài khoản để bắt đầu trải nghiệm
         </motion.p>
@@ -157,23 +157,25 @@ export default function RegisterScreen() {
         <motion.div
           className={`flex items-center justify-center w-10 h-10 rounded-full font-semibold transition-all duration-300 ${
             step >= 1
-              ? "bg-white text-[#2665b1] shadow-lg"
-              : "bg-white/30 text-white"
+              ? "bg-[#334155] text-[#60a5fa] shadow-lg" // nền tối, chữ xanh sáng
+              : "bg-[#1e293b]/50 text-gray-300" // nền tối nhạt, chữ xám nhạt
           }`}
           whileHover={{ scale: 1.1 }}
         >
           {step > 1 ? <CheckCircle2 className="w-5 h-5" /> : "1"}
         </motion.div>
+
         <div
           className={`h-1 w-16 rounded-full transition-all duration-300 ${
-            step >= 2 ? "bg-white" : "bg-white/30"
+            step >= 2 ? "bg-[#60a5fa]" : "bg-[#334155]/50"
           }`}
         ></div>
+
         <motion.div
           className={`flex items-center justify-center w-10 h-10 rounded-full font-semibold transition-all duration-300 ${
             step >= 2
-              ? "bg-white text-[#2665b1] shadow-lg"
-              : "bg-white/30 text-white"
+              ? "bg-[#334155] text-[#60a5fa] shadow-lg"
+              : "bg-[#1e293b]/50 text-gray-300"
           }`}
           whileHover={{ scale: step >= 2 ? 1.1 : 1 }}
         >
@@ -201,7 +203,7 @@ export default function RegisterScreen() {
                       <img
                         src={avatarPreview}
                         alt="Avatar Preview"
-                        className="w-24 h-24 rounded-full object-cover border-4 border-white shadow-lg cursor-pointer"
+                        className="w-24 h-24 rounded-full object-cover border-4 border-black shadow-lg cursor-pointer"
                         onClick={() =>
                           document.getElementById("avatarInput")?.click()
                         }
@@ -218,9 +220,9 @@ export default function RegisterScreen() {
                   ) : (
                     <label
                       htmlFor="avatarInput"
-                      className="w-24 h-24 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center cursor-pointer hover:bg-white/30 transition-all border-4 border-white shadow-lg"
+                      className="w-24 h-24 rounded-full bg-black/20 backdrop-blur-sm flex items-center justify-center cursor-pointer hover:bg-white/30 transition-all border-4 border-white shadow-lg"
                     >
-                      <Upload className="w-8 h-8 text-white" />
+                      <Upload className="w-8 h-8 text-black" />
                     </label>
                   )}
                   <input
@@ -344,7 +346,7 @@ export default function RegisterScreen() {
                 <label className="block mb-3 text-sm font-medium text-gray-700">
                   Giới tính
                 </label>
-                <div className="flex gap-6 bg-white/50 backdrop-blur-sm rounded-lg p-3">
+                <div className="flex gap-6 bg-transparent backdrop-blur-sm rounded-lg p-3">
                   {[
                     { value: "male", label: "Nam" },
                     { value: "female", label: "Nữ" },
@@ -406,12 +408,12 @@ export default function RegisterScreen() {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.3 }}
-        className="mt-6 text-center text-sm text-white/90"
+        className="mt-6 text-center text-sm text-black/90"
       >
         Đã có tài khoản?{" "}
         <button
           type="button"
-          className="text-white font-semibold hover:underline underline-offset-2 transition-all"
+          className="text-blue-600 font-semibold hover:underline underline-offset-2 transition-all cursor-pointer"
           onClick={() => navigation("/login")}
         >
           Đăng nhập ngay

@@ -5,7 +5,7 @@ import (
 
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
-
+  
 type UnPinnedMessageStore interface {
 	UnpinMessage(ctx context.Context, conversationID, messageID primitive.ObjectID) error
 }

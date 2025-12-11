@@ -87,6 +87,6 @@ func CreateGroupHandler(db *mongo.Database) gin.HandlerFunc {
 			return
 		}
 
-		c.JSON(http.StatusOK, common.NewResponse(http.StatusOK, "Thêm nhóm thành công", data.ID.Hex()))
+		c.JSON(http.StatusOK, common.NewResponse(http.StatusOK, "Thêm nhóm thành công", data))
 	}
 }
