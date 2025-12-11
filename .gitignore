@@ -13,6 +13,7 @@ out/
 *.test
 *.out
 *.coverprofile
+*.meta
 coverage*.txt
 coverage/
 
