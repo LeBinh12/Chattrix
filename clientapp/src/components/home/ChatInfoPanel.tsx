@@ -90,18 +90,6 @@ export default function ChatInfoPanel() {
         </div>
 
         <div className="flex-1 divide-y divide-[#edf0f7]">
-          {isGroup && (
-            <div className="p-4">
-              <ActionButtons
-                isGroup={isGroup}
-                onLeaveGroup={handleLeaveGroup}
-                onDeleteHistory={() => {}}
-                userId={user?.data.id}
-                groupId={selectedChat.group_id}
-              />
-            </div>
-          )}
-
           <div className="p-4">
             <RecentMediaSection
               mediaItems={recentMedia}
@@ -118,6 +106,18 @@ export default function ChatInfoPanel() {
               <ActionButtons
                 isGroup={false}
                 onDeleteHistory={handleDeleteHistory}
+              />
+            </div>
+          )}
+
+          {isGroup && (
+            <div className="p-4">
+              <ActionButtons
+                isGroup={isGroup}
+                onLeaveGroup={handleLeaveGroup}
+                onDeleteHistory={() => {}}
+                userId={user?.data.id}
+                groupId={selectedChat.group_id}
               />
             </div>
           )}

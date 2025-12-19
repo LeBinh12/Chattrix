@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Send,
   Smile,
@@ -38,7 +38,6 @@ type ChatInputWindowProps = {
 
 
 
-const MAX_LENGTH = 2000;
 
 export default function ChatInputWindow({
   user_id,
@@ -52,7 +51,6 @@ export default function ChatInputWindow({
   const [message, setMessage] = useState("");
   const [showPicker, setShowPicker] = useState(false);
   const [showRichText, setShowRichText] = useState(false);
-  const [charCount, setCharCount] = useState(0);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [progress, setProgress] = useState<number[]>([]);
   const [uploading, setUploading] = useState(false);
@@ -92,24 +90,7 @@ export default function ChatInputWindow({
   },
   handleKeyDown: (view, event) => {
     if (hasLeftGroup) return true;
-
-    // QUAN TRỌNG: Kiểm tra xem có Mention suggestion đang mở không
-    // Nếu có, để Mention xử lý Enter trước
-    const { state } = view;
-    const { selection } = state;
-    const { $from } = selection;
     
-    // Tìm xem có node mention nào đang active không
-    const mentionPluginState = state.plugins.find(
-      (plugin: any) => plugin.key === 'mention$'
-    );
-    
-    // Nếu mention suggestion đang mở, không xử lý Enter ở đây
-    // Để Mention plugin xử lý trước
-    if (mentionPluginState) {
-      return false;
-    }
-
     if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault();
 

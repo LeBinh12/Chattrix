@@ -1,7 +1,7 @@
 import React, { forwardRef, useEffect, useImperativeHandle, useState } from "react";
 import type { GroupMember } from "../../../types/group-member";
 import UserAvatar from "../../UserAvatar";
-import { Smile, Users } from "lucide-react";
+import { Users } from "lucide-react";
 
 export interface MentionListProps {
   items: GroupMember[];

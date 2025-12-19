@@ -20,7 +20,7 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import type { Messages } from "../../../types/Message";
 import AvatarPreview from "./AvatarPreview";
-import { EditorContent, useEditor } from "@tiptap/react";
+import { useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import { useMemo, useState, useRef, useEffect } from "react";
 import { API_ENDPOINTS } from "../../../config/api";

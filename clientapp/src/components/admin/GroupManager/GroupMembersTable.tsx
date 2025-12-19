@@ -54,7 +54,7 @@ const fetchMembers = useCallback(
           setHasMore(false);
         }
       }
-    } catch (error) {
+    } catch {
       toast.error("Không thể tải danh sách thành viên nhóm!");
     } finally {
       setIsInitialLoading(false);

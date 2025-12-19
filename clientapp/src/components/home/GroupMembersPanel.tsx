@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRecoilValue, useSetRecoilState } from "recoil";
 import {
   ChevronLeft,
@@ -45,7 +45,8 @@ export default function GroupMembersPanel() {
   const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
   const [showPromoteConfirm, setShowPromoteConfirm] = useState(false);
 
-  const loadMembers = async (isInitial = false, limit = 20) => {
+  const loadMembers = useCallback(
+  async (isInitial = false, limit = 20) => {
     if (!groupId || loadingMore || !hasMore) return;
 
     if (isInitial) {
@@ -63,11 +64,11 @@ export default function GroupMembersPanel() {
           ? res.data.members
           : [...existingMembers, ...res.data.members];
 
-        // Loại bỏ trùng email ngay trước khi lưu vào cache
+        // Loại trùng email
         const seenEmails = new Set<string>();
         const uniqueMembers = updatedMembers.filter((member) => {
-          if (!member.email) return true; // giữ nếu không có email
-          if (seenEmails.has(member.email)) return false; // bỏ nếu trùng
+          if (!member.email) return true;
+          if (seenEmails.has(member.email)) return false;
           seenEmails.add(member.email);
           return true;
         });
@@ -90,7 +91,16 @@ export default function GroupMembersPanel() {
         setLoadingMore(false);
       }
     }
-  };
+  },
+  [
+    groupId,
+    page,
+    hasMore,
+    loadingMore,
+    setGroupMembersMap,
+  ]
+);
+
 
 useEffect(() => {
   if (activePanel !== "members") return;
@@ -108,7 +118,7 @@ useEffect(() => {
 
   // Nếu không có cache thì gọi API
   loadMembers(true);
-}, [activePanel, groupId]);
+}, [activePanel, groupId, groupMembersMap, loadMembers]);
 
 
 
@@ -137,7 +147,7 @@ useEffect(() => {
     };
 
     fetchSearchResults();
-  }, [searchQuery]);
+  }, [searchQuery, groupId, setGroupMembersMap]);
 
   // Lấy members từ cache
   // Lấy members từ cache và loại bỏ trùng email

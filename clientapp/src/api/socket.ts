@@ -97,7 +97,7 @@ class SocketManager {
         group_id: groupID,
         display_name: display_name,
         group_name: groupName,
-        group_avatar: groupAvatar,
+        avatar: groupAvatar,
         members: members,
         action: action
       },
@@ -106,7 +106,7 @@ class SocketManager {
   }
 
 
-  sendMemberLeft(senderId?: string, groupID?: string, displayName?: string, avatar?: string) {
+  sendMemberLeft(senderId?: string, groupID?: string, displayName?: string) {
     if (!this.socket || this.socket.readyState !== WebSocket.OPEN) return;
 
     const msg = {
@@ -115,7 +115,6 @@ class SocketManager {
         sender_id: senderId,
         group_id: groupID,
         content: `Người dùng ${displayName} đã thoát nhóm`,
-        avatar: avatar,
         type: "system",
       }, 
     };

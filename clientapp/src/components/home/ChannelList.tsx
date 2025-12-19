@@ -268,7 +268,7 @@ export default function ChannelList({ width }: ChannelListProps) {
 
     socketManager.addListener(listener);
     return () => socketManager.removeListener(listener);
-  }, [user, setResults]);
+  }, [user, setResults, setSelectedChat]);
 
   const handleSearchKeyDown = async (
     e: React.KeyboardEvent<HTMLInputElement>
@@ -564,7 +564,7 @@ export default function ChannelList({ width }: ChannelListProps) {
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-3 py-3 bg-[#f6f7fb] space-y-2 scrollbar-thin scrollbar-thumb-[#d0d7e9] scrollbar-track-transparent">
+        <div className="flex-1 overflow-y-auto bg-[#f6f7fb] scrollbar-thin scrollbar-thumb-[#d0d7e9] scrollbar-track-transparent">
           {loading ? (
             <ChatSkeletonList count={8} />
           ) : hasSearched && results.length === 0 ? (
@@ -595,7 +595,7 @@ export default function ChannelList({ width }: ChannelListProps) {
                     onClick={() =>
                       handleSelectConversation(item, Boolean(isGroup))
                     }
-                    className={`flex items-center gap-3 w-full text-left px-3.5 py-2.5 rounded-2xl transition-all border cursor-pointer ${
+                    className={`flex items-center gap-3 w-full text-left px-3.5 py-2.5  transition-all border cursor-pointer ${
                       isSelected
                         ? "bg-white shadow-lg border-[#bed3ff]"
                         : "bg-white/70 border-transparent hover:border-[#d8def0] hover:bg-white"
