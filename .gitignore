@@ -58,3 +58,8 @@ mongo-data/
 data
 data
 logs
+logs/http.log
+data/.minio.sys/buckets/chat-media/.usage-cache.bin/xl.meta
+data/.minio.sys/buckets/.usage-cache.bin/xl.meta
+data/.minio.sys/buckets/.usage.json/xl.meta
+data/.minio.sys/buckets/.bloomcycle.bin/xl.meta
