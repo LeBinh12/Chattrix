@@ -95,6 +95,7 @@ export default function ChannelList({ width }: ChannelListProps) {
       // Xử lý tin nhắn mới
       if (data.type === "conversations" && data.message) {
         const msg = data.message;
+        const isOwnMessage = msg.sender_id === user.data.id;
         const isGroup =
           msg.group_id && msg.group_id !== "000000000000000000000000";
 
@@ -103,11 +104,11 @@ export default function ChannelList({ width }: ChannelListProps) {
           if (!res.data.is_muted) ding.play();
         }
 
-          if (msg.sender_id === user.data.id) {
-            msg.updated_at = new Date().toISOString();
-            msg.last_date = msg.updated_at;
+        if (msg.sender_id === user.data.id) {
+          msg.updated_at = new Date().toISOString();
+          msg.last_date = msg.updated_at;
         }
-        
+
         setResults((prev) => {
           const existIndex = prev.findIndex((c) => {
             if (isGroup) {
@@ -122,19 +123,23 @@ export default function ChannelList({ width }: ChannelListProps) {
           });
 
           const oldConversation = existIndex >= 0 ? prev[existIndex] : null;
-
           const updatedConversation: Conversation = {
             user_id: isGroup ? "" : msg.user_id ?? "",
             sender_id: msg.sender_id ?? "",
             group_id: isGroup ? msg.group_id ?? "" : "",
-            display_name:
-              msg.display_name ||
-              oldConversation?.display_name ||
-              (isGroup ? "Nhóm" : "Người dùng"),
-            avatar:
-              msg.avatar ||
-              oldConversation?.avatar ||
-              (isGroup ? "/assets/group.png" : "/assets/default-avatar.png"),
+            display_name: isOwnMessage
+              ? oldConversation?.display_name ||
+                (isGroup ? "Nhóm" : "Người dùng")
+              : msg.display_name ||
+                oldConversation?.display_name ||
+                (isGroup ? "Nhóm" : "Người dùng"),
+
+            avatar: isOwnMessage
+              ? oldConversation?.avatar ||
+                (isGroup ? "/assets/group.png" : "/assets/default-avatar.png")
+              : msg.avatar ||
+                oldConversation?.avatar ||
+                (isGroup ? "/assets/group.png" : "/assets/default-avatar.png"),
             last_message:
               msg.last_message || oldConversation?.last_message || "",
             last_message_type:
@@ -197,40 +202,57 @@ export default function ChannelList({ width }: ChannelListProps) {
       }
 
       if (data.type === "group_member_added" && data.message) {
-  const msg = data.message;
-        console.log("msggroup_member_added", msg)
-  setResults((prev) => {
-    // Check xem group đã có trong danh sách chưa
-    const existIndex = prev.findIndex(
-      (c) => c.group_id === msg.group_id
-    );
+        const msg = data.message;
+        console.log("msggroup_member_added", msg);
+        setResults((prev) => {
+          // Check xem group đã có trong danh sách chưa
+          const existIndex = prev.findIndex((c) => c.group_id === msg.group_id);
 
-    const newConversation: Conversation = {
-      user_id: "",
-      group_id: msg.group_id,
-      display_name: msg.display_name ?? "",
-      avatar: msg.avatar || "/assets/group.png",
-      last_message: msg.last_message ?? "",
-      last_message_type: msg.last_message_type || "text",
-      last_message_id: msg.last_message_id,
-      last_date: msg.last_date || new Date().toISOString(),
-      unread_count: 0,
-      status: "group",
-      updated_at: msg.updated_at || new Date().toISOString(),
-    };
+          const newConversation: Conversation = {
+            user_id: "",
+            group_id: msg.group_id,
+            display_name: msg.display_name ?? "",
+            avatar: msg.avatar || "/assets/group.png",
+            last_message: msg.last_message ?? "",
+            last_message_type: msg.last_message_type || "text",
+            last_message_id: msg.last_message_id,
+            last_date: msg.last_date || new Date().toISOString(),
+            unread_count: 0,
+            status: "group",
+            updated_at: msg.updated_at || new Date().toISOString(),
+          };
 
-    // Nếu đã tồn tại → cập nhật lên đầu
-    if (existIndex >= 0) {
-      const newList = [...prev];
-      newList.splice(existIndex, 1);
-      return [newConversation, ...newList];
-    }
+          // Nếu đã tồn tại → cập nhật lên đầu
+          if (existIndex >= 0) {
+            const newList = [...prev];
+            newList.splice(existIndex, 1);
+            return [newConversation, ...newList];
+          }
 
-    // Nếu chưa → thêm mới lên đầu
-    return [newConversation, ...prev];
-  });
-}
+          // Nếu chưa → thêm mới lên đầu
+          return [newConversation, ...prev];
+        });
+      }
 
+      if (data.type === "member_left" && data.message) {
+        const msg = data.message;
+        if (msg.sender_id !== user.data.id) return;
+
+        const leftGroupId = msg.group_id;
+
+        if (!leftGroupId) return;
+
+        setResults((prev) => {
+          const exist = prev.some((c) => c.group_id === leftGroupId);
+
+          if (!exist) return prev;
+
+          return prev.filter((c) => c.group_id !== leftGroupId);
+        });
+
+        setSelectedChat(null)
+        return;
+      }
 
       // Xử lý cập nhật status online/offline
       if (data.user_id && data.status) {
@@ -417,9 +439,14 @@ export default function ChannelList({ width }: ChannelListProps) {
         <div className="p-4 sm:p-5 flex-shrink-0 border-b border-[#e4e8f1] space-y-3 sm:space-y-4">
           {/* Tiêu đề */}
           <div>
+            <div className="flex + justify-between + align-center">
             <p className="text-[10px] uppercase tracking-wide text-[#7c8aac] font-semibold">
               Danh sách chat
-            </p>
+              </p>
+              <p className="text-[10px] uppercase tracking-wide text-[#7c8aac] font-semibold">
+              {user?.data.display_name}
+              </p>  
+              </div>
             <h2 className="text-sm sm:text-base font-semibold text-[#1e2b4a]">
               Tin nhắn
             </h2>
@@ -547,8 +574,9 @@ export default function ChannelList({ width }: ChannelListProps) {
           ) : (
             <>
               {results.map((item, index) => {
-                const isGroup =
-                  item.group_id && item.group_id !== "000000000000000000000000";
+                const isGroup = Boolean(
+                  item.group_id && item.group_id !== "000000000000000000000000"
+                );
                 const isSelected =
                   selectedChat?.group_id === item.group_id &&
                   selectedChat?.user_id === item.user_id;
@@ -567,7 +595,7 @@ export default function ChannelList({ width }: ChannelListProps) {
                     onClick={() =>
                       handleSelectConversation(item, Boolean(isGroup))
                     }
-                    className={`flex items-center gap-3 w-full text-left px-3.5 py-2.5 rounded-2xl transition-all border ${
+                    className={`flex items-center gap-3 w-full text-left px-3.5 py-2.5 rounded-2xl transition-all border cursor-pointer ${
                       isSelected
                         ? "bg-white shadow-lg border-[#bed3ff]"
                         : "bg-white/70 border-transparent hover:border-[#d8def0] hover:bg-white"
@@ -577,6 +605,7 @@ export default function ChannelList({ width }: ChannelListProps) {
                       avatar={item.avatar}
                       isOnline={!isGroup && isOnline}
                       display_name={item.display_name}
+                      isGroup={isGroup}
                     />
 
                     {width > 200 && (

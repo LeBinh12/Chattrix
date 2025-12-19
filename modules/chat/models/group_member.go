@@ -7,11 +7,13 @@ var members []struct {
 }
 
 type Member struct {
-	UserID primitive.ObjectID ` json:"user_id"`
-	Role   string             ` json:"role,omitempty"` // optional
+	UserID   primitive.ObjectID ` json:"user_id"`
+	UserName string             `json:"user_name"`
+	Role     string             ` json:"role,omitempty"` // optional
 }
 
 type GroupMemberRequest struct {
+	Action      string             `json:"action"` // "create_group" | "add_member"
 	Members     []Member           `json:"members"`
 	GroupID     primitive.ObjectID ` json:"group_id"`
 	SenderID    primitive.ObjectID ` json:"sender_id"`

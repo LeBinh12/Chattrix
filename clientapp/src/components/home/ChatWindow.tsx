@@ -76,6 +76,9 @@ export default function ChatWindow({ onBack }: ChatWindowProps) {
   const [pinnedMessages, setPinnedMessages] = useState<PinnedMessageDetail[]>(
     []
   );
+  
+  // ✅ Thêm ref để track conversation đã được fetch
+  const fetchedConversationsRef = useRef<Set<string>>(new Set());
 
   const isGroup =
     !!selectedChat?.group_id &&
@@ -87,15 +90,7 @@ export default function ChatWindow({ onBack }: ChatWindowProps) {
       : `user_${selectedChat.user_id}`
     : "";
 
-  const cachedMessages = conversationKey
-    ? messagesCache[conversationKey]
-    : undefined;
-
   const beginInitialLoading = useCallback(() => {
-    if (loadingTimeoutRef.current) {
-      clearTimeout(loadingTimeoutRef.current);
-      loadingTimeoutRef.current = null;
-    }
     loadingStartRef.current = Date.now();
     setIsInitialLoading(true);
   }, []);
@@ -136,13 +131,11 @@ export default function ChatWindow({ onBack }: ChatWindowProps) {
     if (!selectedChat || !user?.data.id) return;
 
     try {
-      console.log("res_rê", selectedChat.user_id);
 
       const res = await messageAPI.getPinned(
         selectedChat.user_id ?? "",
         selectedChat.group_id ?? ""
       );
-      console.log("res_rê", res);
       if (res.status === 200 && res.data?.data) {
         // Sort by pinned_at desc để tin mới nhất lên đầu
         const sorted = res.data.data.sort(
@@ -156,10 +149,12 @@ export default function ChatWindow({ onBack }: ChatWindowProps) {
     }
   }, [selectedChat, user?.data.id]);
 
-  // Fetch messages với hỗ trợ tìm kiếm theo ID
+  // ✅ REFACTOR: fetchMessages - CHỈ set loading khi thực sự gọi API
   const fetchMessages = useCallback(async () => {
     if (!user?.data.id || !conversationKey) return;
 
+    // ✅ QUAN TRỌNG: Kiểm tra cache TRƯỚC, không bật loading nếu có cache
+    
     // Nếu có messageIDSearch, xử lý tìm kiếm
     if (messageIDSearch) {
       // Kiểm tra trong search cache trước (ưu tiên hơn)
@@ -173,7 +168,6 @@ export default function ChatWindow({ onBack }: ChatWindowProps) {
         setMessages(searchCachedMsgs);
         setHighlightMessageId(messageIDSearch);
         setIsShowingSearchCache(true);
-        setIsInitialLoading(false);
         setMessageIDSearch("");
         return;
       }
@@ -189,12 +183,11 @@ export default function ChatWindow({ onBack }: ChatWindowProps) {
         setMessages(cachedMsgs);
         setHighlightMessageId(messageIDSearch);
         setIsShowingSearchCache(false);
-        setIsInitialLoading(false);
         setMessageIDSearch("");
         return;
       }
 
-      // Nếu chưa có trong cả 2 cache, gọi API để lấy tin nhắn và các tin nhắn xung quanh
+      // ✅ CHỈ BẬT LOADING KHI GỌI API
       try {
         beginInitialLoading();
         const res = await messageAPI.getMessageById(
@@ -254,13 +247,12 @@ export default function ChatWindow({ onBack }: ChatWindowProps) {
     }
 
     // Fetch bình thường nếu không có messageIDSearch
-    // Ưu tiên search cache nếu có, nếu không thì dùng cache chính
+    // ✅ Ưu tiên search cache nếu có, nếu không thì dùng cache chính
     const searchCachedMsgs = messagesSearchCache[conversationKey];
     if (searchCachedMsgs?.length) {
       setMessages(searchCachedMsgs);
       setIsShowingSearchCache(true);
       setHasMore(searchCachedMsgs.length >= limit);
-      setIsInitialLoading(false);
       return;
     }
 
@@ -269,10 +261,10 @@ export default function ChatWindow({ onBack }: ChatWindowProps) {
       setMessages(mainCachedMsgs);
       setIsShowingSearchCache(false);
       setHasMore(mainCachedMsgs.length >= limit);
-      setIsInitialLoading(false);
       return;
     }
 
+    // ✅ CHỈ BẬT LOADING KHI GỌI API VÀ CHƯA CÓ CACHE
     try {
       beginInitialLoading();
       const res = await messageAPI.getMessage(
@@ -294,6 +286,9 @@ export default function ChatWindow({ onBack }: ChatWindowProps) {
       setIsShowingSearchCache(false);
       loadedCountRef.current[conversationKey] = sorted.length;
       setHasMore(sorted.length >= limit);
+      
+      // ✅ Đánh dấu conversation đã fetch
+      fetchedConversationsRef.current.add(conversationKey);
     } catch (err) {
       console.error("Lỗi khi tải tin nhắn:", err);
     } finally {
@@ -321,13 +316,13 @@ export default function ChatWindow({ onBack }: ChatWindowProps) {
     }
   }, [selectedChat, fetchPinnedMessages]);
 
-  // Reset messages when selected chat changes
+  // ✅ REFACTOR: Reset messages - KHÔNG bật loading, chỉ reset state
   useEffect(() => {
     if (!selectedChat) {
       setMessages([]);
       setHasMore(true);
       setHasLeftGroup(false);
-      setIsInitialLoading(false);
+      // ✅ KHÔNG set isInitialLoading ở đây
       setHighlightMessageId(null);
       setIsShowingSearchCache(false);
       return;
@@ -338,36 +333,49 @@ export default function ChatWindow({ onBack }: ChatWindowProps) {
     if (searchCachedMsgs?.length && !messageIDSearch) {
       setMessages(searchCachedMsgs);
       setIsShowingSearchCache(true);
-      setIsInitialLoading(false);
+      // ✅ KHÔNG set isInitialLoading ở đây
     } else {
       // Nếu không có search cache thì dùng main cache
       const mainCachedMsgs = messagesCache[conversationKey];
       if (mainCachedMsgs?.length && !messageIDSearch) {
         setMessages(mainCachedMsgs);
         setIsShowingSearchCache(false);
-        setIsInitialLoading(false);
-      } else {
-        setMessages([]);
-        setIsShowingSearchCache(false);
-        beginInitialLoading();
-      }
+        // ✅ KHÔNG set isInitialLoading ở đây
+      } 
     }
 
     setHasMore(true);
     setHasLeftGroup(false);
   }, [
     selectedChat,
-    cachedMessages,
-    beginInitialLoading,
     messageIDSearch,
     messagesSearchCache,
     messagesCache,
     conversationKey,
   ]);
 
+  // ✅ REFACTOR: CHỈ gọi fetchMessages khi chưa có cache
   useEffect(() => {
-    fetchMessages();
-  }, [fetchMessages]);
+    if (!conversationKey) return;
+    
+    // ✅ CHỈ fetch nếu chưa có trong cache VÀ chưa từng fetch
+    const hasCache = 
+      messagesCache[conversationKey]?.length > 0 ||
+      messagesSearchCache[conversationKey]?.length > 0;
+    
+    const alreadyFetched = fetchedConversationsRef.current.has(conversationKey);
+    
+    if (!hasCache && !alreadyFetched) {
+      fetchMessages();
+    }
+  }, [conversationKey, messagesCache, messagesSearchCache, fetchMessages]);
+
+  // ✅ REFACTOR: Fetch khi có messageIDSearch mới
+  useEffect(() => {
+    if (messageIDSearch && conversationKey) {
+      fetchMessages();
+    }
+  }, [messageIDSearch, conversationKey, fetchMessages]);
 
   // Load more
   const loadMoreMessages = async () => {
@@ -765,6 +773,7 @@ export default function ChatWindow({ onBack }: ChatWindowProps) {
       prev.filter((msg) => msg.message_id !== messageId)
     );
   };
+  
   return (
     <div className="flex flex-col w-full h-full max-h-screen bg-[#f5f7fb] text-[#1c2333]">
       <ChatHeaderWindow

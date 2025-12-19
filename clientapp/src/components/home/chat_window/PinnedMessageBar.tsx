@@ -49,13 +49,13 @@ export default function PinnedMessageBar({
   const getMessageTypeDisplay = (type: string) => {
     switch (type) {
       case "image":
-        return "📷 Hình ảnh";
+        return "Hình ảnh";
       case "video":
-        return "🎥 Video";
+        return "Video";
       case "file":
-        return "📎 File";
+        return "File";
       case "audio":
-        return "🎵 Audio";
+        return "Audio";
       default:
         return "";
     }

@@ -122,5 +122,3 @@ func ValidateAndSaveFile(fileHeader *multipart.FileHeader) error {
 
 	return nil
 }
-
-

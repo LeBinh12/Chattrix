@@ -9,9 +9,8 @@ import {
   Avatar,
   CircularProgress,
   Button,
-  Stack,
 } from "@mui/joy";
-import { ChevronLeft, ChevronRight, UserPlus } from "lucide-react";
+import { UserPlus } from "lucide-react";
 import { groupAdminApi } from "../../../api/admin/groupAdminApi";
 import type { UserInfoInGroup } from "../../../types/admin/groupNumber";
 import { toast } from "react-toastify";
@@ -23,32 +22,47 @@ interface GroupMembersTableProps {
 export default function GroupMembersTable({ groupId }: GroupMembersTableProps) {
   const [members, setMembers] = useState<UserInfoInGroup[]>([]);
   const [totalMembers, setTotalMembers] = useState(0);
-  const [totalPages, setTotalPages] = useState(1);
   const [currentPage, setCurrentPage] = useState(1);
-  const [isLoading, setIsLoading] = useState(true);
+  const [hasMore, setHasMore] = useState(true);
+
+const [isInitialLoading, setIsInitialLoading] = useState(true);
+const [isFetchingMore, setIsFetchingMore] = useState(false);
 
   const pageSize = 10;
 
-  const fetchMembers = useCallback(
-    async (page: number) => {
-      if (!groupId) return;
-      setIsLoading(true);
-      try {
-        const res = await groupAdminApi.getNumber(groupId, page, pageSize);
-        if (res.status === 200 && res.data) {
-          setMembers(res.data.data);
-          setTotalMembers(res.data.total);
-          setTotalPages(res.data.totalPages || 1);
+const fetchMembers = useCallback(
+  async (page: number) => {
+    if (!groupId || !hasMore) return;
+
+    if (page === 1) {
+      setIsInitialLoading(true);
+    } else {
+      setIsFetchingMore(true);
+    }
+
+    try {
+      const res = await groupAdminApi.getNumber(groupId, page, pageSize);
+
+      if (res.status === 200 && res.data) {
+        setMembers((prev) =>
+          page === 1 ? res.data.data : [...prev, ...res.data.data]
+        );
+
+        setTotalMembers(res.data.total);
+
+        if (res.data.data.length < pageSize) {
+          setHasMore(false);
         }
-      } catch (error) {
-        toast.error("Không thể tải danh sách thành viên nhóm!");
-        console.error(error);
-      } finally {
-        setIsLoading(false);
       }
-    },
-    [groupId]
-  );
+    } catch (error) {
+      toast.error("Không thể tải danh sách thành viên nhóm!");
+    } finally {
+      setIsInitialLoading(false);
+      setIsFetchingMore(false);
+    }
+  },
+  [groupId, hasMore]
+);
 
   useEffect(() => {
     fetchMembers(currentPage);
@@ -127,7 +141,7 @@ export default function GroupMembersTable({ groupId }: GroupMembersTableProps) {
         </Button>
       </Box>
 
-      {isLoading ? (
+      {isInitialLoading  ? (
         <Box sx={{ display: "flex", justifyContent: "center", py: 6 }}>
           <CircularProgress />
         </Box>
@@ -136,7 +150,23 @@ export default function GroupMembersTable({ groupId }: GroupMembersTableProps) {
           <Typography>Chưa có thành viên nào trong nhóm này</Typography>
         </Box>
       ) : (
-        <>
+            <>
+              <Box
+  sx={{
+    flex: 1,
+    overflowY: "auto",
+  }}
+  onScroll={(e) => {
+    const target = e.currentTarget;
+    const isBottom =
+      target.scrollTop + target.clientHeight >= target.scrollHeight - 10;
+
+    if (isBottom && !isInitialLoading  && hasMore) {
+      setCurrentPage((p) => p + 1);
+    }
+  }}
+>
+
           <Sheet
             variant="outlined"
             sx={{ borderRadius: "sm", flex: 1, overflow: "hidden" }}
@@ -201,44 +231,21 @@ export default function GroupMembersTable({ groupId }: GroupMembersTableProps) {
                 ))}
               </tbody>
             </Table>
-          </Sheet>
+                </Sheet>
+                </Box>
 
-          {/* Pagination riêng cho thành viên */}
-          {totalPages > 1 && (
-            <Stack
-              direction="row"
-              spacing={1}
-              sx={{ mt: 2, justifyContent: "center", alignItems: "center" }}
-            >
-              <Button
-                size="sm"
-                variant="outlined"
-                color="neutral"
-                disabled={currentPage === 1}
-                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                startDecorator={<ChevronLeft size={16} />}
-              >
-                Trước
-              </Button>
+         {isFetchingMore  && (
+  <Box sx={{ display: "flex", justifyContent: "center", py: 2 }}>
+    <CircularProgress size="sm" />
+  </Box>
+)}
 
-              <Typography level="body-sm">
-                Trang {currentPage} / {totalPages}
-              </Typography>
+{!hasMore && (
+  <Typography level="body-xs" textAlign="center" sx={{ py: 2 }}>
+    Đã tải hết thành viên
+  </Typography>
+)}
 
-              <Button
-                size="sm"
-                variant="outlined"
-                color="neutral"
-                disabled={currentPage === totalPages}
-                onClick={() =>
-                  setCurrentPage((p) => Math.min(totalPages, p + 1))
-                }
-                endDecorator={<ChevronRight size={16} />}
-              >
-                Sau
-              </Button>
-            </Stack>
-          )}
         </>
       )}
     </Box>

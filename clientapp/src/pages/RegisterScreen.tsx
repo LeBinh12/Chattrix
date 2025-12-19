@@ -214,13 +214,13 @@ export default function RegisterScreen() {
                           document.getElementById("avatarInput")?.click()
                         }
                       >
-                        <Upload className="w-6 h-6 text-white" />
+                        <Upload className="w-6 h-6 text-black" />
                       </div>
                     </div>
                   ) : (
                     <label
                       htmlFor="avatarInput"
-                      className="w-24 h-24 rounded-full bg-black/20 backdrop-blur-sm flex items-center justify-center cursor-pointer hover:bg-white/30 transition-all border-4 border-white shadow-lg"
+                      className="w-24 h-24 rounded-full bg-black/20 backdrop-blur-sm flex items-center justify-center cursor-pointer hover:bg-white/30 transition-all border-4 border-black shadow-lg"
                     >
                       <Upload className="w-8 h-8 text-black" />
                     </label>

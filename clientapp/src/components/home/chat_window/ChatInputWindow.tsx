@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Send,
   Smile,
@@ -23,6 +23,8 @@ import Underline from "@tiptap/extension-underline";
 import { useRecoilValue, useSetRecoilState } from "recoil";
 import ReplyPreview from "./ReplyPreview";
 import { replyMessageState } from "../../../recoil/atoms/uiAtom";
+import Mention from "@tiptap/extension-mention";
+import { useMentionSuggestion } from "../../../hooks/useMentionSuggestion";
 
 type ChatInputWindowProps = {
   user_id: string;
@@ -33,6 +35,10 @@ type ChatInputWindowProps = {
   avatar?: string;
   sender_avatar?: string;
 };
+
+
+
+const MAX_LENGTH = 2000;
 
 export default function ChatInputWindow({
   user_id,
@@ -46,6 +52,7 @@ export default function ChatInputWindow({
   const [message, setMessage] = useState("");
   const [showPicker, setShowPicker] = useState(false);
   const [showRichText, setShowRichText] = useState(false);
+  const [charCount, setCharCount] = useState(0);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [progress, setProgress] = useState<number[]>([]);
   const [uploading, setUploading] = useState(false);
@@ -73,38 +80,58 @@ export default function ChatInputWindow({
       StarterKit,
       ImageExt,
       Underline,
+      Mention.configure({
+        suggestion: useMentionSuggestion(group_id),
+      }),
     ],
     content: "",
     onUpdate: ({ editor }) => setMessage(editor.getHTML()),
     editorProps: {
-      attributes: {
-        class: "focus:outline-none prose prose-sm max-w-none text-gray-700 p-3",
-      },
-      handleKeyDown: (_, event) => {
-        if (hasLeftGroup) return true;
+  attributes: {
+    class: "focus:outline-none prose prose-sm max-w-none text-gray-700 p-3",
+  },
+  handleKeyDown: (view, event) => {
+    if (hasLeftGroup) return true;
 
-        if (event.key === "Enter" && !event.shiftKey) {
-          event.preventDefault();
+    // QUAN TRỌNG: Kiểm tra xem có Mention suggestion đang mở không
+    // Nếu có, để Mention xử lý Enter trước
+    const { state } = view;
+    const { selection } = state;
+    const { $from } = selection;
+    
+    // Tìm xem có node mention nào đang active không
+    const mentionPluginState = state.plugins.find(
+      (plugin: any) => plugin.key === 'mention$'
+    );
+    
+    // Nếu mention suggestion đang mở, không xử lý Enter ở đây
+    // Để Mention plugin xử lý trước
+    if (mentionPluginState) {
+      return false;
+    }
 
-          const html = editor?.getHTML().trim();
-          const hasText = !!editor?.getText().replace(/\s+/g, "").trim();
-          const isEmptyHtml = [
-            "<p></p>",
-            "<p><br></p>",
-            "<p>&nbsp;</p>",
-          ].includes(html);
+    if (event.key === "Enter" && !event.shiftKey) {
+      event.preventDefault();
 
-          if (!hasText && isEmptyHtml && selectedFiles.length === 0) {
-            return false;
-          }
+      const html = editor?.getHTML().trim();
+      const hasText = !!editor?.getText().replace(/\s+/g, "").trim();
+      const isEmptyHtml = [
+        "<p></p>",
+        "<p><br></p>",
+        "<p>&nbsp;</p>",
+      ].includes(html);
 
-          handleSend();
-          return true;
-        }
-
+      if (!hasText && isEmptyHtml && selectedFiles.length === 0) {
         return false;
-      },
-    },
+      }
+
+      handleSend();
+      return true;
+    }
+
+    return false;
+  },
+},
   });
 
   useEffect(() => {
@@ -333,7 +360,7 @@ export default function ChatInputWindow({
             onClick={() => fileInputRef.current?.click()}
             className="flex flex-col items-center justify-center w-20 h-20 sm:w-24 sm:h-24 
              border border-dashed border-[#b6c2ff] rounded-xl text-[#4e5eb8]
-             hover:bg-[#f0f3ff] transition flex-shrink-0"
+             hover:bg-[#f0f3ff] transition flex-shrink-0 cursor-pointer"
           >
             <Paperclip size={20} />
             <span className="text-[10px] mt-1">Thêm file</span>
@@ -342,7 +369,7 @@ export default function ChatInputWindow({
             const isImage = file.type.startsWith("image/");
             const isVideo = file.type.startsWith("video/");
             return (
-              <div key={index} className="flex flex-col gap-1 flex-shrink-0">
+              <div key={index} className="flex flex-col gap-1 flex-shrink-0 cursor-pointer">
                 <div className="relative w-20 h-20 sm:w-24 sm:h-24 border border-[#c8d5ff] rounded-xl overflow-hidden bg-[#f0f4ff]">
                   {isImage || isVideo ? (
                     <div className="w-full h-full">
@@ -370,7 +397,7 @@ export default function ChatInputWindow({
                       className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 transition-colors shadow-md z-10"
                     >
                       <X size={12} />
-                    </button>
+                    </button> 
                   )}
                   {uploading && (
                     <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 text-white">
@@ -404,7 +431,7 @@ export default function ChatInputWindow({
                 btn.action();
               }}
               disabled={hasLeftGroup}
-              className={`flex items-center justify-center w-7 h-7 sm:w-9 sm:h-9 rounded-lg border border-transparent hover:border-[#d5e0ff] hover:bg-white transition ${
+              className={`flex items-center justify-center w-7 h-7 sm:w-9 sm:h-9 rounded-lg border border-transparent hover:border-[#d5e0ff] hover:bg-white transition cursor-pointer ${
                 hasLeftGroup ? "opacity-40 cursor-not-allowed" : ""
               }`}
               title={btn.label}
@@ -419,11 +446,16 @@ export default function ChatInputWindow({
             <motion.div
               animate={{
                 minHeight: editorHeight === "compact" ? "50px" : "250px",
+                maxHeight: editorHeight === "compact" ? "200px" : "400px",
               }}
               transition={{ duration: 0.3, ease: "easeInOut" }}
               className={`px-2 sm:px-3 py-2 overflow-y-auto ${
                 hasLeftGroup ? "text-gray-400" : "text-gray-700"
               }`}
+              style={{
+                scrollbarWidth: "thin",
+                scrollbarColor: "#cbd5e1 transparent",
+              }}
             >
               <EditorContent
                 editor={editor}
@@ -438,7 +470,7 @@ export default function ChatInputWindow({
               whileTap={{ scale: hasLeftGroup ? 1 : 0.95 }}
               onClick={() => !hasLeftGroup && setShowPicker((prev) => !prev)}
               disabled={hasLeftGroup}
-              className={`flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-full border border-[#d2dbef] text-[#082550] bg-white hover:bg-[#f1f4fb] transition ${
+              className={`flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-full border border-[#d2dbef] text-[#082550] bg-white hover:bg-[#f1f4fb] transition cursor-pointer ${
                 hasLeftGroup ? "opacity-40 cursor-not-allowed" : ""
               }`}
             >

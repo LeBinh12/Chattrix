@@ -6,7 +6,7 @@ export const chatInfoPanelVisibleAtom = atom<boolean>({
     key: "chatInfoPanelVisible",
     default: true, // mặc định hiển thị
 });
-export const activePanelAtom = atom<"none" | "info" | "search" | "storage">({
+export const activePanelAtom = atom<"none" | "info" | "search" | "storage" | "members">({
     key: "activePanel",
     default: "none", // mặc định không mở gì
 });

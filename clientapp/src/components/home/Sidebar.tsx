@@ -197,7 +197,7 @@ function SidebarButton({
   return (
     <button
       onClick={onClick}
-      className={`group relative flex items-center justify-center w-12 h-12 rounded-2xl transition-all duration-300 shadow-lg ${
+      className={`group relative flex items-center justify-center w-12 h-12 rounded-2xl transition-all duration-300 shadow-lg cursor-pointer ${
         danger
           ? "bg-red-500/30 text-red-50 hover:bg-red-500/60"
           : active

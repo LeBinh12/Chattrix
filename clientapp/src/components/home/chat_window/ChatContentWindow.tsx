@@ -172,7 +172,7 @@ export default function ChatContentWindow({
           scrollBehaviorRef.current = "auto";
         }, 3000);
       }, 100);
-    }
+    }      
   }, [highlightMessageId, onClearHighlight]);
 
   // ========== XỬ LÝ KHI ĐỔI CUỘC TRÒ CHUYỆN ==========
@@ -419,7 +419,7 @@ export default function ChatContentWindow({
               stiffness: 400,
               damping: 25,
             }}
-            className="absolute left-1/2 -translate-x-1/2 bottom-30 sm:bottom-40 bg-white text-[#2754d7] rounded-full shadow-xl p-2 sm:p-2.5 z-20 border border-[#c7d5f6]"
+            className="absolute left-1/2 -translate-x-1/2 bottom-30 sm:bottom-40 bg-white text-[#2754d7] rounded-full shadow-xl p-2 sm:p-2.5 z-20 border border-[#c7d5f6] cursor-pointer"
           >
             <motion.div
               animate={{ y: [0, 3, 0] }}
@@ -444,7 +444,7 @@ export default function ChatContentWindow({
               stiffness: 400,
               damping: 25,
             }}
-            className="absolute left-1/2 -translate-x-1/3 bottom-32 sm:bottom-40 bg-white text-[#ff6b6b] rounded-full shadow-lg p-2 z-20 border border-[#ffb3b3] hover:bg-[#fff5f5] transition-colors"
+            className="absolute left-1/2 -translate-x-1/3 bottom-32 sm:bottom-40 bg-white text-[#ff6b6b] rounded-full shadow-lg p-2 z-20 border border-[#ffb3b3] hover:bg-[#fff5f5] transition-colors cursor-pointer"
             title="Quay lại tin nhắn chính"
           >
             <motion.div

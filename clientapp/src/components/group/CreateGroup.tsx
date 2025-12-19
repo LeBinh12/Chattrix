@@ -6,7 +6,7 @@ import { groupApi } from "../../api/group";
 import { motion, AnimatePresence } from "framer-motion";
 import UserAvatar from "../UserAvatar";
 import { socketManager } from "../../api/socket";
-import { useRecoilState, useRecoilValue } from "recoil";
+import { useRecoilValue } from "recoil";
 import { userAtom } from "../../recoil/atoms/userAtom";
 
 // Types
@@ -176,7 +176,7 @@ export default function CreateGroupModal({
         }));
         
         socketManager.sendAddGroupMember(userRecoil?.data.id ?? "", userRecoil?.data.display_name ?? "",
-          res.data.id, res.data.name, res.data.image, members)
+          res.data.id, res.data.name, res.data.image, members, "create_group")
         toast.success("Tạo nhóm thành công!");
         onClose();
       } else {

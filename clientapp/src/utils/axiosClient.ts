@@ -1,7 +1,8 @@
 import axios from "axios";
 import type { InternalAxiosRequestConfig, AxiosRequestHeaders } from "axios";
+import { API_BASE_URL } from "../config/api";
 const axiosClient = axios.create({
-  baseURL: "http://localhost:3000/v1",
+  baseURL: API_BASE_URL,
   headers: {
     "X-API-Key": "becfce45-9237-4c6d-a7c5-f3be786249a5",
   },

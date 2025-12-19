@@ -14,5 +14,6 @@ func GroupRoutes(rg *gin.RouterGroup, db *mongo.Database) {
 		group.POST("/add-number", ginGroup.CreateGroupMemberHandler(db))
 		group.GET("/get-all", ginGroup.ListGroupsByUserHandler(db))
 		group.GET("/not-in-group", ginGroup.ListUsersNotInGroupHandler(db))
+		group.GET("/list-group-member", ginGroup.ListGroupMembersExceptMeHandler(db))
 	}
 }

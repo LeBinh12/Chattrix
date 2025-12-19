@@ -1,4 +1,5 @@
 import type { CreateGroupResponse, GetAllGroupResponse, GetAllNotNumberGroup } from "../types/group";
+import type { ListGroupMembersResponse } from "../types/group-member";
 import axiosClient from "../utils/axiosClient";
 
 export const groupApi = {
@@ -23,6 +24,13 @@ export const groupApi = {
         });
         return response.data
     },
+    getGroupMembers: async (group_id: string, page = 1, limit = 20, keyword?: string): Promise<ListGroupMembersResponse> => {
+        const response = await axiosClient.get<ListGroupMembersResponse>(`/group/list-group-member`, {
+            params: { group_id, page, limit, keyword }
+        });
+        return response.data;
+    },
+
     addMember: async (data: {
         group_id: string;
         user_id: string;

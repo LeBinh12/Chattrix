@@ -447,6 +447,49 @@ func (h *Hub) Run() {
 						}
 					}
 				}
+
+			case "member_left":
+				resSocket := event.Payload.(*models.MessageResponse)
+
+				dataRecall, _ := json.Marshal(map[string]interface{}{
+					"type":    "member_left",
+					"message": resSocket,
+				})
+				// Nếu là nhắn nhóm
+				if resSocket.GroupID != primitive.NilObjectID {
+					members, err := storage.NewMongoChatStore(h.DB).GetGroupMembers(context.Background(), resSocket.GroupID)
+					if err != nil {
+						log.Println("Lỗi GetGroupMembers:", err)
+						break
+					}
+
+					for _, memberID := range members {
+
+						if sessions, ok := h.Clients[memberID.Hex()]; ok {
+							for _, c := range sessions {
+								// Gửi type recall-message
+								select {
+								case c.Send <- dataRecall:
+								default:
+									log.Printf("Buffer full — dropping recall for %s", memberID.Hex())
+								}
+							}
+						}
+					}
+
+					break
+				}
+
+				if sessions, ok := h.Clients[resSocket.SenderID.Hex()]; ok {
+					for _, c := range sessions {
+						// Gửi type recall-message
+						select {
+						case c.Send <- dataRecall:
+						default:
+							log.Printf("Buffer full — dropping recall for %s", resSocket.SenderID.Hex())
+						}
+					}
+				}
 			}
 		}
 	}

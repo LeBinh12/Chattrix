@@ -182,11 +182,11 @@ export default function ChatInfoHeader({
 
         <div className="flex items-center gap-2">
           <button
-            className="w-9 h-9 rounded-full border border-[#e1e7fb] text-[#4f5f87] hover:bg-[#f4f6fb] transition"
+            className="w-9 h-9 rounded-full border border-[#e1e7fb] text-[#4f5f87] hover:bg-[#f4f6fb] transition cursor-pointer"
             onClick={handleBellClick}
             title={bell?.is_muted ? "Bật thông báo" : "Tắt thông báo"}
           >
-            {bell?.is_muted ? (
+            {bell?.is_muted ? ( 
               <BellOff className="w-4 h-4 mx-auto" />
             ) : (
               <Bell className="w-4 h-4 mx-auto" />
@@ -195,7 +195,7 @@ export default function ChatInfoHeader({
 
           {isGroup && (
             <button
-              className="w-9 h-9 rounded-full border border-[#e1e7fb] text-[#4f5f87] hover:bg-[#f4f6fb] transition"
+              className="w-9 h-9 rounded-full border border-[#e1e7fb] text-[#4f5f87] hover:bg-[#f4f6fb] transition cursor-pointer"
               onClick={() => setShowAddMemberModal(true)}
               title="Thêm thành viên"
             >

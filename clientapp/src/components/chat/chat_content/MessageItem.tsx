@@ -178,6 +178,23 @@ export default function MessageItem({
     () => (msg.media_ids || []).filter((m) => m.type === "file"),
     [msg.media_ids]
   );
+  const shouldShowTimestamp = useMemo(() => {
+    // Always show timestamp for the first message
+    if (index === 0) return true;
+
+    const previousMsg = messages[index - 1];
+
+    if (!previousMsg || previousMsg.type === "system") {
+      return false;
+    }
+
+    const currentTime = new Date(msg.created_at).getTime();
+    const previousTime = new Date(previousMsg.created_at).getTime();
+
+    const THREE_HOURS_IN_MS = 3 * 60 * 60 * 1000;
+
+    return currentTime - previousTime > THREE_HOURS_IN_MS;
+  }, [msg.created_at, messages, index]);
 
   const onDeleteMessage = (messageId: string) => {
     socketManager.sendDeleteMessageForMe(currentUserId ?? "", [messageId]);
@@ -189,6 +206,47 @@ export default function MessageItem({
       .getMinutes()
       .toString()
       .padStart(2, "0")}`;
+  };
+
+  const formatTimestamp = (date: string): string => {
+    const now = new Date();
+    const msgDate = new Date(date);
+
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+
+    const msgDay = new Date(
+      msgDate.getFullYear(),
+      msgDate.getMonth(),
+      msgDate.getDate()
+    );
+
+    const timeStr = msgDate.toLocaleTimeString("vi-VN", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    });
+
+    // Today → only show time
+    if (msgDay.getTime() === today.getTime()) {
+      return timeStr;
+    }
+
+    // Yesterday → time + "Hôm qua"
+    if (msgDay.getTime() === yesterday.getTime()) {
+      return `${timeStr} Hôm qua`;
+    }
+
+    // Older → time + date
+    const dateStr = msgDate.toLocaleDateString("vi-VN", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    });
+
+    return `${timeStr} ${dateStr}`;
   };
 
   const handleReport = () => {
@@ -509,314 +567,324 @@ export default function MessageItem({
   };
 
   return (
-    <AnimatePresence initial={false}>
-      <motion.div
-        key={msg.id}
-        initial={{ opacity: 0, y: 20, scale: 0.95 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        exit={{ opacity: 0, y: 10, scale: 0.95 }}
-        transition={{ type: "spring", stiffness: 400, damping: 30 }}
-        className={`flex gap-2.5 ${
-          isMine ? "justify-end" : "justify-start"
-        } relative`}
-        onMouseEnter={() => setIsHovered(true)}
-        onMouseLeave={() => {
-          setIsHovered(false);
-        }}
-      >
-        {!isMine ? (
-          <AvatarPreview
-            src={
-              msg.sender_avatar && msg.sender_avatar !== "null"
-                ? `${API_ENDPOINTS.UPLOAD_MEDIA}/${msg.sender_avatar}`
-                : LOGO
-            }
-            alt={display_name}
-            size={size === "small" ? 30 : 32}
-          />
-        ) : (
-          <div className="w-7" />
-        )}
+    <>
+      {shouldShowTimestamp && (
+        <div className="flex justify-center my-4">
+          <span className="text-xs text-gray-500 px-3 py-1 bg-gray-100 rounded-full">
+            {formatTimestamp(msg.created_at)}
+          </span>
+        </div>
+      )}
 
-        <div
-          className={`flex flex-col ${
-            isMine ? "items-end" : "items-start"
-          } max-w-[85%] sm:max-w-[75%] md:max-w-[68%] gap-1 relative`}
+      <AnimatePresence initial={false}>
+        <motion.div
+          key={msg.id}
+          initial={{ opacity: 0, y: 20, scale: 0.95 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: 10, scale: 0.95 }}
+          transition={{ type: "spring", stiffness: 400, damping: 30 }}
+          className={`flex gap-2.5 ${
+            isMine ? "justify-end" : "justify-start"
+          } relative`}
+          onMouseEnter={() => setIsHovered(true)}
+          onMouseLeave={() => {
+            setIsHovered(false);
+          }}
         >
-          {!isMine && (
-            <div className="text-xs font-semibold text-gray-600 ml-1 mb-1">
-              {msg.sender_name}
-            </div>
+          {!isMine ? (
+            <AvatarPreview
+              src={
+                msg.sender_avatar && msg.sender_avatar !== "null"
+                  ? `${API_ENDPOINTS.UPLOAD_MEDIA}/${msg.sender_avatar}`
+                  : LOGO
+              }
+              alt={display_name}
+              size={size === "small" ? 30 : 32}
+            />
+          ) : (
+            <div className="w-7" />
           )}
 
-          {/* Hover actions */}
-          {isHovered && !showMenu && (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9, y: -3 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.9, y: -3 }}
-              className={`
+          <div
+            className={`flex flex-col ${
+              isMine ? "items-end" : "items-start"
+            } max-w-[85%] sm:max-w-[75%] md:max-w-[68%] gap-1 relative`}
+          >
+            {!isMine && (
+              <div className="text-xs font-semibold text-gray-600 ml-1 mb-1">
+                {msg.sender_name}
+              </div>
+            )}
+
+            {/* Hover actions */}
+            {isHovered && !showMenu && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.9, y: -3 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.9, y: -3 }}
+                className={`
       absolute bottom-1 -translate-y-1/2 flex items-center gap-1 
       px-1.5 py-1 z-20
 
       ${isMine ? "right-full mr-1" : "left-full ml-1"}
     `}
-            >
-              {/* Reply button */}
-              <button
-                onClick={handleReply}
-                className="
+              >
+                {/* Reply button */}
+                <button
+                  onClick={handleReply}
+                  className="
         w-7 h-7 flex items-center justify-center rounded-full
         bg-white border border-gray-300
         hover:bg-gray-200 transition-colors
         shadow-sm
       "
-                title="Trả lời"
-              >
-                <Reply className="w-3.5 h-3.5 text-[#6b7a8f]" />
-              </button>
+                  title="Trả lời"
+                >
+                  <Reply className="w-3.5 h-3.5 text-[#6b7a8f]" />
+                </button>
 
-              {/* More button */}
-              <button
-                onClick={() => setShowMenu(true)}
-                className="
+                {/* More button */}
+                <button
+                  onClick={() => setShowMenu(true)}
+                  className="
         w-7 h-7 flex items-center justify-center rounded-full
         bg-white border border-gray-300
         hover:bg-gray-200 transition-colors
         shadow-sm
       "
-              >
-                <MoreVertical className="w-3.5 h-3.5 text-[#6b7a8f]" />
-              </button>
-            </motion.div>
-          )}
+                >
+                  <MoreVertical className="w-3.5 h-3.5 text-[#6b7a8f]" />
+                </button>
+              </motion.div>
+            )}
 
-          {/* Menu dropdown */}
-          {showMenu && (
-            <motion.div
-              ref={menuRef}
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className={` absolute z-50 w-56 bg-white            
+            {/* Menu dropdown */}
+            {showMenu && (
+              <motion.div
+                ref={menuRef}
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                className={` absolute z-50 w-56 bg-white            
     ${isMine ? "left-0 -translate-x-full" : "right-0 translate-x-full"}
 rounded shadow-2xl overflow-hidden border border-gray-200`}
-            >
-              {isMine ? (
-                <div className="py-1">
-                  <button
-                    onClick={handleReply}
-                    className="w-full px-4 py-2.5 text-[#1f2a44] hover:bg-[#f5f7fb] flex items-center gap-3 text-sm"
-                  >
-                    <Reply className="w-4 h-4 text-[#707b97]" />
-                    <span>Trả lời</span>
-                  </button>
-                  <button className="w-full px-4 py-2.5 text-[#1f2a44] hover:bg-[#f5f7fb] flex items-center gap-3 text-sm">
-                    <Share2 className="w-4 h-4 text-[#707b97]" />
-                    <span>Chia sẽ</span>
-                  </button>
-                  <div className="h-px bg-gray-300 w-4/5 mx-auto"></div>
-                  <button
-                    onClick={handleCopy}
-                    className="w-full px-4 py-2.5 text-[#1f2a44] hover:bg-[#f5f7fb] flex items-center gap-3 text-sm"
-                  >
-                    <Copy className="w-4 h-4 text-[#707b97]" />
-                    <span>Copy tin nhắn</span>
-                  </button>
-                  <div className="h-px bg-gray-300 w-4/5 mx-auto"></div>
-                  {hasMedia && (
-                    <>
-                      <button
-                        onClick={handleCopyMedia}
-                        className="w-full px-4 py-2.5 flex items-center gap-3 text-sm text-[#1f2a44] hover:bg-[#f5f7fb]"
-                      >
-                        <Copy className="w-4 h-4 text-[#707b97]" />
-                        <span>Copy ảnh</span>
-                      </button>
-                      <button
-                        onClick={handleDownloadAll}
-                        className="w-full px-4 py-2.5 flex items-center gap-3 text-sm text-[#1f2a44] hover:bg-[#f5f7fb]"
-                      >
-                        <Download className="w-4 h-4 text-[#707b97]" />
-                        <span>Tải tất cả</span>
-                      </button>
-                    </>
-                  )}
-                  <div className="h-px bg-gray-300 w-4/5 mx-auto"></div>
-                  <button
-                    onClick={handlePin}
-                    className="w-full px-4 py-2.5 text-[#1f2a44] hover:bg-[#f5f7fb] flex items-center gap-3 text-sm"
-                  >
-                    <Pin className="w-4 h-4 text-[#707b97]" />
-                    <span>Ghim tin nhắn</span>
-                  </button>
-                  <button
-                    onClick={handleStar}
-                    className="w-full px-4 py-2.5 text-left text-[#1f2a44] hover:bg-[#f5f7fb] flex items-center gap-3 text-sm"
-                  >
-                    <Star className="w-4 h-4 text-[#707b97]" />
-                    <span>Đánh dấu tin nhắn</span>
-                  </button>
-                  <button
-                    onClick={handleSelectMultiple}
-                    className="w-full px-4 py-2.5 text-left text-[#1f2a44] hover:bg-[#f5f7fb] flex items-center gap-3 text-sm"
-                  >
-                    <List className="w-4 h-4 text-[#707b97]" />
-                    <span>Chọn nhiều tin nhắn</span>
-                  </button>
-                  <button
-                    onClick={handleViewDetail}
-                    className="w-full px-4 py-2.5 text-left text-[#1f2a44] hover:bg-[#f5f7fb] flex items-center gap-3 text-sm"
-                  >
-                    <Info className="w-4 h-4 text-[#707b97]" />
-                    <span>Xem chi tiết</span>
-                  </button>
+              >
+                {isMine ? (
+                  <div className="py-1">
+                    <button
+                      onClick={handleReply}
+                      className="w-full px-4 py-2.5 text-[#1f2a44] hover:bg-[#f5f7fb] flex items-center gap-3 text-sm"
+                    >
+                      <Reply className="w-4 h-4 text-[#707b97]" />
+                      <span>Trả lời</span>
+                    </button>
+                    <button className="w-full px-4 py-2.5 text-[#1f2a44] hover:bg-[#f5f7fb] flex items-center gap-3 text-sm">
+                      <Share2 className="w-4 h-4 text-[#707b97]" />
+                      <span>Chia sẽ</span>
+                    </button>
+                    <div className="h-px bg-gray-300 w-4/5 mx-auto"></div>
+                    <button
+                      onClick={handleCopy}
+                      className="w-full px-4 py-2.5 text-[#1f2a44] hover:bg-[#f5f7fb] flex items-center gap-3 text-sm"
+                    >
+                      <Copy className="w-4 h-4 text-[#707b97]" />
+                      <span>Copy tin nhắn</span>
+                    </button>
+                    <div className="h-px bg-gray-300 w-4/5 mx-auto"></div>
+                    {hasMedia && (
+                      <>
+                        <button
+                          onClick={handleCopyMedia}
+                          className="w-full px-4 py-2.5 flex items-center gap-3 text-sm text-[#1f2a44] hover:bg-[#f5f7fb]"
+                        >
+                          <Copy className="w-4 h-4 text-[#707b97]" />
+                          <span>Copy ảnh</span>
+                        </button>
+                        <button
+                          onClick={handleDownloadAll}
+                          className="w-full px-4 py-2.5 flex items-center gap-3 text-sm text-[#1f2a44] hover:bg-[#f5f7fb]"
+                        >
+                          <Download className="w-4 h-4 text-[#707b97]" />
+                          <span>Tải tất cả</span>
+                        </button>
+                      </>
+                    )}
+                    <div className="h-px bg-gray-300 w-4/5 mx-auto"></div>
+                    <button
+                      onClick={handlePin}
+                      className="w-full px-4 py-2.5 text-[#1f2a44] hover:bg-[#f5f7fb] flex items-center gap-3 text-sm"
+                    >
+                      <Pin className="w-4 h-4 text-[#707b97]" />
+                      <span>Ghim tin nhắn</span>
+                    </button>
+                    <button
+                      onClick={handleStar}
+                      className="w-full px-4 py-2.5 text-left text-[#1f2a44] hover:bg-[#f5f7fb] flex items-center gap-3 text-sm"
+                    >
+                      <Star className="w-4 h-4 text-[#707b97]" />
+                      <span>Đánh dấu tin nhắn</span>
+                    </button>
+                    <button
+                      onClick={handleSelectMultiple}
+                      className="w-full px-4 py-2.5 text-left text-[#1f2a44] hover:bg-[#f5f7fb] flex items-center gap-3 text-sm"
+                    >
+                      <List className="w-4 h-4 text-[#707b97]" />
+                      <span>Chọn nhiều tin nhắn</span>
+                    </button>
+                    <button
+                      onClick={handleViewDetail}
+                      className="w-full px-4 py-2.5 text-left text-[#1f2a44] hover:bg-[#f5f7fb] flex items-center gap-3 text-sm"
+                    >
+                      <Info className="w-4 h-4 text-[#707b97]" />
+                      <span>Xem chi tiết</span>
+                    </button>
 
-                  <div className="h-px bg-gray-300 w-4/5 mx-auto"></div>
+                    <div className="h-px bg-gray-300 w-4/5 mx-auto"></div>
 
-                  <button
-                    onClick={handleRecall}
-                    className="w-full px-4 py-2.5 text-left text-red-400 hover:bg-[#f5f7fb] flex items-center gap-3 text-sm"
-                  >
-                    <Undo className="w-4 h-4 " />
-                    <span>Thu hồi</span>
-                  </button>
-                  <button
-                    onClick={handleDeleteForMe}
-                    className="w-full px-4 py-2.5 text-left text-red-400 hover:bg-[#f5f7fb] flex items-center gap-3 text-sm"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                    <span>Xóa chỉ ở phía tôi</span>
-                  </button>
-                </div>
-              ) : (
-                <div className="py-1">
-                  <button
-                    onClick={handleReply}
-                    className="w-full px-4 py-2.5 text-[#1f2a44] hover:bg-[#f5f7fb] flex items-center gap-3 text-sm"
-                  >
-                    <Reply className="w-4 h-4 text-[#707b97]" />
-                    <span>Trả lời tin nhắn</span>
-                  </button>
-                  <button className="w-full px-4 py-2.5 text-[#1f2a44] hover:bg-[#f5f7fb] flex items-center gap-3 text-sm">
-                    <Share2 className="w-4 h-4 text-[#707b97]" />
-                    <span>Chia sẽ</span>
-                  </button>
-                  <div className="h-px bg-gray-300 w-4/5 mx-auto"></div>
-                  <button
-                    onClick={handleCopy}
-                    className="w-full px-4 py-2.5 text-left text-[#1f2a44] hover:bg-[#f5f7fb] flex items-center gap-3 text-sm"
-                  >
-                    <Copy className="w-4 h-4 text-[#707b97]" />
-                    <span>Copy tin nhắn</span>
-                  </button>
-                  <div className="h-px bg-gray-300 w-4/5 mx-auto"></div>
-                  {hasMedia && (
-                    <>
-                      <button
-                        onClick={handleCopyMedia}
-                        className="w-full px-4 py-2.5 flex items-center gap-3 text-sm text-[#1f2a44] hover:bg-[#f5f7fb]"
-                      >
-                        <Image className="w-4 h-4 text-[#707b97]" />
-                        <span>Copy ảnh</span>
-                      </button>
-                      <button
-                        onClick={handleDownloadAll}
-                        className="w-full px-4 py-2.5 flex items-center gap-3 text-sm text-[#1f2a44] hover:bg-[#f5f7fb]"
-                      >
-                        <Download className="w-4 h-4 text-[#707b97]" />
-                        <span>Tải tất cả</span>
-                      </button>
-                    </>
-                  )}
-                  <div className="h-px bg-gray-300 w-4/5 mx-auto"></div>
-                  <button
-                    onClick={handlePin}
-                    className="w-full px-4 py-2.5 text-left text-[#1f2a44] hover:bg-[#f5f7fb] flex items-center gap-3 text-sm"
-                  >
-                    <Pin className="w-4 h-4 text-[#707b97]" />
-                    <span>Ghim tin nhắn</span>
-                  </button>
-                  <button
-                    onClick={handleStar}
-                    className="w-full px-4 py-2.5 text-left text-[#1f2a44] hover:bg-[#f5f7fb] flex items-center gap-3 text-sm"
-                  >
-                    <Star className="w-4 h-4 text-[#707b97]" />
-                    <span>Đánh dấu tin nhắn</span>
-                  </button>
-                  <button
-                    onClick={handleSelectMultiple}
-                    className="w-full px-4 py-2.5 text-left text-[#1f2a44] hover:bg-[#f5f7fb] flex items-center gap-3 text-sm"
-                  >
-                    <List className="w-4 h-4" />
-                    <span>Chọn nhiều tin nhắn</span>
-                  </button>
-                  <button
-                    onClick={handleViewDetail}
-                    className="w-full px-4 py-2.5 text-left text-[#1f2a44] hover:bg-[#f5f7fb] flex items-center gap-3 text-sm"
-                  >
-                    <Info className="w-4 h-4 text-[#707b97]" />
-                    <span>Xem chi tiết</span>
-                  </button>
-                  <div className="h-px bg-gray-300 w-4/5 mx-auto"></div>
-                  <button
-                    onClick={handleReport}
-                    className="w-full px-4 py-2.5 text-left text-red-400 hover:bg-[#f5f7fb] flex items-center gap-3 text-sm"
-                  >
-                    <Info className="w-4 h-4 " />
-                    <span>Báo cáo</span>
-                  </button>
-                  <button
-                    onClick={handleDeleteForMe}
-                    className="w-full px-4 py-2.5 text-left text-red-400 hover:bg-[#f5f7fb] flex items-center gap-3 text-sm"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                    <span>Xóa chỉ ở phía tôi</span>
-                  </button>
-                </div>
-              )}
-            </motion.div>
-          )}
-
-          {/* Message bubble */}
-          <div
-            className={`px-3 py-2 rounded-[20px] border shadow-sm max-w-full leading-5 ${bubbleStyles} ${
-              size === "small" ? "text-[12px]" : "text-[13px]"
-            } ${
-              isHighlighted
-                ? "ring-2 ring-blue-500 shadow-lg shadow-blue-200/50"
-                : ""
-            }`}
-          >
-            {/* Hiển thị reply preview nếu tin nhắn này reply tin khác */}
-            {renderReplyPreview()}
-
-            {msg.type !== "file" && editor && (
-              <LongMessageContent
-                content={msg.content}
-                isMine={isMine}
-                maxLength={1000} // Ngưỡng để xem là tin nhắn dài
-              />
-            )}
-            {renderMedia()}
-            {renderFiles()}
-          </div>
-
-          <div className="flex items-center gap-1.5 text-[10px] text-[#8a94b3] pl-1 pr-1">
-            <span>{formatTime(msg.created_at)}</span>
-            {isMine && (
-              <>
-                {(isLastMineMessage || isHovered) && (
-                  <span className="flex items-center gap-0.5">
-                    <statusInfo.icon className="w-3 h-3" />
-                    {statusInfo.label}
-                  </span>
+                    <button
+                      onClick={handleRecall}
+                      className="w-full px-4 py-2.5 text-left text-red-400 hover:bg-[#f5f7fb] flex items-center gap-3 text-sm"
+                    >
+                      <Undo className="w-4 h-4 " />
+                      <span>Thu hồi</span>
+                    </button>
+                    <button
+                      onClick={handleDeleteForMe}
+                      className="w-full px-4 py-2.5 text-left text-red-400 hover:bg-[#f5f7fb] flex items-center gap-3 text-sm"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      <span>Xóa chỉ ở phía tôi</span>
+                    </button>
+                  </div>
+                ) : (
+                  <div className="py-1">
+                    <button
+                      onClick={handleReply}
+                      className="w-full px-4 py-2.5 text-[#1f2a44] hover:bg-[#f5f7fb] flex items-center gap-3 text-sm"
+                    >
+                      <Reply className="w-4 h-4 text-[#707b97]" />
+                      <span>Trả lời tin nhắn</span>
+                    </button>
+                    <button className="w-full px-4 py-2.5 text-[#1f2a44] hover:bg-[#f5f7fb] flex items-center gap-3 text-sm">
+                      <Share2 className="w-4 h-4 text-[#707b97]" />
+                      <span>Chia sẽ</span>
+                    </button>
+                    <div className="h-px bg-gray-300 w-4/5 mx-auto"></div>
+                    <button
+                      onClick={handleCopy}
+                      className="w-full px-4 py-2.5 text-left text-[#1f2a44] hover:bg-[#f5f7fb] flex items-center gap-3 text-sm"
+                    >
+                      <Copy className="w-4 h-4 text-[#707b97]" />
+                      <span>Copy tin nhắn</span>
+                    </button>
+                    <div className="h-px bg-gray-300 w-4/5 mx-auto"></div>
+                    {hasMedia && (
+                      <>
+                        <button
+                          onClick={handleCopyMedia}
+                          className="w-full px-4 py-2.5 flex items-center gap-3 text-sm text-[#1f2a44] hover:bg-[#f5f7fb]"
+                        >
+                          <Image className="w-4 h-4 text-[#707b97]" />
+                          <span>Copy ảnh</span>
+                        </button>
+                        <button
+                          onClick={handleDownloadAll}
+                          className="w-full px-4 py-2.5 flex items-center gap-3 text-sm text-[#1f2a44] hover:bg-[#f5f7fb]"
+                        >
+                          <Download className="w-4 h-4 text-[#707b97]" />
+                          <span>Tải tất cả</span>
+                        </button>
+                      </>
+                    )}
+                    <div className="h-px bg-gray-300 w-4/5 mx-auto"></div>
+                    <button
+                      onClick={handlePin}
+                      className="w-full px-4 py-2.5 text-left text-[#1f2a44] hover:bg-[#f5f7fb] flex items-center gap-3 text-sm"
+                    >
+                      <Pin className="w-4 h-4 text-[#707b97]" />
+                      <span>Ghim tin nhắn</span>
+                    </button>
+                    <button
+                      onClick={handleStar}
+                      className="w-full px-4 py-2.5 text-left text-[#1f2a44] hover:bg-[#f5f7fb] flex items-center gap-3 text-sm"
+                    >
+                      <Star className="w-4 h-4 text-[#707b97]" />
+                      <span>Đánh dấu tin nhắn</span>
+                    </button>
+                    <button
+                      onClick={handleSelectMultiple}
+                      className="w-full px-4 py-2.5 text-left text-[#1f2a44] hover:bg-[#f5f7fb] flex items-center gap-3 text-sm"
+                    >
+                      <List className="w-4 h-4" />
+                      <span>Chọn nhiều tin nhắn</span>
+                    </button>
+                    <button
+                      onClick={handleViewDetail}
+                      className="w-full px-4 py-2.5 text-left text-[#1f2a44] hover:bg-[#f5f7fb] flex items-center gap-3 text-sm"
+                    >
+                      <Info className="w-4 h-4 text-[#707b97]" />
+                      <span>Xem chi tiết</span>
+                    </button>
+                    <div className="h-px bg-gray-300 w-4/5 mx-auto"></div>
+                    <button
+                      onClick={handleReport}
+                      className="w-full px-4 py-2.5 text-left text-red-400 hover:bg-[#f5f7fb] flex items-center gap-3 text-sm"
+                    >
+                      <Info className="w-4 h-4 " />
+                      <span>Báo cáo</span>
+                    </button>
+                    <button
+                      onClick={handleDeleteForMe}
+                      className="w-full px-4 py-2.5 text-left text-red-400 hover:bg-[#f5f7fb] flex items-center gap-3 text-sm"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      <span>Xóa chỉ ở phía tôi</span>
+                    </button>
+                  </div>
                 )}
-              </>
+              </motion.div>
             )}
+
+            {/* Message bubble */}
+            <div
+              className={`px-3 py-2 rounded-[20px] border shadow-sm max-w-full leading-5 ${bubbleStyles} ${
+                size === "small" ? "text-[12px]" : "text-[14px]"
+              } ${
+                isHighlighted
+                  ? "ring-2 ring-blue-500 shadow-lg shadow-blue-200/50"
+                  : ""
+              }`}
+            >
+              {/* Hiển thị reply preview nếu tin nhắn này reply tin khác */}
+              {renderReplyPreview()}
+
+              {msg.type !== "file" && editor && (
+                <LongMessageContent
+                  content={msg.content}
+                  isMine={isMine}
+                  maxLength={1000} // Ngưỡng để xem là tin nhắn dài
+                />
+              )}
+              {renderMedia()}
+              {renderFiles()}
+            </div>
+
+            <div className="flex items-center gap-1.5 text-[10px] text-[#8a94b3] pl-1 pr-1">
+              <span>{formatTime(msg.created_at)}</span>
+              {isMine && (
+                <>
+                  {(isLastMineMessage || isHovered) && (
+                    <span className="flex items-center gap-0.5">
+                      <statusInfo.icon className="w-3 h-3" />
+                      {statusInfo.label}
+                    </span>
+                  )}
+                </>
+              )}
+            </div>
           </div>
-        </div>
-      </motion.div>
-    </AnimatePresence>
+        </motion.div>
+      </AnimatePresence>
+    </>
   );
 }

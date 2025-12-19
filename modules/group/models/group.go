@@ -44,6 +44,26 @@ type UserInfoInGroup struct {
 	Status      string             `json:"status" bson:"status"`
 }
 
+type GroupMemberDetail struct {
+	ID       primitive.ObjectID `json:"id" bson:"_id"` // id group_member
+	GroupID  primitive.ObjectID `json:"group_id" bson:"group_id"`
+	UserID   primitive.ObjectID `json:"user_id" bson:"user_id"`
+	Role     string             `json:"role" bson:"role"`
+	Status   string             `json:"status" bson:"status"`
+	JoinedAt time.Time          `json:"joined_at" bson:"joined_at"`
+
+	// user info
+	Username    string `json:"username" bson:"username"`
+	DisplayName string `json:"display_name" bson:"display_name"`
+	Email       string `json:"email" bson:"email"`
+	Avatar      string `json:"avatar" bson:"avatar"`
+	Phone       string `json:"phone" bson:"phone"`
+
+	// user status
+	OnlineStatus string    `json:"online_status" bson:"online_status"`
+	LastOnlineAt time.Time `json:"last_online_at" bson:"last_online_at"`
+}
+
 type KafkaGroupMemberEvent struct {
 	GroupID primitive.ObjectID `json:"group_id"`
 	Members []models.Member    `json:"members"`

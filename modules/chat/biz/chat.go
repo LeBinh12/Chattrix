@@ -103,12 +103,15 @@ func (biz *ChatBiz) HandleMessage(
 			return nil, errors.New("không tìm thấy nhóm")
 		}
 
-		inGroup, err := biz.store.IsUserInGroup(ctx, senderID, groupID)
-		if err != nil {
-			return nil, err
-		}
-		if !inGroup {
-			return nil, errors.New("người gửi không thuộc nhóm")
+		// Kiểm tra người dùng có trong nhóm không
+		if msg.Type != "system" {
+			inGroup, err := biz.store.IsUserInGroup(ctx, senderID, groupID)
+			if err != nil {
+				return nil, err
+			}
+			if !inGroup {
+				return nil, errors.New("người gửi không thuộc nhóm")
+			}
 		}
 	}
 

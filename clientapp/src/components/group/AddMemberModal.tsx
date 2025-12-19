@@ -4,6 +4,10 @@ import { toast } from "react-toastify";
 import { groupApi } from "../../api/group";
 import { API_ENDPOINTS } from "../../config/api";
 import { LOGO } from "../../assets/paths";
+import { useRecoilValue } from "recoil";
+import { selectedChatState } from "../../recoil/atoms/chatAtom";
+import { socketManager } from "../../api/socket";
+import { userAtom } from "../../recoil/atoms/userAtom";
 
 interface User {
   id: string;
@@ -30,6 +34,8 @@ export default function AddMemberModal({
   );
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+    const selectedChat = useRecoilValue(selectedChatState);
+  const userRecoil = useRecoilValue(userAtom)
   // const [page, setPage] = useState(1);
   // const [hasMore, setHasMore] = useState(true);
 
@@ -89,13 +95,20 @@ export default function AddMemberModal({
 
     try {
       setSubmitting(true);
-      for (const userId of Array.from(selectedMembers)) {
-        await groupApi.addMember({
-          group_id: groupId,
+      const members = Array.from(selectedMembers).map((userId) => {
+        const user = users.find((u) => u.id === userId);
+
+        return {
           user_id: userId,
-          role: "member",
-        });
-      }
+          user_name: user?.display_name || "",
+          role: "number", // role mặc định
+        };
+      });
+
+      socketManager.sendAddGroupMember(userRecoil?.data.id ?? "", userRecoil?.data.display_name ?? "",
+        selectedChat?.group_id ?? "", selectedChat?.display_name ?? "",
+        selectedChat?.avatar ?? "", members, "add_member")
+
 
       // Lọc bỏ những user vừa thêm khỏi list hiện tại
       setUsers((prev) => prev.filter((u) => !selectedMembers.has(u.id)));
@@ -144,7 +157,7 @@ export default function AddMemberModal({
               </p>
             </div>
           </div>
-          <button onClick={onClose} className="p-2 bg-white/10 rounded-full">
+          <button onClick={onClose} className="p-2 bg-white/10 rounded-full cursor-pointer">
             <X size={20} className="text-white" />
           </button>
         </div>
@@ -198,7 +211,7 @@ export default function AddMemberModal({
         <div className="flex gap-3 p-5 border-t">
           <button
             onClick={onClose}
-            className="px-6 py-3 border rounded-2xl font-semibold text-gray-700"
+            className="px-6 py-3 border rounded-2xl font-semibold text-gray-700 cursor-pointer"
           >
             Hủy
           </button>
@@ -207,7 +220,7 @@ export default function AddMemberModal({
             disabled={
               selectedMembers.size === 0 || submitting || users.length === 0
             }
-            className="flex-1 px-6 py-3 bg-blue-500 text-white rounded-2xl font-semibold disabled:opacity-50"
+            className="flex-1 px-6 py-3 bg-blue-500 text-white rounded-2xl font-semibold disabled:opacity-50 cursor-pointer"
           >
             {submitting ? "Đang thêm..." : `Thêm (${selectedMembers.size})`}
           </button>

@@ -42,7 +42,7 @@ export default function ConfirmModal({
               <h3 className="text-xl font-bold text-white">{title}</h3>
               <button
                 onClick={onCancel}
-                className="p-1.5 hover:bg-[#404249] rounded-lg transition-colors text-gray-400 hover:text-white"
+                className="p-1.5 hover:bg-[#404249] rounded-lg transition-colors text-gray-400 hover:text-white cursor-pointer"
               >
                 <X size={20} />
               </button>
@@ -53,13 +53,13 @@ export default function ConfirmModal({
             <div className="flex justify-end gap-3">
               <button
                 onClick={onCancel}
-                className="px-5 py-2.5 rounded-lg bg-transparent text-white hover:bg-[#404249] transition-all font-medium border border-[#404249] hover:border-[#4e5058]"
+                className="px-5 py-2.5 rounded-lg bg-transparent text-white hover:bg-[#404249] transition-all font-medium border border-[#404249] hover:border-[#4e5058] cursor-pointer"
               >
                 {cancelText}
               </button>
               <button
                 onClick={onConfirm}
-                className="px-5 py-2.5 rounded-lg bg-[#da373c] text-white hover:bg-[#a12d30] transition-all font-medium shadow-lg"
+                className="px-5 py-2.5 rounded-lg bg-[#da373c] text-white hover:bg-[#a12d30] transition-all font-medium shadow-lg cursor-pointer"
               >
                 {confirmText}
               </button>

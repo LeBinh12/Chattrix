@@ -88,7 +88,7 @@ export default function ChatHeaderWindow({
           onClick={() =>
             setActivePanel(activePanel === "search" ? "none" : "search")
           }
-          className="flex items-center justify-center w-9 h-9 rounded-full bg-[#f0f4ff] hover:bg-[#e1e9ff] border border-[#d0deff] text-[#2754d7] transition-all"
+          className="flex items-center justify-center w-9 h-9 rounded-full bg-[#f0f4ff] hover:bg-[#e1e9ff] border border-[#d0deff] text-[#2754d7] transition-all cursor-pointer"
           title="Tìm kiếm"
         >
           <Search size={18} strokeWidth={2} />
@@ -101,7 +101,7 @@ export default function ChatHeaderWindow({
           onClick={() =>
             setActivePanel(activePanel === "info" ? "none" : "info")
           }
-          className="flex items-center justify-center w-9 h-9 rounded-full bg-[#f0f4ff] hover:bg-[#e1e9ff] border border-[#d0deff] text-[#2754d7] transition-all"
+          className="flex items-center justify-center w-9 h-9 rounded-full bg-[#f0f4ff] hover:bg-[#e1e9ff] border border-[#d0deff] text-[#2754d7] transition-all cursor-pointer"
           title="Thông tin"
         >
           <PanelLeft size={18} strokeWidth={2} />

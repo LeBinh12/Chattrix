@@ -15,8 +15,8 @@ func InitRouter(r *gin.Engine, db *mongo.Database, hub *websocket.Hub, esClient 
 
 	v1.Use(
 		middleware.LoggerMiddleware(),
-		middleware.ApiKeyMiddleware(),
-		middleware.RateLimitingMiddleware(),
+		// middleware.ApiKeyMiddleware(),
+		// middleware.RateLimitingMiddleware(),
 	)
 	{
 		api.RegisterUserRoutes(v1, db)
@@ -47,7 +47,7 @@ func InitRouter(r *gin.Engine, db *mongo.Database, hub *websocket.Hub, esClient 
 	}
 
 	// Upload không có middleware
-	v1Upload := r.Group("v1")
+	v1Upload := r.Group("/v1")
 	{
 		api.UploadRoutes(v1Upload, db)
 		api.RegisterStatisticalRoutes(v1Upload, db)

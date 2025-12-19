@@ -305,3 +305,89 @@
     background-color: #bfdbfe;
   }
 }
+
+span[data-type="mention"] {
+  background-color: #d1e7ff; /* màu nền */
+  color: #1e40af;           /* màu chữ */
+  padding: 2px 4px;
+  border-radius: 4px;
+  display: inline-block;
+}
+
+
+/* Tippy.js styles for mention popover */
+.tippy-box[data-animation='fade'][data-state='hidden'] {
+  opacity: 0;
+}
+
+.tippy-box {
+  position: relative;
+  background-color: #fff;
+  color: #333;
+  border-radius: 8px;
+  font-size: 14px;
+  line-height: 1.4;
+  outline: 0;
+  transition-property: transform, visibility, opacity;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1),
+    0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+
+.tippy-content {
+  position: relative;
+  padding: 0;
+  z-index: 1;
+}
+
+.tippy-arrow {
+  width: 16px;
+  height: 16px;
+  color: #fff;
+}
+
+.tippy-arrow::before {
+  content: '';
+  position: absolute;
+  border-color: transparent;
+  border-style: solid;
+}
+
+.tippy-box[data-placement^='top'] > .tippy-arrow {
+  bottom: 0;
+}
+
+.tippy-box[data-placement^='top'] > .tippy-arrow::before {
+  bottom: -7px;
+  left: 0;
+  border-width: 8px 8px 0;
+  border-top-color: initial;
+  transform-origin: center top;
+}
+
+.tippy-box[data-placement^='bottom'] > .tippy-arrow {
+  top: 0;
+}
+
+.tippy-box[data-placement^='bottom'] > .tippy-arrow::before {
+  top: -7px;
+  left: 0;
+  border-width: 0 8px 8px;
+  border-bottom-color: initial;
+  transform-origin: center bottom;
+}
+
+/* Custom mention styles */
+.ProseMirror .mention {
+  background-color: #e3f2fd;
+  color: #1976d2;
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-weight: 500;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background-color 0.2s;
+}
+
+.ProseMirror .mention:hover {
+  background-color: #bbdefb;
+}

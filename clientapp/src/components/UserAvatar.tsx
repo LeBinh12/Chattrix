@@ -6,6 +6,7 @@ type UserAvatarProps = {
   avatar?: string | null;
   display_name: string; // thêm display_name
   isOnline?: boolean;
+  isGroup?: boolean;
   size?: number; // kích thước avatar (px)
 };
 
@@ -13,6 +14,7 @@ const UserAvatar: React.FC<UserAvatarProps> = ({
   avatar,
   display_name,
   isOnline = false,
+  isGroup = false,
   size = 48,
 }) => {
   const avatarUrl =
@@ -22,16 +24,20 @@ const UserAvatar: React.FC<UserAvatarProps> = ({
 
   const firstLetter = display_name?.[0]?.toUpperCase() || "?";
 
-  return (
+    const shapeClass = isGroup ? "rounded-xl" : "rounded-full";
+
+   return (
     <div
       className="relative flex-shrink-0"
       style={{ width: size, height: size }}
     >
-      <div className="w-full h-full rounded-full overflow-hidden border-2 border-white/20 transition-all flex items-center justify-center bg-gray-200 text-white font-semibold text-lg">
+      <div
+        className={`w-full h-full overflow-hidden border-2 border-white/20 transition-all flex items-center justify-center bg-gray-200 text-white font-semibold text-lg ${shapeClass}`}
+      >
         {avatarUrl ? (
           <img
             src={avatarUrl}
-            alt="User Avatar"
+            alt="Avatar"
             className="w-full h-full object-cover"
             onError={(e) => {
               e.currentTarget.onerror = null;
@@ -43,13 +49,14 @@ const UserAvatar: React.FC<UserAvatarProps> = ({
         )}
       </div>
 
-      {/* Status dot với animation */}
-      <span
-        className={`absolute bottom-0 right-1 w-3 h-3 rounded-full border border-brand-700 ${
-          isOnline ? "bg-green-500" : "bg-gray-400"
-        }`}
-        title={isOnline ? "Đang hoạt động" : "Ngoại tuyến"}
-      />
+      {!isGroup && (
+        <span
+          className={`absolute bottom-0 right-1 w-3 h-3 rounded-full border border-brand-700 ${
+            isOnline ? "bg-green-500" : "bg-gray-400"
+          }`}
+          title={isOnline ? "Đang hoạt động" : "Ngoại tuyến"}
+        />
+      )}
     </div>
   );
 };

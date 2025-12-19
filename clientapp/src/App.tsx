@@ -28,6 +28,7 @@ import MediaManagerScreen from "./pages/admin/MediaManagerScreen";
 import SystemLogManagerScreen from "./pages/admin/SystemLogManagerScreen";
 import NotificationManagerScreen from "./pages/admin/NotificationManager";
 import LoginAdminScreen from "./pages/admin/LoginAdminScreen";
+import FavicoNotifier from "./components/FavicoNotifier";
 
 function App() {
   useLoadUser();
@@ -41,6 +42,7 @@ function App() {
   }, [user?.data.id]);
   return (
     <>
+      <FavicoNotifier />
       <Routes>
         <Route
           element={

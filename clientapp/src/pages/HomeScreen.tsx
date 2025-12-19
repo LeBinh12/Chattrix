@@ -10,6 +10,7 @@ import ChatInfoPanel from "../components/home/ChatInfoPanel";
 import ChatSearchModal from "../components/home/ChatSearchModal";
 import { AnimatePresence, motion } from "framer-motion";
 import StorageArchivePanel from "../components/home/StorageArchivePanel";
+import GroupMembersPanel from "../components/home/GroupMembersPanel";
 
 export default function HomeScreen() {
   const user = useRecoilValue(userAtom);
@@ -143,7 +144,17 @@ export default function HomeScreen() {
             >
               <ChatSearchModal />
             </motion.div>
-          )}
+            )}
+            
+            {activePanel === "members" && (
+  <motion.div
+    initial={{ x: 200, opacity: 0 }}
+    animate={{ x: 0, opacity: 1 }}
+    className="hidden lg:block flex-shrink-0 border-l border-[#dbe2ef] w-80 overflow-y-auto"
+  >
+    <GroupMembersPanel />
+  </motion.div>
+)}
         </>
       )}
     </div>

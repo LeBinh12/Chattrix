@@ -88,7 +88,7 @@ class SocketManager {
   }
 
   sendAddGroupMember(senderId: string, display_name: string, groupID: string, groupName: string,
-    groupAvatar: string, members: { user_id: string; role: string }[]) {
+    groupAvatar: string, members: { user_id: string; role: string; user_name?: string }[], action: string) {
     if (!this.socket || this.socket.readyState !== WebSocket.OPEN) return;
     const msg: MessagePayload = {
       type: "add-group-member",
@@ -98,7 +98,8 @@ class SocketManager {
         display_name: display_name,
         group_name: groupName,
         group_avatar: groupAvatar,
-        members: members
+        members: members,
+        action: action
       },
     };
     this.socket.send(JSON.stringify(msg));
@@ -116,7 +117,7 @@ class SocketManager {
         content: `Người dùng ${displayName} đã thoát nhóm`,
         avatar: avatar,
         type: "system",
-      },
+      }, 
     };
 
     this.socket.send(JSON.stringify(msg));

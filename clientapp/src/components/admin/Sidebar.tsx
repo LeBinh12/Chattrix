@@ -124,7 +124,7 @@ export default function Sidebar() {
             <ListItemButton role="menuitem" component="a" href="/admin">
               <HomeRoundedIcon />
               <ListItemContent>
-                <Typography level="title-sm">Dashboard</Typography>
+                <Typography level="title-sm">Thống Kê</Typography>
               </ListItemContent>
             </ListItemButton>
           </ListItem>
@@ -136,7 +136,7 @@ export default function Sidebar() {
             >
               <DashboardRoundedIcon />
               <ListItemContent>
-                <Typography level="title-sm">User Management</Typography>
+                <Typography level="title-sm">Quản Lý Người Dùng</Typography>
               </ListItemContent>
             </ListItemButton>
           </ListItem>
@@ -148,7 +148,7 @@ export default function Sidebar() {
             >
               <ShoppingCartRoundedIcon />
               <ListItemContent>
-                <Typography level="title-sm">Group & Channel</Typography>
+                <Typography level="title-sm">Kênh và Group</Typography>
               </ListItemContent>
             </ListItemButton>
           </ListItem>
@@ -160,7 +160,7 @@ export default function Sidebar() {
             >
               <QuestionAnswerRoundedIcon />
               <ListItemContent>
-                <Typography level="title-sm">Chat Monitoring</Typography>
+                <Typography level="title-sm">Giám Sát Tin Nhắn</Typography>
               </ListItemContent>
             </ListItemButton>
           </ListItem>
@@ -184,7 +184,7 @@ export default function Sidebar() {
             >
               <QuestionAnswerRoundedIcon />
               <ListItemContent>
-                <Typography level="title-sm">System Logs</Typography>
+                <Typography level="title-sm">Nhật Ký Hệ Thống</Typography>
               </ListItemContent>
             </ListItemButton>
           </ListItem>
@@ -196,7 +196,7 @@ export default function Sidebar() {
             >
               <QuestionAnswerRoundedIcon />
               <ListItemContent>
-                <Typography level="title-sm">Notification Center</Typography>
+                <Typography level="title-sm">Trung Tâm Thông Báo</Typography>
               </ListItemContent>
             </ListItemButton>
           </ListItem>
@@ -214,7 +214,7 @@ export default function Sidebar() {
           <ListItem>
             <ListItemButton>
               <SettingsRoundedIcon />
-              System settings
+              Cài Đặt
             </ListItemButton>
           </ListItem>
         </List>

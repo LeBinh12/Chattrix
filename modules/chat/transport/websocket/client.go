@@ -7,6 +7,7 @@ import (
 	"my-app/common/kafka"
 	"my-app/modules/chat/models"
 	"my-app/modules/chat/storage"
+	"strings"
 	"sync"
 	"time"
 
@@ -84,23 +85,27 @@ func (c *Client) handleGroupMember(res *models.GroupMemberRequest) {
 		return
 	}
 
-	var msg models.MessageResponse
+	msg := &models.MessageResponse{
+		ID:        primitive.NewObjectID(),
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+		Status:    models.StatusDelivered,
+		Type:      "system",
+		IsRead:    true,
+		GroupID:   res.GroupID,
+		SenderID:  res.SenderID,
+	}
+	msg.Content = buildSystemMessage(res)
 
-	msg.CreatedAt = time.Now()
-	msg.UpdatedAt = time.Now()
-	msg.ID = primitive.NewObjectID()
-	msg.Status = models.StatusDelivered
-
-	msg.Content = fmt.Sprintf("Người dùng %s đã tạo nhóm %s", res.DisplayName, res.GroupName)
-	msg.Type = "system"
-	msg.Status = "seen"
-	msg.IsRead = true
 	msgCopy := msg
-	msg.GroupID = res.GroupID
-	msg.SenderID = res.SenderID
 
 	go c.sendToKafkaWithRetry("add-group-member", res.SenderID.Hex(), res)
 	go c.sendToKafkaWithRetry("chat-topic", msg.SenderID.Hex(), msg)
+
+	c.Hub.Broadcast <- HubEvent{
+		Type:    "chat",
+		Payload: msg,
+	}
 
 	c.Hub.Broadcast <- HubEvent{
 		Type: "group_member_added",
@@ -176,10 +181,11 @@ func (c *Client) handlePinnedMessage(msg *models.MessageResponse, res *models.Me
 
 	res.GroupID = msg.GroupID
 	res.ReceiverID = string(msg.ReceiverID.Hex())
-	// tin nhắn
-	go c.sendToKafkaWithRetry("chat-topic", msg.SenderID.Hex(), msg)
 	// Update DB before broadcast (nếu cần)
 	go c.sendToKafkaWithRetry("pinned-message-topic", msg.SenderID.Hex(), res)
+
+	// tin nhắn
+	go c.sendToKafkaWithRetry("chat-topic", msg.SenderID.Hex(), msg)
 
 	c.Hub.Broadcast <- HubEvent{
 		Type:    "chat",
@@ -302,14 +308,26 @@ func (c *Client) handleMemberLeft(msg *models.MessageResponse) {
 		return
 	}
 
+	msg.CreatedAt = time.Now()
+	msg.UpdatedAt = time.Now()
+	msg.ID = primitive.NewObjectID()
+
+	msg.Status = "seen"
+	msg.IsRead = true
+
+	msgCopy := *msg
+	go c.sendToKafkaWithRetry("chat-topic", msgCopy.SenderID.Hex(), msgCopy)
+	go c.sendToKafkaWithRetry("group-out", msgCopy.SenderID.Hex(), msgCopy)
+
 	c.Hub.Broadcast <- HubEvent{
 		Type:    "chat",
 		Payload: msg,
 	}
 
-	msgCopy := *msg
-	go c.sendToKafkaWithRetry("chat-topic", msgCopy.SenderID.Hex(), msgCopy)
-	go c.sendToKafkaWithRetry("group-out", msgCopy.SenderID.Hex(), msgCopy)
+	c.Hub.Broadcast <- HubEvent{
+		Type:    "member_left",
+		Payload: msg,
+	}
 }
 
 func (c *Client) handleDeleteForMe(delMsg *models.DeleteMessageForMe) {
@@ -419,4 +437,38 @@ func (c *Client) SafeClose() {
 		close(c.Send)
 		c.closed = true
 	}
+}
+
+func buildSystemMessage(res *models.GroupMemberRequest) string {
+	switch res.Action {
+
+	case "create_group":
+		return fmt.Sprintf(
+			"Người dùng %s đã tạo nhóm %s",
+			res.DisplayName,
+			res.GroupName,
+		)
+
+	case "add_member":
+		names := []string{}
+		for _, m := range res.Members {
+			names = append(names, m.UserName)
+		}
+
+		if len(names) == 1 {
+			return fmt.Sprintf(
+				"Người dùng %s đã thêm %s vào nhóm",
+				res.DisplayName,
+				names[0],
+			)
+		}
+
+		return fmt.Sprintf(
+			"Người dùng %s đã thêm %s vào nhóm",
+			res.DisplayName,
+			strings.Join(names, ", "),
+		)
+	}
+
+	return ""
 }
