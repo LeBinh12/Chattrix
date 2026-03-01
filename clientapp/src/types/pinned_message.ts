@@ -2,10 +2,11 @@ export interface PinnedMessageDetail {
     pin_id: string;
     message_id: string;
     conversation_id: string;
-
+    group_id: string;
     content: string;
     sender_id: string;
     sender_name: string;
+    receiver_id?: string; // Added for filtering
 
     pinned_by_id: string;
     pinned_by_name: string;

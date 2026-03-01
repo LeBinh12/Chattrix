@@ -1,4 +1,4 @@
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Video } from "lucide-react";
 import { motion } from "framer-motion";
 import type { Conversation } from "../../types/conversation";
 import { API_ENDPOINTS } from "../../config/api";
@@ -34,7 +34,25 @@ export default function ChatHeader({ onUser, onBack }: Props) {
       </div>
 
       {/* Tên người gửi */}
-      <h2 className="font-bold text-lg">{onUser.display_name}</h2>
+      <h2 className="font-bold text-lg flex-1">{onUser.display_name}</h2>
+
+      {/* Video Call Button */}
+      <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
+        <button
+          onClick={() => {
+            // Generate a unique room name
+            // For user chat, use user_id. For group chat, use group_id. 
+            // Fallback to sender_id if others are missing.
+            const uniqueId = onUser.user_id || onUser.group_id || onUser.sender_id || `unknown`;
+            const roomId = `room_${uniqueId}`;
+            window.open(`/video-call?room=${roomId}`, '_blank');
+          }}
+          className="p-2 rounded-full hover:bg-white/20 transition-colors text-white"
+          title="Video Call"
+        >
+          <Video size={24} />
+        </button>
+      </motion.div>
     </div>
   );
 }

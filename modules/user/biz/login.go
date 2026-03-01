@@ -3,6 +3,7 @@ package biz
 import (
 	"context"
 	"errors"
+	"fmt"
 	"my-app/modules/user/models"
 	"my-app/utils"
 
@@ -11,6 +12,7 @@ import (
 
 type LoginStorage interface {
 	FindByUsername(ctx context.Context, user string) (*models.User, error)
+	GetUserRoles(ctx context.Context, userID string) ([]string, error)
 }
 
 type LoginBiz struct {
@@ -32,7 +34,15 @@ func (biz *LoginBiz) Login(ctx context.Context, data *models.LoginRequest) (stri
 		return "", errors.New("Sai tên đăng nhập hoặc mật khẩu")
 	}
 
-	token, err := utils.GenerateJWT(user.ID.Hex())
+	// Lấy danh sách role của user để đưa vào JWT
+	roles, err := biz.store.GetUserRoles(ctx, user.ID.Hex())
+	if err != nil {
+		roles = []string{}
+	}
+
+	fmt.Printf("[LOGIN BIZ] UserID: %s, Roles from storage: %v\n", user.ID.Hex(), roles)
+
+	token, err := utils.GenerateJWT(user.ID.Hex(), roles)
 
 	if err != nil {
 		return "", err

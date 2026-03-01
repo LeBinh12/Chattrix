@@ -1,6 +1,7 @@
 package ginUser
 
 import (
+	"fmt"
 	"my-app/common"
 	"my-app/modules/user/biz"
 	"my-app/modules/user/storage"
@@ -26,13 +27,24 @@ func ListUsersWithStatusHandler(db *mongo.Database) gin.HandlerFunc {
 			limit = 10
 		}
 
+		search := c.Query("q")
+		gender := c.Query("gender")
+		status := c.Query("status")
+		fromDate := c.Query("from_date")
+		toDate := c.Query("to_date")
+
 		store := storage.NewMongoStore(db)
 		business := biz.NewUserGetPaginationUserBiz(store)
 
-		users, total, err := business.ListUsersWithStatus(c.Request.Context(), page, limit)
+		users, total, err := business.ListUsersWithStatus(c.Request.Context(), page, limit, search, gender, status, fromDate, toDate)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, common.NewResponse(500, "Lấy danh sách thất bại", nil))
 			return
+		}
+
+		// DEBUG: Log response
+		if len(users) > 0 {
+			fmt.Printf("🔍 [Backend Handler] First user: Username=%s, Roles=%v\n", users[0].User.Username, users[0].Roles)
 		}
 
 		data := map[string]interface{}{

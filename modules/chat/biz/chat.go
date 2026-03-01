@@ -47,6 +47,8 @@ func (biz *ChatBiz) HandleMessage(
 	mediaList []models.Media,
 	createAt time.Time,
 	replyTo models.ReplyMessageMini,
+	task *models.Task,
+	parentID string,
 ) (*models.Message, error) {
 
 	senderID, _ := primitive.ObjectIDFromHex(sender)
@@ -69,6 +71,14 @@ func (biz *ChatBiz) HandleMessage(
 		IsRead:     false,
 		MediaIDs:   mediaIDs,
 		Reply:      replyTo,
+		Task:       task,
+	}
+
+	if parentID != "" {
+		pID, _ := primitive.ObjectIDFromHex(parentID)
+		msg.ParentMessageID = &pID
+		msg.RootMessageID = &pID // Cho đơn giản, Root hiện tại trùng với Parent cấp 1
+		msg.ThreadDepth = 1
 	}
 
 	msg.ID = message_id

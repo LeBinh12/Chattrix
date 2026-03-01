@@ -21,6 +21,7 @@ func RegisterStatisticalRoutes(rg *gin.RouterGroup, db *mongo.Database) {
 		upload.GET("/total-message-by-week", ginMessage.StatisticalWeeklyMessageHandler(db))
 		upload.GET("/total-new-user-by-month", ginUser.TotalNewUsersByWeekHandler(db))
 		upload.GET("/export-excel", export.ExportStatisticsExcelHandler(db))
+		upload.GET("/export-users-excel", export.ExportUsersStatisticsExcelHandler(db))
 
 	}
 }

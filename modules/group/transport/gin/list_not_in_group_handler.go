@@ -16,13 +16,13 @@ func ListUsersNotInGroupHandler(db *mongo.Database) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		groupIDStr := c.Query("group_id")
 		if groupIDStr == "" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "group_id là bắt buộc"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "group_id is required"})
 			return
 		}
 
 		groupID, err := primitive.ObjectIDFromHex(groupIDStr)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "group_id không hợp lệ"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid group_id"})
 			return
 		}
 
@@ -38,6 +38,6 @@ func ListUsersNotInGroupHandler(db *mongo.Database) gin.HandlerFunc {
 			return
 		}
 
-		c.JSON(http.StatusOK, common.NewResponse(http.StatusOK, "Lấy danh sách user chưa vào nhóm thành công", users))
+		c.JSON(http.StatusOK, common.NewResponse(http.StatusOK, "Users not in group retrieved successfully", users))
 	}
 }

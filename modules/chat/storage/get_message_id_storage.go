@@ -30,9 +30,11 @@ func (s *MongoChatStore) GetMessageByID(
 	if groupID != primitive.NilObjectID {
 		// Kiểm tra user có phải member không
 		var member ModelGroup.GroupMember
-		err := s.db.Collection("group_members").FindOne(ctx, bson.M{
-			"group_id": groupID,
-			"user_id":  senderID,
+		err := s.db.Collection("group_user_roles").FindOne(ctx, bson.M{
+			"group_id":   groupID.Hex(),
+			"user_id":    senderID.Hex(),
+			"is_deleted": bson.M{"$ne": true},
+			"role_id":    bson.M{"$ne": ""},
 		}).Decode(&member)
 		if err != nil {
 			return nil, fmt.Errorf("bạn không phải thành viên của nhóm này")
@@ -44,13 +46,13 @@ func (s *MongoChatStore) GetMessageByID(
 		}
 
 		// Kiểm tra tin nhắn có được tạo sau khi user join không
-		if targetMessage.CreatedAt.Before(member.JoinedAt) {
+		if targetMessage.CreatedAt.Before(member.CreatedAt) {
 			return nil, fmt.Errorf("tin nhắn được tạo trước khi bạn tham gia nhóm")
 		}
 
 		baseFilter = bson.M{
 			"group_id":    groupID,
-			"created_at":  bson.M{"$gte": member.JoinedAt},
+			"created_at":  bson.M{"$gte": member.CreatedAt},
 			"deleted_for": bson.M{"$ne": senderID},
 		}
 	} else {
@@ -191,21 +193,54 @@ func (s *MongoChatStore) GetMessageByID(
 		}
 	}
 
+	// --- 9.5. ĐẾM SỐ COMMENT CHO MỖI TIN NHẮN ---
+	commentCounts := make(map[primitive.ObjectID]int)
+	if len(allMessages) > 0 {
+		msgIDs := make([]primitive.ObjectID, len(allMessages))
+		for i, m := range allMessages {
+			msgIDs[i] = m.ID
+		}
+
+		commentCursor, err := s.db.Collection("messages").Aggregate(ctx, []bson.D{
+			{{"$match", bson.M{"parent_message_id": bson.M{"$in": msgIDs}}}},
+			{{"$group", bson.M{"_id": "$parent_message_id", "count": bson.M{"$sum": 1}}}},
+		})
+		if err == nil {
+			var results []struct {
+				ID    primitive.ObjectID `bson:"_id"`
+				Count int                `bson:"count"`
+			}
+			if err := commentCursor.All(ctx, &results); err == nil {
+				for _, res := range results {
+					commentCounts[res.ID] = res.Count
+				}
+			}
+			commentCursor.Close(ctx)
+		}
+	}
+
 	// --- 10. Ghép dữ liệu thành MessageResponse ---
 	var messageResponses []models.MessageResponse
 	for _, msg := range allMessages {
 		res := models.MessageResponse{
-			ID:         msg.ID,
-			SenderID:   msg.SenderID,
-			ReceiverID: msg.ReceiverID,
-			GroupID:    msg.GroupID,
-			Content:    msg.Content,
-			CreatedAt:  msg.CreatedAt,
-			Status:     msg.Status,
-			IsRead:     msg.IsRead,
-			Type:       msg.Type,
-			RecalledAt: msg.RecalledAt,
-			RecalledBy: msg.RecalledBy,
+			ID:           msg.ID,
+			SenderID:     msg.SenderID,
+			ReceiverID:   msg.ReceiverID,
+			GroupID:      msg.GroupID,
+			Content:      msg.Content,
+			CreatedAt:    msg.CreatedAt,
+			Status:       msg.Status,
+			IsRead:       msg.IsRead,
+			Type:         msg.Type,
+			RecalledAt:   msg.RecalledAt,
+			RecalledBy:   msg.RecalledBy,
+			Reactions:    msg.Reactions,
+			EditedAt:     msg.EditedAt,
+			CommentCount: commentCounts[msg.ID],
+		}
+
+		if msg.ParentMessageID != nil {
+			res.ParentID = msg.ParentMessageID.Hex()
 		}
 
 		if user, ok := userMap[msg.SenderID]; ok {
@@ -225,17 +260,9 @@ func (s *MongoChatStore) GetMessageByID(
 
 		// Xử lý Reply
 		if msg.Reply.ID != primitive.NilObjectID {
-			replyUser, ok := userMap[msg.Reply.ID]
-			senderName := ""
-			if ok {
-				senderName = replyUser.DisplayName
-			} else {
-				senderName = msg.Reply.Sender
-			}
-
 			res.Reply = models.ReplyMessageMini{
 				ID:       msg.Reply.ID,
-				Sender:   senderName,
+				Sender:   msg.Reply.Sender,
 				Content:  msg.Reply.Content,
 				Type:     msg.Reply.Type,
 				MediaUrl: msg.Reply.MediaUrl,

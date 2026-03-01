@@ -11,5 +11,7 @@ func RegisterConversation(rg *gin.RouterGroup, db *mongo.Database) {
 	friend := rg.Group("/conversations")
 	{
 		friend.GET("/list", ginMessage.ConversationsHandler(db))
+		friend.POST("/tags", ginMessage.UpdateTagsHandler(db))
+		friend.GET("/tags", ginMessage.ListTagsHandler(db))
 	}
 }

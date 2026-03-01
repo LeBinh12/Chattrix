@@ -1,5 +1,9 @@
 import React, { useCallback } from "react";
 import UserAvatar from "../UserAvatar";
+import { useRecoilValue } from "recoil";
+import { videoCallState } from "../../recoil/atoms/videoCallAtom";
+import { activeCallsAtom } from "../../recoil/atoms/activeCallsAtom";
+import { Headphones } from "lucide-react";
 import { LOGO } from "../../assets/paths";
 import { API_ENDPOINTS } from "../../config/api";
 import TimeAgo from "javascript-time-ago";
@@ -42,6 +46,18 @@ function ChannelItem({
     return message.substring(0, 50) + (message.length > 50 ? "..." : "");
   }, [conversation.last_message, conversation.last_message_type]);
 
+  const callState = useRecoilValue(videoCallState);
+  const activeCalls = useRecoilValue(activeCallsAtom);
+
+  const isMyCall = callState.isCalling && (
+    (conversation.group_id && conversation.group_id !== "000000000000000000000000" && callState.chatId === conversation.group_id) ||
+    (conversation.user_id && callState.chatId === conversation.user_id)
+  );
+
+  const isRealtimeCall = (conversation.group_id && activeCalls[conversation.group_id]) || (conversation.user_id && activeCalls[conversation.user_id]);
+
+  const isCallingActive = isMyCall || isRealtimeCall;
+
   const isOnline = conversation.status === "online";
 
   return (
@@ -50,10 +66,9 @@ function ChannelItem({
       className={`
         flex items-center gap-3 p-3 rounded-lg cursor-pointer
         transition-all duration-200 hover:bg-gray-100
-        ${
-          isSelected
-            ? "bg-blue-100 border-l-4 border-blue-500"
-            : "hover:bg-gray-50"
+        ${isSelected
+          ? "bg-blue-100 border-l-4 border-blue-500"
+          : "hover:bg-gray-50"
         }
       `}
     >
@@ -61,8 +76,9 @@ function ChannelItem({
       <div className="relative flex-shrink-0">
         <UserAvatar
           avatar={avatarUrl}
-          display_name={conversation.display_name}
+          display_name={conversation.is_deleted ? "Tài khoản đã bị xóa" : conversation.display_name}
           size={isCompact ? 36 : 44}
+          isDeleted={conversation.is_deleted}
         />
         {isOnline && (
           <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white" />
@@ -73,11 +89,17 @@ function ChannelItem({
       {!isCompact && width > 100 && (
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between gap-2">
-            <p className="font-semibold text-gray-900 truncate">
-              {conversation.display_name}
+            <p className="font-semibold text-gray-900 truncate flex items-center gap-2">
+              {conversation.is_deleted ? "Tài khoản đã bị xóa" : conversation.display_name}
+              {isCallingActive && (
+                <span className="text-green-500 animate-pulse bg-green-100 p-1 rounded-full">
+                  <Headphones size={14} />
+                </span>
+              )}
             </p>
             <span className="text-xs text-gray-500 flex-shrink-0">
               {conversation.last_date &&
+                new Date(conversation.last_date).getFullYear() > 2000 &&
                 timeAgo.format(new Date(conversation.last_date))}
             </span>
           </div>

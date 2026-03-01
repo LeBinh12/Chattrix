@@ -1,8 +1,11 @@
 package routes
 
 import (
+	"my-app/config"
 	"my-app/middleware"
 	"my-app/modules/chat/transport/websocket"
+	"my-app/modules/permission/biz"
+	"my-app/modules/permission/storage"
 	"my-app/routes/api"
 
 	"github.com/elastic/go-elasticsearch/v8"
@@ -10,43 +13,52 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
-func InitRouter(r *gin.Engine, db *mongo.Database, hub *websocket.Hub, esClient *elasticsearch.Client) {
+func InitRouter(r *gin.Engine, db *mongo.Database, hub *websocket.Hub, esClient *elasticsearch.Client, cfg config.AppConfig) {
+	
+	permStore := storage.NewMongoStore(db)
+	permBiz := biz.NewPermissionBiz(permStore)
 	v1 := r.Group("/v1")
 
+	
 	v1.Use(
 		middleware.LoggerMiddleware(),
-		// middleware.ApiKeyMiddleware(),
-		// middleware.RateLimitingMiddleware(),
 	)
 	{
-		api.RegisterUserRoutes(v1, db)
-		api.RegisterAdminRoutes(v1, db)
+		api.RegisterUserRoutes(v1, db, permBiz) 
 	}
 
-	v1.Use(
+
+	v1Protected := r.Group("/v1")
+	v1Protected.Use(
 		middleware.LoggerMiddleware(),
-		// middleware.ApiKeyMiddleware(),
-		// middleware.RateLimitingMiddleware(),
 		middleware.AuthMiddleware(),
 	)
 	{
-		api.MessageRoutes(v1, db, esClient)
-		api.RegisterFriendRoutes(v1, db)
-		api.RegisterConversation(v1, db)
-		api.GroupRoutes(v1, db)
-		api.RegisterUserStatusRoutes(v1, db)
+		
+		api.RegisterAdminRoutes(v1Protected, db, hub, permBiz)
+		api.RegisterRoleRoutes(v1Protected, db, permBiz)
+		api.RegisterPermissionRoutes(v1Protected, db, permBiz)
+		api.RegisterModuleRoutes(v1Protected, db, permBiz)
+		api.RegisterPermissionMatrixRoutes(v1Protected, db, permBiz)
 
+	
+		api.MessageRoutes(v1Protected, db, esClient)
+		api.RegisterFriendRoutes(v1Protected, db)
+		api.RegisterConversation(v1Protected, db)
+		api.GroupRoutes(v1Protected, db, hub)
+		api.RegisterUserStatusRoutes(v1Protected, db)
+		api.RegisterTaskRoutes(v1Protected, db)
+		api.RegisterVideoCallRoutes(v1Protected, cfg.LiveKit, hub, db)
 	}
 
-	// Nhóm không có middleware (chat)
-	// websocket
+
 	v1NoMiddleware := r.Group("/v1")
 	{
 
 		api.RegisterChatRoutes(v1NoMiddleware, db, hub)
 	}
 
-	// Upload không có middleware
+
 	v1Upload := r.Group("/v1")
 	{
 		api.UploadRoutes(v1Upload, db)

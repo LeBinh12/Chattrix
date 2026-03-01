@@ -12,10 +12,10 @@ import {
 } from "lucide-react";
 import { useRecoilState } from "recoil";
 import { mediaViewerAtom } from "../../recoil/atoms/mediaViewerAtom";
+import { forceDownload } from "../../utils/downloadUtil";
 import { API_ENDPOINTS } from "../../config/api";
 
 export default function MediaViewerModal() {
-  // Sử dụng Recoil để quản lý state
   const [mediaViewerState, setMediaViewerState] =
     useRecoilState(mediaViewerAtom);
 
@@ -27,7 +27,6 @@ export default function MediaViewerModal() {
   const currentMedia = mediaItems[currentIndex];
   const isVideo = currentMedia?.type === "video";
 
-  // Reset zoom và rotation khi đổi ảnh
   useEffect(() => {
     setZoom(1);
     setRotation(0);
@@ -75,13 +74,14 @@ export default function MediaViewerModal() {
   };
 
   const handleDownload = () => {
-    const link = document.createElement("a");
-    link.href = `${API_ENDPOINTS.STREAM_MEDIA}/${currentMedia.url}`;
-    link.download = currentMedia.filename;
-    link.click();
+    if (!currentMedia) return;
+    const url = isVideo
+      ? `${API_ENDPOINTS.STREAM_MEDIA}/${currentMedia.id}`
+      : `${API_ENDPOINTS.UPLOAD_MEDIA}/${currentMedia.url}`;
+    
+    forceDownload(url, currentMedia.filename || "download");
   };
 
-  // Keyboard navigation
   useEffect(() => {
     if (!isOpen) return;
 
@@ -114,7 +114,6 @@ export default function MediaViewerModal() {
         className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center"
         onClick={handleClose}
       >
-        {/* Header Controls */}
         <div className="absolute top-0 left-0 right-0 p-4 bg-gradient-to-b from-black/60 to-transparent z-10">
           <div className="flex items-center justify-between max-w-7xl mx-auto">
             <div className="text-white">
@@ -187,7 +186,6 @@ export default function MediaViewerModal() {
           </div>
         </div>
 
-        {/* Navigation Arrows */}
         {mediaItems.length > 1 && (
           <>
             <button
@@ -213,7 +211,6 @@ export default function MediaViewerModal() {
           </>
         )}
 
-        {/* Media Content */}
         <div
           className="relative max-w-7xl max-h-[90vh] w-full h-full flex items-center justify-center p-4"
           onClick={(e) => e.stopPropagation()}
@@ -229,7 +226,7 @@ export default function MediaViewerModal() {
             {isVideo ? (
               <div className="relative">
                 <video
-                  src={`http://localhost:3000/v1/upload/media/${currentMedia.url}`}
+                  src={`${API_ENDPOINTS.STREAM_MEDIA}/${currentMedia.id}`}
                   controls
                   autoPlay={isPlaying}
                   className="max-w-full max-h-[85vh] rounded-lg"
@@ -239,7 +236,7 @@ export default function MediaViewerModal() {
               </div>
             ) : (
               <img
-                src={`http://localhost:3000/v1/upload/media/${currentMedia.url}`}
+                src={`${API_ENDPOINTS.UPLOAD_MEDIA}/${currentMedia.url}`}
                 alt={currentMedia.filename}
                 className="max-w-full max-h-[85vh] object-contain rounded-lg select-none"
                 style={{
@@ -252,7 +249,6 @@ export default function MediaViewerModal() {
           </motion.div>
         </div>
 
-        {/* Thumbnail Strip */}
         {mediaItems.length > 1 && (
           <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/60 to-transparent">
             <div className="flex items-center justify-center gap-2 max-w-7xl mx-auto overflow-x-auto scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent">
@@ -275,7 +271,7 @@ export default function MediaViewerModal() {
                   {media.type === "video" ? (
                     <>
                       <video
-                        src={`http://localhost:3000/v1/upload/media/${media.url}`}
+                        src={`${API_ENDPOINTS.STREAM_MEDIA}/${media.id}`}
                         className="w-full h-full object-cover"
                       />
                       <div className="absolute inset-0 flex items-center justify-center bg-black/30">
@@ -284,7 +280,7 @@ export default function MediaViewerModal() {
                     </>
                   ) : (
                     <img
-                      src={`http://localhost:3000/v1/upload/media/${media.url}`}
+                      src={`${API_ENDPOINTS.UPLOAD_MEDIA}/${media.url}`}
                       alt={media.filename}
                       className="w-full h-full object-cover"
                     />

@@ -69,11 +69,12 @@ func GetMessagesBelow(db *mongo.Database) gin.HandlerFunc {
 		}
 
 		limit, _ := strconv.ParseInt(ctx.DefaultQuery("limit", "20"), 10, 64)
+		parentID := ctx.Query("parent_id")
 
 		store := storage.NewMongoChatStore(db)
 		business := biz.NewGetMessageBelowBiz(store)
 
-		messages, err := business.GetMessageBelow(ctx.Request.Context(), senderObjectID, receiverObjectID, groupObjectID, limit, parsedTime)
+		messages, err := business.GetMessageBelow(ctx.Request.Context(), senderObjectID, receiverObjectID, groupObjectID, limit, parsedTime, parentID)
 		if err != nil {
 			ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return

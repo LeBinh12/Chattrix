@@ -1,6 +1,7 @@
 import axios from "axios";
 import type { InternalAxiosRequestConfig, AxiosRequestHeaders } from "axios";
 import { API_BASE_URL } from "../config/api";
+import { toast } from "react-toastify";
 const axiosClient = axios.create({
   baseURL: API_BASE_URL,
   headers: {
@@ -22,6 +23,21 @@ axiosClient.interceptors.request.use(
     }
 
     return config;
+  }
+);
+
+// Interceptor xử lý response
+axiosClient.interceptors.response.use(
+  (response) => {
+    return response;
+  },
+  (error) => {
+    if (error.response && error.response.status === 403) {
+      toast.error("Bạn không được phép truy cập chức năng này", {
+        toastId: "403_forbidden_error",
+      });
+    }
+    return Promise.reject(error);
   }
 );
 

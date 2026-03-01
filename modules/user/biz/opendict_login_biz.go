@@ -39,7 +39,13 @@ func (biz *OpenIdDictBiz) LoginOrRegisterByOpenIdDict(ctx context.Context, email
 		}
 		user = newUser
 	}
-	token, err := utils.GenerateJWT(user.ID.Hex())
+
+	roles, err := biz.store.GetUserRoles(ctx, user.ID.Hex())
+	if err != nil {
+		roles = []string{}
+	}
+
+	token, err := utils.GenerateJWT(user.ID.Hex(), roles)
 	if err != nil {
 		return "", err
 	}

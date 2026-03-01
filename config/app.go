@@ -15,6 +15,13 @@ type (
 		Kafka         KafkaConfig
 		Static        StaticConfig
 		Elasticsearch ESConfig
+		LiveKit       LiveKitConfig
+	}
+
+	LiveKitConfig struct {
+		APIKey    string
+		APISecret string
+		URL       string
 	}
 
 	ESConfig struct {
@@ -46,10 +53,10 @@ func LoadAppConfig() AppConfig {
 	_ = godotenv.Load()
 
 	return AppConfig{
-		HTTPAddress: getEnv("HTTP_ADDRESS", "0.0.0.0:3000"),
+		HTTPAddress: getEnv("HTTP_ADDRESS", "0.0.0.0:8088"),
 		Mongo: MongoConfig{
 			URI:  getEnv("MONGO_URI", "mongodb://localhost:27017"),
-			Name: getEnv("MONGO_DB", "chattrix"),
+			Name: getEnv("MONGO_DB", "unichat"),
 		},
 		Kafka: KafkaConfig{
 			Brokers: splitAndTrim(getEnv("KAFKA_BROKERS", "localhost:9092")),
@@ -65,6 +72,7 @@ func LoadAppConfig() AppConfig {
 					"pinned-message-topic",
 					"un-pinned-message-topic",
 					"add-group-member",
+					"chat-notification-all",
 				}, ",")),
 			),
 		},
@@ -75,8 +83,13 @@ func LoadAppConfig() AppConfig {
 		},
 		Elasticsearch: ESConfig{
 			Addresses: splitAndTrim(getEnv("ES_ADDRESSES", "http://localhost:9200")),
-			Username:  getEnv("ES_USER", ""),
-			Password:  getEnv("ES_PASSWORD", ""),
+			Username:  getEnv("ES_USER", "elastic"),
+			Password:  getEnv("ES_PASSWORD", "MyStrongPassword123"),
+		},
+		LiveKit: LiveKitConfig{
+			APIKey:    getEnv("LIVEKIT_API_KEY", "devkey"),
+			APISecret: getEnv("LIVEKIT_API_SECRET", "secret"),
+			URL:       getEnv("LIVEKIT_URL", "http://localhost:7880"),
 		},
 	}
 }

@@ -17,7 +17,7 @@ func ListGroupMembersWithUserHandler(db *mongo.Database) gin.HandlerFunc {
 		groupIDStr := c.Query("groupID")
 		groupID, err := primitive.ObjectIDFromHex(groupIDStr)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "groupID không hợp lệ"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid groupID"})
 			return
 		}
 
@@ -33,7 +33,7 @@ func ListGroupMembersWithUserHandler(db *mongo.Database) gin.HandlerFunc {
 			return
 		}
 
-		c.JSON(http.StatusOK, common.NewResponse(http.StatusOK, "Lấy danh sách thành viên thành công", gin.H{
+		c.JSON(http.StatusOK, common.NewResponse(http.StatusOK, "Members retrieved successfully", gin.H{
 			"data":       members,
 			"page":       page,
 			"pageSize":   pageSize,

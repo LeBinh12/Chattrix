@@ -16,17 +16,24 @@ type Group struct {
 	Status            string             `json:"status" bson:"status"`
 }
 
+type RoleInfo struct {
+	Code        string   `json:"code" bson:"code"`
+	Name        string   `json:"name" bson:"name"`
+	Permissions []string `json:"permissions" bson:"permissions"`
+}
+
 type GroupMember struct {
-	common.MongoModel `bson:",inline"`   // chứa ID, CreatedAt, UpdatedAt
+	common.MongoModel `bson:",inline"`   // contains ID, CreatedAt, UpdatedAt
 	GroupID           primitive.ObjectID `json:"group_id" bson:"group_id" binding:"required"`
 	UserID            primitive.ObjectID `json:"user_id" bson:"user_id" binding:"required"`
 	Role              string             `json:"role" bson:"role"`
+	RoleInfo          *RoleInfo          `json:"role_info" bson:"role_info"`
 	Status            string             `json:"status" bson:"status"`
 	JoinedAt          time.Time          `json:"joined_at" bson:"joined_at"`
 }
 
 type GroupDetail struct {
-	ID            primitive.ObjectID `json:"id" bson:"id"`
+	ID            primitive.ObjectID `json:"id" bson:"_id"`
 	Name          string             `json:"name" bson:"name"`
 	Image         string             `json:"image" bson:"image"`
 	MembersCount  int64              `json:"members_count" bson:"members_count"`
@@ -34,21 +41,23 @@ type GroupDetail struct {
 }
 
 type UserInfoInGroup struct {
-	ID          primitive.ObjectID `json:"id" bson:"id"` // ID của GroupMember
+	ID          primitive.ObjectID `json:"id" bson:"_id"` // GroupMember ID
 	UserID      primitive.ObjectID `json:"user_id" bson:"user_id"`
-	DisplayName string             `json:"display_name" bson:"display_name"` // từ collection users
+	DisplayName string             `json:"display_name" bson:"display_name"` // from users collection
 	Email       string             `json:"email" bson:"email"`
 	Avatar      string             `json:"avatar" bson:"avatar"`
 	JoinedAt    time.Time          `json:"joined_at" bson:"joined_at"`
 	Role        string             `json:"role" bson:"role"`
+	RoleInfo    *RoleInfo          `json:"role_info" bson:"role_info"`
 	Status      string             `json:"status" bson:"status"`
 }
 
 type GroupMemberDetail struct {
-	ID       primitive.ObjectID `json:"id" bson:"_id"` // id group_member
+	ID       primitive.ObjectID `json:"id" bson:"_id"` // group_member id
 	GroupID  primitive.ObjectID `json:"group_id" bson:"group_id"`
 	UserID   primitive.ObjectID `json:"user_id" bson:"user_id"`
 	Role     string             `json:"role" bson:"role"`
+	RoleInfo *RoleInfo          `json:"role_info" bson:"role_info"`
 	Status   string             `json:"status" bson:"status"`
 	JoinedAt time.Time          `json:"joined_at" bson:"joined_at"`
 
@@ -67,6 +76,6 @@ type GroupMemberDetail struct {
 type KafkaGroupMemberEvent struct {
 	GroupID primitive.ObjectID `json:"group_id"`
 	Members []models.Member    `json:"members"`
-	Inviter string             `json:"inviter_id"` // Người tạo nhóm / mời
+	Inviter string             `json:"inviter_id"` // Group creator / inviter
 	Created time.Time          `json:"created_at"`
 }

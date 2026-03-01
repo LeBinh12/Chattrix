@@ -1,6 +1,0 @@
-export const COLORS = {
-    SIDEBAR_BG: "#0030A0",
-    SIDEBAR_TEXT: "#FFFFFF",
-    SIDEBAR_ACTIVE: "#1E4DFF",
-    SIDEBAR_HOVER: "#1A3FBA",
-};

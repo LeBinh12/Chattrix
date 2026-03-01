@@ -64,13 +64,13 @@ export default function GroupScreen() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 p-4 md:p-8">
+    <div className="min-h-screen bg-surface-muted p-4 md:p-8">
       {/* Floating particles animation */}
       <div className="fixed inset-0 pointer-events-none">
         {[...Array(20)].map((_, i) => (
           <div
             key={i}
-            className="absolute w-2 h-2 bg-blue-400 rounded-full opacity-20 animate-pulse"
+            className="absolute w-2 h-2 bg-brand-400 rounded-full opacity-20 animate-pulse"
             style={{
               left: `${Math.random() * 100}%`,
               top: `${Math.random() * 100}%`,
@@ -84,9 +84,9 @@ export default function GroupScreen() {
       <div className="max-w-7xl mx-auto relative z-10">
         {/* Header with animation */}
         <div className="mb-8 text-center animate-fade-in">
-          <h1 className="text-4xl md:text-6xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 mb-3 animate-gradient">
+          <p className="text-4xl md:text-6xl font-bold text-brand-700 mb-3">
             Khám phá nhóm
-          </h1>
+          </p>
           <p className="text-gray-600 text-lg mb-6">
             Tham gia các cộng đồng để kết nối và chia sẻ đam mê của bạn
           </p>
@@ -100,7 +100,7 @@ export default function GroupScreen() {
                 placeholder="Tìm kiếm nhóm theo tên hoặc mô tả..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-12 pr-12 py-4 rounded-2xl border-2 border-gray-200 focus:border-blue-500 focus:outline-none transition-all duration-300 shadow-lg hover:shadow-xl"
+                className="w-full pl-12 pr-12 py-4 rounded-2xl border-2 border-gray-200 focus:border-brand-500 focus:outline-none transition-all duration-300 shadow-lg hover:shadow-xl"
               />
               {searchQuery && (
                 <button
@@ -119,11 +119,10 @@ export default function GroupScreen() {
               <button
                 key={category}
                 onClick={() => setSelectedCategory(category)}
-                className={`px-5 py-2 rounded-full font-medium transition-all duration-300 transform hover:scale-105 ${
-                  selectedCategory === category
-                    ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg"
+                className={`px-5 py-2 rounded-full font-medium transition-all duration-300 transform hover:scale-105 ${selectedCategory === category
+                    ? "bg-brand-600 text-white shadow-lg"
                     : "bg-white text-gray-700 hover:bg-gray-100 shadow-md"
-                }`}
+                  }`}
               >
                 {category}
               </button>
@@ -133,7 +132,7 @@ export default function GroupScreen() {
           {/* Results count */}
           <p className="text-gray-500 text-sm">
             Tìm thấy{" "}
-            <span className="font-bold text-blue-600">
+            <span className="font-bold text-brand-600">
               {filteredGroups.length}
             </span>{" "}
             nhóm
@@ -145,15 +144,13 @@ export default function GroupScreen() {
           {displayedGroups.map((group, index) => (
             <div
               key={group.id}
-              className={`bg-white rounded-2xl shadow-lg overflow-hidden transition-all duration-500 transform ${
-                animatedCards.includes(index)
+              className={`bg-white rounded-2xl shadow-lg overflow-hidden transition-all duration-500 transform ${animatedCards.includes(index)
                   ? "opacity-100 translate-y-0"
                   : "opacity-0 translate-y-10"
-              } ${
-                hoveredCard === group.id
+                } ${hoveredCard === group.id
                   ? "scale-105 shadow-2xl rotate-1"
                   : "hover:scale-102 hover:shadow-xl"
-              }`}
+                }`}
               onMouseEnter={() => setHoveredCard(group.id)}
               onMouseLeave={() => setHoveredCard(null)}
               style={{
@@ -188,9 +185,9 @@ export default function GroupScreen() {
                   <span className="inline-block px-3 py-1 bg-white/20 backdrop-blur-sm rounded-full text-white text-xs font-semibold mb-2">
                     {group.category}
                   </span>
-                  <h3 className="text-white text-xl font-bold line-clamp-1 drop-shadow-lg">
+                  <p className="text-white text-xl font-bold line-clamp-1 drop-shadow-lg">
                     {group.name}
-                  </h3>
+                  </p>
                 </div>
               </div>
 
@@ -214,11 +211,11 @@ export default function GroupScreen() {
 
                 {/* Action Buttons */}
                 <div className="flex gap-3">
-                  <button className="flex-1 bg-gradient-to-r from-blue-600 to-indigo-600 text-white py-2.5 rounded-xl font-semibold hover:from-blue-700 hover:to-indigo-700 transition-all duration-300 flex items-center justify-center gap-2 shadow-md hover:shadow-lg transform hover:-translate-y-1">
+                  <button className="flex-1 bg-brand-600 text-white py-2.5 rounded-xl font-semibold hover:bg-brand-700 transition-all duration-300 flex items-center justify-center gap-2 shadow-md hover:shadow-lg transform hover:-translate-y-1">
                     <UserPlus className="w-4 h-4" />
                     Tham gia
                   </button>
-                  <button className="flex-1 bg-gradient-to-r from-gray-100 to-gray-200 text-gray-700 py-2.5 rounded-xl font-semibold hover:from-gray-200 hover:to-gray-300 transition-all duration-300 flex items-center justify-center gap-2 transform hover:-translate-y-1">
+                  <button className="flex-1 bg-gray-100 text-gray-700 py-2.5 rounded-xl font-semibold hover:bg-gray-200 transition-all duration-300 flex items-center justify-center gap-2 transform hover:-translate-y-1">
                     <Eye className="w-4 h-4" />
                     Chi tiết
                   </button>
@@ -233,7 +230,7 @@ export default function GroupScreen() {
           <div className="text-center">
             <button
               onClick={loadMore}
-              className="px-8 py-4 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl font-bold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 hover:-translate-y-1"
+              className="px-8 py-4 bg-brand-600 text-white rounded-xl font-bold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 hover:-translate-y-1"
             >
               Xem thêm nhóm
             </button>

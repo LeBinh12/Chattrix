@@ -11,6 +11,12 @@ export const userApi = {
         const response = await axiosClient.get<UserStatusResponse>(`/user-status/status`);
         return response.data
     },
+    updateProfile: async (formData: FormData): Promise<UserResponse> => {
+        const response = await axiosClient.patch<UserResponse>(`/users/update-profile`, formData, {
+            headers: { "Content-Type": "multipart/form-data" }
+        });
+        return response.data
+    },
     upsertSetting: async (res: UpsertSettingRequest): Promise<UpsertSettingResponse> => {
         const response = await axiosClient.post<UpsertSettingResponse>(`/users/upsert-setting`, res);
         return response.data
@@ -24,6 +30,14 @@ export const userApi = {
         });
         return response.data
     },
-
-
+    changePassword: async (data: {old_password: string, new_password: string}): Promise<any> => {
+        const response = await axiosClient.patch(`/users/change-password`, data);
+        return response.data;
+    },
+    getPagination: async (page = 1, limit = 10): Promise<any> => {
+        const response = await axiosClient.get(`/users/get-pagination`, {
+            params: { page, limit }
+        });
+        return response.data;
+    }
 }

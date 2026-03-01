@@ -85,9 +85,9 @@ func (bp *BatchProcessor) Add(msg models.MessageResponse, sess sarama.ConsumerGr
 		kafkaMsg: kafkaMsg,
 	})
 
-	// Flush trong lock để tránh race condition
+	// Flush inside lock to avoid race conditions
 	if len(bp.messages) >= bp.maxBatchSize {
-		bp.flushLocked() // Flush ngay trong lock
+		bp.flushLocked() // Flush immediately inside lock
 	}
 }
 
@@ -117,7 +117,7 @@ func (bp *BatchProcessor) flushLocked() {
 	copy(messages, bp.messages)
 	bp.messages = bp.messages[:0]
 
-	// Process trong goroutine riêng để không block lock
+	// Process in a separate goroutine to avoid blocking the lock
 	bp.processingWg.Add(1)
 	go bp.processBatch(messages)
 }
@@ -135,8 +135,12 @@ func (bp *BatchProcessor) processBatch(messages []messageWithCommit) {
 
 	for _, msgWithCommit := range messages {
 		msg := msgWithCommit.message
+		log.Printf("[Kafka-Consumer] Processing message: %s, has_reply: %v, parent_id: %s", msg.ID.Hex(), msg.Reply.ID != primitive.NilObjectID, msg.ParentID)
+		if msg.Reply.ID != primitive.NilObjectID {
+			log.Printf("[Kafka-Consumer] Reply content: %s", msg.Reply.Content)
+		}
 
-		// Retry logic: tối đa 3 lần
+		// Retry logic: max 3 attempts
 		var err error
 		for retry := 0; retry < 3; retry++ {
 			_, err = chatBiz.HandleMessage(ctx,
@@ -150,10 +154,12 @@ func (bp *BatchProcessor) processBatch(messages []messageWithCommit) {
 				msg.MediaIDs,
 				msg.CreatedAt,
 				msg.Reply,
+				msg.Task,
+				msg.ParentID,
 			)
 
 			if err == nil {
-				// SUCCESS: Commit offset chỉ khi insert thành công
+				// SUCCESS: Commit offset only if insert is successful
 				bp.commitQueue <- &commitTask{
 					session: msgWithCommit.session,
 					message: msgWithCommit.kafkaMsg,
@@ -161,7 +167,7 @@ func (bp *BatchProcessor) processBatch(messages []messageWithCommit) {
 				break
 			}
 
-			// Retry với exponential backoff
+			// Retry with exponential backoff
 			if retry < 2 {
 				time.Sleep(time.Duration(retry+1) * 100 * time.Millisecond)
 				log.Printf(" Retry %d/3 for message %s: %v", retry+1, msg.ID.Hex(), err)
@@ -169,9 +175,9 @@ func (bp *BatchProcessor) processBatch(messages []messageWithCommit) {
 		}
 
 		if err != nil {
-			// FAILED after 3 retries: KHÔNG commit offset → message sẽ được reprocess
+			// FAILED after 3 retries: DO NOT commit offset -> message will be reprocessed
 			log.Printf(" CRITICAL: Failed to insert message %s after 3 retries: %v", msg.ID.Hex(), err)
-			// Có thể gửi vào Dead Letter Queue ở đây
+			// Optional: send to Dead Letter Queue here
 		}
 	}
 }
@@ -180,7 +186,7 @@ func (bp *BatchProcessor) Close() {
 	close(bp.done)
 	bp.flushTicker.Stop()
 	bp.Flush()
-	bp.processingWg.Wait() // Đợi tất cả batch xử lý xong
+	bp.processingWg.Wait() // Wait for all batches to complete
 }
 
 // ======================== FIX #1: Manual commit with dedicated goroutine ========================
@@ -238,7 +244,7 @@ func StartConsumer(ctx context.Context, brokers []string, groupID string, topics
 	}
 }
 
-// ======================== FIX #1: Commit chỉ sau khi insert thành công ========================
+// ======================== FIX #1: Commit only after successful insert ========================
 func (c *chatConsumer) commitWorker(ctx context.Context) {
 	commitBatch := make([]*commitTask, 0, 100)
 	ticker := time.NewTicker(1 * time.Second)
@@ -257,7 +263,7 @@ func (c *chatConsumer) commitWorker(ctx context.Context) {
 				continue
 			}
 
-			// Commit toàn bộ messages
+			// Commit all messages
 			for _, t := range commitBatch {
 				t.session.MarkMessage(t.message, "")
 			}
@@ -289,7 +295,7 @@ func (c *chatConsumer) ConsumeClaim(sess sarama.ConsumerGroupSession, claim sara
 		c.workerPool <- struct{}{}
 		c.wg.Add(1)
 
-		//  FIX: KHÔNG commit ở đây nữa
+		// FIX: DO NOT commit here anymore
 		go c.processMessage(sess, msg)
 	}
 	return nil
@@ -323,6 +329,107 @@ func (c *chatConsumer) processMessage(sess sarama.ConsumerGroupSession, msg *sar
 		c.processUnPinnedMessage(ctx, sess, msg)
 	case "add-group-member":
 		c.processGroupMember(ctx, sess, msg)
+	case "chat-notification-all":
+		c.processNotificationAll(ctx, sess, msg)
+	}
+}
+
+// processNotificationAll - Send system notification to ALL users
+func (c *chatConsumer) processNotificationAll(ctx context.Context, sess sarama.ConsumerGroupSession, msg *sarama.ConsumerMessage) {
+	var notification models.MessageNotificationResponse
+	if err := json.Unmarshal(msg.Value, &notification); err != nil {
+		log.Printf("[chat-notification-all] Unmarshal error: %v", err)
+		sess.MarkMessage(msg, "")
+		return
+	}
+
+	// Validate: must be a system notification
+	if notification.NotificationType != models.NotificationTypeSystem {
+		log.Printf("[chat-notification-all] Not a system notification: %v", notification.NotificationType)
+		sess.MarkMessage(msg, "")
+		return
+	}
+
+	if notification.SenderID.IsZero() {
+		log.Printf("[chat-notification-all] Missing SenderID")
+		sess.MarkMessage(msg, "")
+		return
+	}
+
+	// Get sender info (system channel) to get name + avatar
+	userStore := StorageUser.NewMongoStore(c.db)
+	userBiz := BizUser.NewUserGetPaginationUserBiz(userStore)
+
+	// Get list of all users
+	allUserIDs, err := userBiz.GetAllUserIDs(ctx)
+	if err != nil {
+		log.Printf("[chat-notification-all] Failed to get all user IDs: %v", err)
+		sess.MarkMessage(msg, "")
+		return
+	}
+
+	if len(allUserIDs) == 0 {
+		log.Println("[chat-notification-all] No users in system")
+		sess.MarkMessage(msg, "")
+		return
+	}
+
+	log.Printf("[chat-notification-all] Start broadcasting to %d users from channel %s", len(allUserIDs), notification.SenderID.Hex())
+
+	// Create store + biz to save message
+	chatStore := storage.NewMongoChatStore(c.db)
+	esStore := storage.NewESChatStore(c.es) // can be nil if not needed
+	chatBiz := biz.NewChatBiz(chatStore, esStore)
+
+	successCount := 0
+	for _, userID := range allUserIDs {
+		// Create individual message for each user (1:1 from system channel)
+		perUserMsg := &models.MessageResponse{
+			ID:           primitive.NewObjectID(),
+			SenderID:     notification.SenderID,
+			ReceiverID:   userID, // only 1 recipient
+			Content:      notification.Content,
+			Type:         notification.Type,
+			MediaIDs:     notification.MediaIDs,
+			CreatedAt:    time.Now(),
+			UpdatedAt:    time.Now(),
+			Status:       models.StatusSent, // will become Delivered when user is online
+			IsRead:       false,
+			SenderName:   notification.SenderName,
+			SenderAvatar: notification.SenderAvatar,
+			// Other fields if needed
+		}
+
+		// Save to DB (HandleMessage handles full logic: save message, update conversation, index ES...)
+		_, err := chatBiz.HandleMessage(ctx,
+			perUserMsg.ID,
+			perUserMsg.SenderID.Hex(),
+			perUserMsg.ReceiverID.Hex(),
+			perUserMsg.Content,
+			perUserMsg.Status,
+			"", // empty group_id
+			perUserMsg.Type,
+			perUserMsg.MediaIDs,
+			perUserMsg.CreatedAt,
+			models.ReplyMessageMini{}, // zero value – no reply
+			&models.Task{},
+			"",
+		)
+
+		if err != nil {
+			log.Printf("[chat-notification-all] Failed to save message for user %s: %v", userID.Hex(), err)
+			continue
+		}
+
+		successCount++
+	}
+
+	log.Printf("[chat-notification-all] Successfully saved messages for %d/%d users", successCount, len(allUserIDs))
+
+	// Commit message gốc từ Kafka
+	c.commitQueue <- &commitTask{
+		session: sess,
+		message: msg,
 	}
 }
 
@@ -340,38 +447,46 @@ func (c *chatConsumer) processGroupMember(ctx context.Context, sess sarama.Consu
 	groupBiz := BizGroup.CreateGroupMemberStorage(groupStore)
 	fmt.Println("add-group-member Kaffka", payload)
 
-	// Lặp qua tất cả member
+	// Iterate through all members
 	for _, m := range payload.Members {
+		roleCode := m.Role
+		if roleCode == "" || roleCode == "member" {
+			roleCode = "member" // Normalize to 'number'
+		}
+
 		groupMember := ModelsGroup.GroupMember{
 			GroupID:  payload.GroupID,
 			UserID:   m.UserID,
-			Role:     m.Role,
-			Status:   "active", // hoặc giá trị mặc định khác nếu cần
+			Role:     roleCode,
+			Status:   "active",
 			JoinedAt: time.Now(),
 		}
 
-		// Retry 3 lần nếu gặp lỗi
-		var insertErr error
+		// 1. Create legacy member record (if needed)
+		_ = groupBiz.CreateGroupNumber(ctx, &groupMember)
+
+		// 2. Sync to group_user_roles (Formal RBAC)
+		// Retry 3 times if error occurs
+		var rbErr error
 		for attempt := 0; attempt < 3; attempt++ {
-			insertErr = groupBiz.CreateGroupNumber(ctx, &groupMember)
-			if insertErr == nil {
-				break // thành công → thoát vòng retry
+			rbErr = groupStore.UpdateMemberRole(ctx, payload.GroupID, m.UserID, roleCode)
+			if rbErr == nil {
+				break
 			}
 
-			log.Printf("[group-member] Retry %d/3 for user %s: %v", attempt+1, m.UserID.Hex(), insertErr)
+			log.Printf("[group-member] RBAC Sync Retry %d/3 for user %s: %v", attempt+1, m.UserID.Hex(), rbErr)
 			if attempt < 2 {
 				time.Sleep(time.Duration(attempt+1) * 200 * time.Millisecond)
 			}
 		}
 
-		if insertErr != nil {
-			log.Printf("[group-member] FAILED after retries for user %s: %v", m.UserID.Hex(), insertErr)
-			// Tùy bạn có commit hay không, nếu muốn message được re-deliver thì không commit
+		if rbErr != nil {
+			log.Printf("[group-member] RBAC Sync FAILED after retries for user %s: %v", m.UserID.Hex(), rbErr)
 			continue
 		}
 	}
 
-	// Nếu tất cả thành công → commit Kafka
+	// If all successful -> commit Kafka
 	c.commitQueue <- &commitTask{
 		session: sess,
 		message: msg,
@@ -394,12 +509,13 @@ func (c *chatConsumer) processUnPinnedMessage(ctx context.Context, sess sarama.C
 	MessageID, _ := primitive.ObjectIDFromHex(payload.MessageID)
 	ConversationID, _ := primitive.ObjectIDFromHex(payload.ConversationID)
 
-	// Retry 3 lần
+	fmt.Println("ConversationID Kaffka", ConversationID)
+	// Retry 3 times
 	var recallErr error
 	for attempt := 0; attempt < 3; attempt++ {
 		recallErr = recallBiz.UnpinMessage(ctx, ConversationID, MessageID)
 		if recallErr == nil {
-			// Thành công: Commit
+			// Success: Commit
 			c.commitQueue <- &commitTask{
 				session: sess,
 				message: msg,
@@ -420,23 +536,63 @@ func (c *chatConsumer) processPinnedMessage(ctx context.Context, sess sarama.Con
 	var payload models.MessageResponseSocket
 
 	if err := json.Unmarshal(msg.Value, &payload); err != nil {
-		log.Printf("[recall-message] Unmarshal error: %v | payload: %s", err, string(msg.Value))
+		log.Printf("[pinned-message] Unmarshal error: %v | payload: %s", err, string(msg.Value))
 		sess.MarkMessage(msg, "")
 		return
 	}
-	// Biz
-	recallStore := storage.NewMongoChatStore(c.db)
-	recallBiz := biz.NewPinnedMessageBiz(recallStore)
 
-	messageID, _ := primitive.ObjectIDFromHex(payload.MessageID)
-	pinnedByID, _ := primitive.ObjectIDFromHex(payload.PinnedByID)
-	targetConvID, _ := primitive.ObjectIDFromHex(payload.ConversationID)
-	// Retry 3 lần
-	var recallErr error
+	// Convert IDs from string to primitive.ObjectID
+	messageID, errMsg := primitive.ObjectIDFromHex(payload.MessageID)
+	if errMsg != nil {
+		log.Printf("[pinned-message] Invalid MessageID: %v", errMsg)
+		sess.MarkMessage(msg, "")
+		return
+	}
+
+	pinnedByID, errPin := primitive.ObjectIDFromHex(payload.PinnedByID)
+	if errPin != nil {
+		log.Printf("[pinned-message] Invalid PinnedByID: %v", errPin)
+		sess.MarkMessage(msg, "")
+		return
+	}
+
+	// === DETERMINE targetConvID CONDITIONALLY ===
+	var targetConvID primitive.ObjectID
+	var convIDFromHex primitive.ObjectID
+	var errConv error
+
+	// Priority 1: If valid GroupID exists -> this is a group -> use GroupID
+	if payload.GroupID != primitive.NilObjectID { // primitive.NilObjectID is the zero value of ObjectID
+		targetConvID = payload.GroupID
+		log.Printf("[pinned-message] Using GroupID as targetConvID: %s", targetConvID.Hex())
+	} else {
+		// Priority 2: No GroupID -> personal chat -> use ConversationID (string)
+		if payload.ConversationID == "" {
+			log.Printf("[pinned-message] Missing both GroupID and ConversationID")
+			sess.MarkMessage(msg, "")
+			return
+		}
+
+		convIDFromHex, errConv = primitive.ObjectIDFromHex(payload.ConversationID)
+		if errConv != nil {
+			log.Printf("[pinned-message] Invalid ConversationID format: %v", errConv)
+			sess.MarkMessage(msg, "")
+			return
+		}
+		targetConvID = convIDFromHex
+		log.Printf("[pinned-message] Using ConversationID as targetConvID: %s", targetConvID.Hex())
+	}
+
+	// Biz logic
+	pinStore := storage.NewMongoChatStore(c.db)
+	pinBiz := biz.NewPinnedMessageBiz(pinStore)
+
+	// Retry 3 times
+	var pinErr error
 	for attempt := 0; attempt < 3; attempt++ {
-		recallErr = recallBiz.PinMessage(ctx, targetConvID, messageID, pinnedByID, "")
-		if recallErr == nil {
-			// Thành công: Commit
+		pinErr = pinBiz.PinMessage(ctx, targetConvID, messageID, pinnedByID, "")
+		if pinErr == nil {
+			// Success → commit
 			c.commitQueue <- &commitTask{
 				session: sess,
 				message: msg,
@@ -444,13 +600,16 @@ func (c *chatConsumer) processPinnedMessage(ctx context.Context, sess sarama.Con
 			return
 		}
 
-		log.Printf("[pinned-message] Retry %d/3: %v", attempt+1, recallErr)
+		log.Printf("[pinned-message] Retry %d/3 failed: %v", attempt+1, pinErr)
 		if attempt < 2 {
 			time.Sleep(time.Duration(attempt+1) * 200 * time.Millisecond)
 		}
 	}
 
-	log.Printf("[pinned-message] FAILED after retries: %v", recallErr)
+	// Failed after 3 retries
+	log.Printf("[pinned-message] FAILED after 3 retries for message %s in conv %s: %v",
+		payload.MessageID, targetConvID.Hex(), pinErr)
+	sess.MarkMessage(msg, "") // Still mark to avoid perpetual reconsumption
 }
 
 func (c *chatConsumer) processRecallMessage(ctx context.Context, sess sarama.ConsumerGroupSession, msg *sarama.ConsumerMessage) {
@@ -463,14 +622,15 @@ func (c *chatConsumer) processRecallMessage(ctx context.Context, sess sarama.Con
 	}
 	// Biz
 	recallStore := storage.NewMongoChatStore(c.db)
-	recallBiz := biz.NewRecallMessageBiz(recallStore)
+	esStore := storage.NewESChatStore(c.es)
+	recallBiz := biz.NewRecallMessageBiz(recallStore, esStore)
 
-	// Retry 3 lần
+	// Retry 3 times
 	var recallErr error
 	for attempt := 0; attempt < 3; attempt++ {
 		recallErr = recallBiz.RecallMessage(ctx, payload.ID, *payload.RecalledBy)
 		if recallErr == nil {
-			// Thành công: Commit
+			// Success: Commit
 			c.commitQueue <- &commitTask{
 				session: sess,
 				message: msg,
@@ -485,7 +645,7 @@ func (c *chatConsumer) processRecallMessage(ctx context.Context, sess sarama.Con
 	}
 
 	log.Printf("[recall-message] FAILED after retries: %v", recallErr)
-	// ❗ Không commit → Kafka sẽ giao lại message này
+	// ❗ Do not commit -> Kafka will deliver this message again
 }
 
 func (c *chatConsumer) processChatMessage(ctx context.Context, sess sarama.ConsumerGroupSession, msg *sarama.ConsumerMessage) {
@@ -495,7 +655,7 @@ func (c *chatConsumer) processChatMessage(ctx context.Context, sess sarama.Consu
 		return
 	}
 
-	//  FIX: Truyền session và message để commit sau khi insert thành công
+	// FIX: Pass session and message to commit after successful insert
 	c.batchProcessor.Add(chatMsg, sess, msg)
 }
 
@@ -550,7 +710,7 @@ func (c *chatConsumer) processUserStatus(ctx context.Context, sess sarama.Consum
 	}
 
 	log.Printf("Update user_status error after 3 retries: %v", err)
-	// ❗ Không commit → message sẽ reprocess
+	// ❗ Do not commit -> message will reprocess
 }
 
 func (c *chatConsumer) processGroupOut(ctx context.Context, sess sarama.ConsumerGroupSession, msg *sarama.ConsumerMessage) {
@@ -560,23 +720,23 @@ func (c *chatConsumer) processGroupOut(ctx context.Context, sess sarama.Consumer
 		return
 	}
 
-	// Validate dữ liệu bắt buộc
+	// Validate mandatory data
 	if groupOut.GroupID.IsZero() || groupOut.SenderID.IsZero() {
 		log.Printf("Invalid group-out payload (missing id): %s\n", string(msg.Value))
 		return
 	}
 
-	// Tạo context riêng với timeout ngắn tránh block
+	// Create a separate context with a short timeout to avoid blocking
 	opCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
-	// Tạo store + biz (như hiện tại). Nếu muốn tối ưu, see notes dưới để reuse.
+	// Create store + biz (as current). For optimization, see notes below to reuse.
 	GroupStore := StorageGroup.NewMongoStoreGroup(c.db)
 	GroupBiz := BizGroup.NewRemoveGroupMemberBiz(GroupStore)
 
 	var err error
 	for retry := 0; retry < 3; retry++ {
-		err = GroupBiz.RemoveMember(opCtx, groupOut.GroupID.Hex(), groupOut.SenderID.Hex())
+		_, err = GroupBiz.RemoveMember(opCtx, "", groupOut.GroupID.Hex(), groupOut.SenderID.Hex())
 		if err == nil {
 			c.commitQueue <- &commitTask{
 				session: sess,
@@ -585,7 +745,7 @@ func (c *chatConsumer) processGroupOut(ctx context.Context, sess sarama.Consumer
 			return
 		}
 
-		// Retry với exponential backoff nhỏ
+		// Retry with small exponential backoff
 		if retry < 2 {
 			backoff := time.Duration(retry+1) * 150 * time.Millisecond
 			log.Printf("Retry %d/3 removing member from group %s: %v (backoff %s)", retry+1, groupOut.GroupID.Hex(), err, backoff)
@@ -599,7 +759,7 @@ func (c *chatConsumer) processDeleteMessageForMe(ctx context.Context, sess saram
 	var delMsg models.DeleteMessageForMe
 	if err := json.Unmarshal(msg.Value, &delMsg); err != nil {
 		log.Printf("[delete-message-for-me] Unmarshal error: %v | payload: %s", err, string(msg.Value))
-		// Dữ liệu sai → không thể xử lý → commit để tránh loop vô hạn
+		// Incorrect data -> cannot process -> commit to avoid infinite loop
 		sess.MarkMessage(msg, "")
 		return
 	}
@@ -607,7 +767,7 @@ func (c *chatConsumer) processDeleteMessageForMe(ctx context.Context, sess saram
 	// Validate UserID
 	userID, err := primitive.ObjectIDFromHex(delMsg.UserID)
 	if err != nil {
-		log.Printf("[delete-message-for-me] UserID không hợp lệ: %s | err: %v", delMsg.UserID, err)
+		log.Printf("[delete-message-for-me] Invalid UserID: %s | err: %v", delMsg.UserID, err)
 		sess.MarkMessage(msg, "")
 		return
 	}
@@ -618,48 +778,49 @@ func (c *chatConsumer) processDeleteMessageForMe(ctx context.Context, sess saram
 	for _, idStr := range delMsg.MessageIDs {
 		oid, err := primitive.ObjectIDFromHex(idStr)
 		if err != nil {
-			log.Printf("[delete-message-for-me] MessageID không hợp lệ: %s | err: %v", idStr, err)
+			log.Printf("[delete-message-for-me] Invalid MessageID: %s | err: %v", idStr, err)
 			hasInvalid = true
 			continue
 		}
 		messageIDs = append(messageIDs, oid)
 	}
 
-	// Nếu toàn bộ ID đều lỗi hoặc không có ID nào hợp lệ → commit luôn
+	// If all IDs are errors or none are valid -> commit immediately
 	if hasInvalid && len(messageIDs) == 0 {
-		log.Printf("[delete-message-for-me] Không có MessageID hợp lệ nào từ user %s", delMsg.UserID)
+		log.Printf("[delete-message-for-me] No valid MessageIDs from user %s", delMsg.UserID)
 		sess.MarkMessage(msg, "")
 		return
 	}
 
-	// Tạo biz
+	// Create biz
 	chatStore := storage.NewMongoChatStore(c.db)
-	chatBiz := biz.NewDeleteMessageForMeBiz(chatStore)
+	esStore := storage.NewESChatStore(c.es)
+	chatBiz := biz.NewDeleteMessageForMeBiz(chatStore, esStore)
 
-	// Retry 3 lần
+	// Retry 3 times
 	var deleteErr error
 	for attempt := 0; attempt < 3; attempt++ {
 		deleteErr = chatBiz.DeleteMessageForMe(ctx, userID, messageIDs)
 		if deleteErr == nil {
-			// THÀNH CÔNG → gửi vào hàng đợi commit
+			// SUCCESS -> send to commit queue
 			c.commitQueue <- &commitTask{
 				session: sess,
 				message: msg,
 			}
-			log.Printf("[delete-message-for-me] User %s đã xóa thành công %d tin nhắn (commit queued)", delMsg.UserID, len(messageIDs))
+			log.Printf("[delete-message-for-me] User %s deleted %d messages successfully (commit queued)", delMsg.UserID, len(messageIDs))
 			return
 		}
 
-		// Log lỗi + backoff
-		log.Printf("[delete-message-for-me] Lỗi lần %d/3 - User %s xóa %d tin: %v", attempt+1, delMsg.UserID, len(messageIDs), deleteErr)
+		// Log error + backoff
+		log.Printf("[delete-message-for-me] Error attempt %d/3 - User %s deleting %d msgs: %v", attempt+1, delMsg.UserID, len(messageIDs), deleteErr)
 		if attempt < 2 {
 			time.Sleep(time.Duration(attempt+1) * 200 * time.Millisecond)
 		}
 	}
 
-	// Sau 3 lần vẫn lỗi → KHÔNG commit → Kafka sẽ re-deliver
-	log.Printf("[delete-message-for-me] CRITICAL: User %s xóa tin nhắn thất bại sau 3 lần retry → sẽ được xử lý lại", delMsg.UserID)
-	// Không MarkMessage → message sẽ được consume lại ở lần rebalance tiếp theo
+	// After 3 failed attempts -> DO NOT commit -> Kafka will re-deliver
+	log.Printf("[delete-message-for-me] CRITICAL: User %s failed to delete messages after 3 retries -> will be reprocessed", delMsg.UserID)
+	// No MarkMessage -> message will be re-consumed on next rebalance
 }
 
 func (c *chatConsumer) updateStatusWithRetry(ctx context.Context, statusMsg *models.MessageStatusRequest) error {
@@ -669,24 +830,27 @@ func (c *chatConsumer) updateStatusWithRetry(ctx context.Context, statusMsg *mod
 
 	chatStore := storage.NewMongoChatStore(c.db)
 	chatBiz := biz.UpdateSeenStatusStorage(chatStore)
-	conversationID := storage.GetConversationID(senderID, receiverID)
-	seen, _ := chatBiz.FindByUserAndConversation(ctx, senderID, conversationID)
-	var oldLastSeenMsgID primitive.ObjectID
-	if seen != nil {
-		oldLastSeenMsgID = seen.LastSeenMessageID
+
+	// Check if receiverID is a group
+	isGroup, err := chatStore.CheckGroupExists(ctx, statusMsg.ReceiverID)
+	var conversationID primitive.ObjectID
+	if err == nil && isGroup {
+		conversationID = receiverID
+	} else {
+		conversationID = storage.GetConversationID(senderID, receiverID)
 	}
 
 	if err := chatBiz.CreateOrUpdate(ctx, senderID, conversationID, lastSeenMsgID); err != nil {
 		return err
 	}
 
-	return chatBiz.UpdateStatusSeen(ctx, receiverID, senderID, lastSeenMsgID, oldLastSeenMsgID)
+	return chatBiz.UpdateStatusSeen(ctx, receiverID, senderID, lastSeenMsgID, primitive.NilObjectID)
 }
 
 func (c *chatConsumer) Shutdown() {
 	log.Println(" Shutting down consumer...")
-	c.wg.Wait()              // Đợi tất cả worker
-	c.batchProcessor.Close() // Đợi batch processor
-	close(c.commitQueue)     // Đóng commit queue
+	c.wg.Wait()              // Wait for all workers
+	c.batchProcessor.Close() // Wait for batch processor
+	close(c.commitQueue)     // Close commit queue
 	log.Println("Consumer shutdown gracefully")
 }

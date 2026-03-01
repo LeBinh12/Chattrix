@@ -14,6 +14,9 @@ type ListUsersNotInGroupStorage interface {
 		ctx context.Context,
 		page int64,
 		pageSize int64,
+		search string,
+		minMember int,
+		maxMember int,
 	) ([]models.GroupDetail, int64, error)
 	ListGroupMembersWithUserInfo(ctx context.Context, groupID primitive.ObjectID, page, pageSize int64) ([]models.UserInfoInGroup, int64, error)
 }
@@ -44,7 +47,7 @@ func (biz *listUsersNotInGroupBiz) List(ctx context.Context, groupID primitive.O
 	return users, nil
 }
 
-func (biz *listUsersNotInGroupBiz) ListAllGroups(ctx context.Context, page, pageSize int64) ([]models.GroupDetail, int64, error) {
+func (biz *listUsersNotInGroupBiz) ListAllGroups(ctx context.Context, page, pageSize int64, search string, minMember, maxMember int) ([]models.GroupDetail, int64, error) {
 	if page <= 0 {
 		page = 1
 	}
@@ -52,7 +55,7 @@ func (biz *listUsersNotInGroupBiz) ListAllGroups(ctx context.Context, page, page
 		pageSize = 10
 	}
 
-	return biz.store.ListAllGroupsWithStats(ctx, page, pageSize)
+	return biz.store.ListAllGroupsWithStats(ctx, page, pageSize, search, minMember, maxMember)
 }
 
 func (biz *listUsersNotInGroupBiz) ListMembers(ctx context.Context, groupID primitive.ObjectID, page, pageSize int64) ([]models.UserInfoInGroup, int64, error) {

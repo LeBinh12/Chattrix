@@ -25,6 +25,8 @@ func (s *ESChatStore) SearchMessages(
 	groupID string,
 	limit int,
 	cursorTime string, // <<< thêm cursor
+	startTime string,
+	endTime string,
 ) ([]models.ESMessage, string, error) {
 
 	if limit <= 0 {
@@ -78,19 +80,53 @@ func (s *ESChatStore) SearchMessages(
 		},
 	}
 
+	// ================== RANGE FILTER (DATE) ==================
+	var filters []interface{}
+	if startTime != "" || endTime != "" {
+		rangeQuery := map[string]interface{}{}
+		if startTime != "" {
+			rangeQuery["gte"] = startTime
+		}
+		if endTime != "" {
+			rangeQuery["lte"] = endTime
+		}
+		filters = append(filters, map[string]interface{}{
+			"range": map[string]interface{}{
+				"created_at": rangeQuery,
+			},
+		})
+	}
+
 	boolQuery := map[string]interface{}{
 		"must": mustQueries,
+		"must_not": []interface{}{
+			map[string]interface{}{
+				"exists": map[string]interface{}{
+					"field": "recalled_at",
+				},
+			},
+			map[string]interface{}{
+				"term": map[string]interface{}{
+					"deleted_for.keyword": myID,
+				},
+			},
+		},
+	}
+
+	if len(filters) > 0 {
+		boolQuery["filter"] = filters
 	}
 
 	// ================== FILTER USER OR GROUP ==================
 	if groupID != "" {
-		boolQuery["filter"] = []interface{}{
-			map[string]interface{}{
-				"term": map[string]interface{}{
-					"group_id.keyword": groupID,
-				},
-			},
+		if boolQuery["filter"] == nil {
+			boolQuery["filter"] = []interface{}{}
 		}
+		boolQuery["filter"] = append(boolQuery["filter"].([]interface{}), map[string]interface{}{
+			"term": map[string]interface{}{
+				"group_id.keyword": groupID,
+			},
+		})
 	} else {
 		boolQuery["should"] = []interface{}{
 			map[string]interface{}{

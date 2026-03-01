@@ -1,17 +1,21 @@
 import { useRecoilState } from "recoil";
-import { userAtom } from "../recoil/atoms/userAtom";
+import { userAtom, isAuthLoadingAtom } from "../recoil/atoms/userAtom";
 import { userApi } from "../api/userApi";
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 
 export const useLoadUser = () => {
   const [user, setUser] = useRecoilState(userAtom);
+  const [isAuthLoading, setIsAuthLoading] = useRecoilState(isAuthLoadingAtom);
   const navigate = useNavigate()
   useEffect(() => {
     const token = localStorage.getItem("access_token");
 
     const loadUser = async () => {
-      if (!token) return;
+      if (!token) {
+        setIsAuthLoading(false);
+        return;
+      }
 
       try {
         const res = await userApi.getProfile();
@@ -25,11 +29,13 @@ export const useLoadUser = () => {
         console.warn("Token hết hạn hoặc không hợp lệ");
         localStorage.removeItem("access_token");
         setUser(null);
+      } finally {
+        setIsAuthLoading(false);
       }
     };
 
     loadUser();
-  }, [navigate, setUser]);
+  }, [navigate, setUser, setIsAuthLoading]);
 
 
 

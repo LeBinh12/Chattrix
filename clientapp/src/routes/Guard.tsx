@@ -1,6 +1,9 @@
 import type { JSX } from "react";
 import { Navigate } from "react-router-dom";
 import { toast } from "react-toastify";
+import { useRecoilValue } from "recoil";
+import { userAtom, isAuthLoadingAtom } from "../recoil/atoms/userAtom";
+import { canAccessAdminPanel } from "../constants/menuPermissions";
 
 function PublicRoute({ children }: { children: JSX.Element }) {
   const token = localStorage.getItem("access_token");
@@ -32,10 +35,20 @@ function PrivateRoute({ children }: { children: JSX.Element }) {
 }
 
 export default function AdminGuard({ children }: { children: JSX.Element }) {
-  const isAdmin = localStorage.getItem("admin_auth") === "1";
-  if (!isAdmin) {
-    toast.info("Bạn cần phải đăng nhập");
-    return <Navigate to="/admin/login" replace />;
+  const user = useRecoilValue(userAtom);
+  const isAuthLoading = useRecoilValue(isAuthLoadingAtom);
+  const token = localStorage.getItem("access_token");
+
+  if (isAuthLoading) return null; // Or a loading spinner
+
+  if (!token || !user) {
+    toast.error("Bạn cần phải đăng nhập");
+    return <Navigate to="/login" replace />;
+  }
+
+  if (!canAccessAdminPanel((user.data as any)?.permissions)) {
+    toast.error("Bạn không có quyền truy cập trang quản trị");
+    return <Navigate to="/" replace />;
   }
 
   return children;

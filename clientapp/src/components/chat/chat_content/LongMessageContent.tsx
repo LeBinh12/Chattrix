@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { linkifyHtmlContent, linkifyUrls } from "../../../utils/urlLinkifier";
 
 type Props = {
   content: string;
@@ -44,14 +45,16 @@ export default function LongMessageContent({
       cutPosition = nearestPeriod + 1;
     }
 
+    // Return truncated text (which will be linkified during render)
     return text.substring(0, cutPosition);
   };
 
   if (!isLongMessage) {
+    const linkifiedContent = linkifyHtmlContent(content);
     return (
       <div
-        className="prose prose-sm max-w-none"
-        dangerouslySetInnerHTML={{ __html: content }}
+        className="prose prose-sm max-w-none break-words"
+        dangerouslySetInnerHTML={{ __html: linkifiedContent }}
       />
     );
   }
@@ -67,16 +70,17 @@ export default function LongMessageContent({
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
           >
-            <div className="prose prose-sm max-w-none whitespace-pre-wrap">
-              {getTruncatedContent()}
-            </div>
+            <div 
+              className="prose prose-sm max-w-none whitespace-pre-wrap break-words"
+              dangerouslySetInnerHTML={{ __html: linkifyUrls(getTruncatedContent()) }}
+            />
 
             {/* Gradient overlay */}
             <div
               className={`absolute bottom-0 left-0 right-0 h-20 pointer-events-none ${
                 isMine
-                  ? "bg-gradient-to-t from-[#dfe8ff] to-transparent"
-                  : "bg-gradient-to-t from-white to-transparent"
+                  ? "bg-gradient-to-t from-blue-50 to-transparent"
+                  : "bg-gradient-to-t from-gray-50 to-transparent"
               }`}
             />
 
@@ -85,16 +89,13 @@ export default function LongMessageContent({
               onClick={() => setIsExpanded(true)}
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
-              className={`
-                mt-2 w-full py-2 px-3 rounded-lg
-                flex items-center justify-center gap-2
-                text-sm font-medium transition-colors
-                ${
-                  isMine
-                    ? "bg-[#c5d6ff] hover:bg-[#b5c9ff] text-[#0f3d8c]"
-                    : "bg-[#f0f2f5] hover:bg-[#e4e6eb] text-[#1f2a44]"
-                }
-              `}
+              className={`w-full py-2.5 flex items-center justify-center gap-2 text-[13px] font-semibold transition-all ${
+                isMine
+                  ? "bg-gray-100 hover:bg-gray-200 text-gray-900"
+                  : "bg-gray-50 hover:bg-gray-100 text-[#1f2a44]"
+              } border-t ${
+                isMine ? "border-blue-100/50" : "border-gray-100"
+              }`}
             >
               <span>Xem thêm</span>
               <ChevronDown className="w-4 h-4" />
@@ -109,8 +110,8 @@ export default function LongMessageContent({
             transition={{ duration: 0.2 }}
           >
             <div
-              className="prose prose-sm max-w-none whitespace-pre-wrap"
-              dangerouslySetInnerHTML={{ __html: content }}
+              className="prose prose-sm max-w-none whitespace-pre-wrap break-words"
+              dangerouslySetInnerHTML={{ __html: linkifyHtmlContent(content) }}
             />
 
             {/* Collapse button */}
@@ -118,16 +119,13 @@ export default function LongMessageContent({
               onClick={() => setIsExpanded(false)}
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
-              className={`
-                mt-2 w-full py-2 px-3 rounded-lg
-                flex items-center justify-center gap-2
-                text-sm font-medium transition-colors
-                ${
-                  isMine
-                    ? "bg-[#c5d6ff] hover:bg-[#b5c9ff] text-[#0f3d8c]"
-                    : "bg-[#f0f2f5] hover:bg-[#e4e6eb] text-[#1f2a44]"
-                }
-              `}
+              className={`w-full py-2.5 flex items-center justify-center gap-2 text-[13px] font-semibold transition-all ${
+                isMine
+                   ? "bg-gray-100 hover:bg-gray-200 text-gray-900"
+                  : "bg-gray-50 hover:bg-gray-100 text-[#1f2a44]"
+              } border-t ${
+                isMine ? "border-blue-100/50" : "border-gray-100"
+              } rounded-b-2xl`}
             >
               <span>Thu gọn</span>
               <ChevronUp className="w-4 h-4" />

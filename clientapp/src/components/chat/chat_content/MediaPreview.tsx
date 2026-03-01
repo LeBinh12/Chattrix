@@ -9,6 +9,7 @@ import {
   ZoomOut,
 } from "lucide-react";
 import { API_ENDPOINTS } from "../../../config/api";
+import { forceDownload } from "../../../utils/downloadUtil";
 
 type Media = {
   id?: string;
@@ -103,33 +104,32 @@ export default function MediaPreview({
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         onClick={onClose}
-        className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm"
+        className="!fixed !inset-0 !z-50 !flex !items-center !justify-center !bg-black/90 !backdrop-blur-sm"
       >
         {/* Header controls */}
-        <div className="absolute top-0 left-0 right-0 bg-gradient-to-b from-black/60 to-transparent p-4 z-10">
-          <div className="flex items-center justify-between max-w-7xl mx-auto">
+        <div className="!absolute !top-0 !left-0 !right-0 !bg-gradient-to-b !from-black/60 !to-transparent !p-4 !z-10">
+          <div className="!flex !items-center !justify-between !max-w-7xl !mx-auto">
             {/* Left side - Download */}
-            <a
-              href={downloadUrl}
-              download={currentMedia.filename}
-              target="_blank"
-              rel="noreferrer"
-              onClick={(e) => e.stopPropagation()}
-              className="bg-white/10 hover:bg-white/20 backdrop-blur-sm text-white rounded-lg px-4 py-2 flex items-center gap-2 transition"
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                forceDownload(downloadUrl, currentMedia.filename || `media_${currentIndex + 1}`);
+              }}
+              className="!bg-white/10 !hover:bg-white/20 !backdrop-blur-sm !text-white !rounded-lg !px-4 !py-2 !flex !items-center !gap-2 !transition"
             >
               <Download size={18} />
-              <span className="hidden sm:inline text-sm">Tải xuống</span>
-            </a>
+              <span className="!hidden !sm:inline !text-sm">Tải xuống</span>
+            </button>
 
             {/* Center - Media counter */}
             {allMedia.length > 1 && (
-              <div className="bg-white/10 backdrop-blur-sm text-white rounded-lg px-4 py-2 text-sm">
+              <div className="!bg-white/10 !backdrop-blur-sm !text-white !rounded-lg !px-4 !py-2 !text-sm">
                 {currentIndex + 1} / {allMedia.length}
               </div>
             )}
 
             {/* Right side - Close & Zoom controls */}
-            <div className="flex items-center gap-2">
+            <div className="!flex !items-center !gap-2">
               {!isVideo && (
                 <>
                   <button
@@ -138,11 +138,11 @@ export default function MediaPreview({
                       handleZoomOut();
                     }}
                     disabled={zoom <= 0.5}
-                    className="bg-white/10 hover:bg-white/20 disabled:opacity-50 disabled:cursor-not-allowed backdrop-blur-sm text-white rounded-lg w-9 h-9 flex items-center justify-center transition"
+                    className="!bg-white/10 !hover:bg-white/20 !disabled:opacity-50 !disabled:cursor-not-allowed !backdrop-blur-sm !text-white !rounded-lg !w-9 !h-9 !flex !items-center !justify-center !transition"
                   >
                     <ZoomOut size={18} />
                   </button>
-                  <span className="text-white text-sm bg-white/10 backdrop-blur-sm rounded-lg px-3 py-2">
+                  <span className="!text-white !text-sm !bg-white/10 !backdrop-blur-sm !rounded-lg !px-3 !py-2">
                     {Math.round(zoom * 100)}%
                   </span>
                   <button
@@ -151,7 +151,7 @@ export default function MediaPreview({
                       handleZoomIn();
                     }}
                     disabled={zoom >= 3}
-                    className="bg-white/10 hover:bg-white/20 disabled:opacity-50 disabled:cursor-not-allowed backdrop-blur-sm text-white rounded-lg w-9 h-9 flex items-center justify-center transition"
+                    className="!bg-white/10 !hover:bg-white/20 !disabled:opacity-50 !disabled:cursor-not-allowed !backdrop-blur-sm !text-white !rounded-lg !w-9 !h-9 !flex !items-center !justify-center !transition"
                   >
                     <ZoomIn size={18} />
                   </button>
@@ -159,7 +159,7 @@ export default function MediaPreview({
               )}
               <button
                 onClick={onClose}
-                className="bg-red-500/80 hover:bg-red-600 backdrop-blur-sm text-white rounded-lg w-9 h-9 flex items-center justify-center transition"
+                className="!bg-red-500/80 !hover:bg-red-600 !backdrop-blur-sm !text-white !rounded-lg !w-9 !h-9 !flex !items-center !justify-center !transition"
               >
                 <X size={20} />
               </button>
@@ -175,7 +175,7 @@ export default function MediaPreview({
                 e.stopPropagation();
                 prevMedia();
               }}
-              className="absolute left-4 top-1/2 -translate-y-1/2 text-white bg-black/40 hover:bg-black/60 backdrop-blur-sm rounded-full p-3 transition z-10"
+              className="!absolute !left-4 !top-1/2 !-translate-y-1/2 !text-white !bg-black/40 !hover:bg-black/60 !backdrop-blur-sm !rounded-full !p-3 !transition !z-10"
             >
               <ChevronLeft size={28} />
             </button>
@@ -184,7 +184,7 @@ export default function MediaPreview({
                 e.stopPropagation();
                 nextMedia();
               }}
-              className="absolute right-4 top-1/2 -translate-y-1/2 text-white bg-black/40 hover:bg-black/60 backdrop-blur-sm rounded-full p-3 transition z-10"
+              className="!absolute !right-4 !top-1/2 !-translate-y-1/2 !text-white !bg-black/40 !hover:bg-black/60 !backdrop-blur-sm !rounded-full !p-3 !transition !z-10"
             >
               <ChevronRight size={28} />
             </button>
@@ -193,11 +193,11 @@ export default function MediaPreview({
 
         {/* Loading indicator */}
         {isLoading && (
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <div className="!absolute !inset-0 !flex !items-center !justify-center !pointer-events-none">
             <motion.div
               animate={{ rotate: 360 }}
               transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-              className="w-12 h-12 border-4 border-white/30 border-t-white rounded-full"
+              className="!w-12 !h-12 !border-4 !border-white/30 !border-t-white !rounded-full"
             />
           </div>
         )}
@@ -210,13 +210,13 @@ export default function MediaPreview({
           exit={{ scale: 0.9, opacity: 0 }}
           transition={{ duration: 0.3 }}
           onClick={(e) => e.stopPropagation()}
-          className="max-w-[90vw] max-h-[85vh] flex items-center justify-center"
+          className="!max-w-[90vw] !max-h-[85vh] !flex !items-center !justify-center"
         >
           {isVideo ? (
             <video
               ref={videoRef}
               key={fileUrl}
-              className="max-h-[85vh] max-w-[90vw] rounded-lg shadow-2xl"
+              className="!max-h-[85vh] !max-w-[90vw] !rounded-lg !shadow-2xl"
               controls
               autoPlay
               preload="metadata"
@@ -232,7 +232,7 @@ export default function MediaPreview({
               alt={currentMedia.filename || "Preview"}
               style={{ scale: zoom }}
               transition={{ type: "spring", stiffness: 300, damping: 30 }}
-              className="max-h-[85vh] max-w-[90vw] object-contain rounded-lg shadow-2xl cursor-zoom-in"
+              className="!max-h-[85vh] !max-w-[90vw] !object-contain !rounded-lg !shadow-2xl !cursor-zoom-in"
               onLoad={() => setIsLoading(false)}
               onError={() => setIsLoading(false)}
               onClick={(e) => {
@@ -244,9 +244,9 @@ export default function MediaPreview({
         </motion.div>
 
         {/* Bottom info bar */}
-        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-4">
-          <div className="max-w-7xl mx-auto">
-            <p className="text-white text-sm text-center truncate">
+        <div className="!absolute !bottom-0 !left-0 !right-0 !bg-gradient-to-t !from-black/60 !to-transparent !p-4">
+          <div className="!max-w-7xl !mx-auto">
+            <p className="!text-white !text-sm !text-center !truncate">
               {currentMedia.filename || currentMedia.url}
             </p>
           </div>

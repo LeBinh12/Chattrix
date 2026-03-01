@@ -22,42 +22,95 @@ import { conversationListAtom } from "../../recoil/atoms/conversationListAtom";
 import type { Conversation } from "../../types/conversation";
 import type { PinnedMessageDetail } from "../../types/pinned_message";
 import PinnedMessageBar from "./chat_window/PinnedMessageBar";
+import type { Task } from "../../api/taskApi";
+import { videoCallState } from "../../recoil/atoms/videoCallAtom";
+import { activeCallsAtom } from "../../recoil/atoms/activeCallsAtom";
+import type { TaskComment } from "../../types/task-comment";
+import { taskCommentsAtom } from "../../recoil/atoms/taskComment";
+import {
+  groupMembersAtom,
+  groupTotalMembersAtom,
+} from "../../recoil/atoms/groupAtom";
+import { threadTargetAtom } from "../../recoil/atoms/uiAtom";
+import type { GroupMember, GroupRole } from "../../types/group-member";
 
 type ChatSocketEvent =
   | { type: "chat"; message: Messages }
   | {
-      type: "update_seen";
-      message: {
-        last_seen_message_id?: string;
-        receiver_id?: string;
-        sender_id?: string;
-      };
-    }
+    type: "update_seen";
+    message: {
+      last_seen_message_id?: string;
+      receiver_id?: string;
+      sender_id?: string;
+    };
+  }
   | {
-      type: "delete_for_me";
-      message: { user_id: string; message_ids: string[] };
-    }
-  | { type?: string; message?: unknown }
+    type: "delete_for_me";
+    message: { user_id: string; message_ids: string[] };
+  }
+  | {
+    type: "group_member_added";
+    message: { group_id: string; members: GroupMember[]; total_members?: number };
+  }
+  | { type: "group_member_removed"; message: { group_id: string; user_id: string } }
+  | { type: "group_member_promoted"; payload: { group_id: string; user_id: string; role: string } }
+  | { type: string; message: any }
   | { type: "pinned-message"; message: Messages | PinnedMessageDetail }
   | { type: "un-pinned-message"; message: Messages | PinnedMessageDetail }
-  | { type: "recall-message"; message: Messages };
-
+  | { type: "recall-message"; message: Messages }
+  | { type: "rep-task"; message: Messages & { task?: Task } }
+  | { type: "rep-task"; message: Messages & { task?: Task } }
+  | { type: "account_deleted"; message: string; payload?: string }
+  | { type: "video-call"; message: any }
+  | {
+    type: "reaction_update";
+    message: {
+      type: "add" | "remove" | "remove_all";
+      message_id: string;
+      user_id: string;
+      user_name: string;
+      emoji: string;
+    };
+  }
+  | {
+    type: "task_comment";
+    message: TaskComment;
+  }
+  | {
+    type: "edit_message_update";
+    id: string;
+    content: string;
+    edited_at: string;
+  };
 type ChatWindowProps = {
   onBack?: () => void;
 };
 
 export default function ChatWindow({ onBack }: ChatWindowProps) {
   const selectedChat = useRecoilValue(selectedChatState);
+  const selectedChatRef = useRef(selectedChat);
+  useEffect(() => {
+    selectedChatRef.current = selectedChat;
+  }, [selectedChat]);
+
   const user = useRecoilValue(userAtom);
+  const setCommentsCache = useSetRecoilState(taskCommentsAtom);
   const [messages, setMessages] = useState<Messages[]>([]);
   const [messagesCache, setMessagesCache] = useRecoilState(messagesCacheAtom);
   const [messagesSearchCache, setMessagesSearchCache] = useRecoilState(
     messagesSearchCacheAtom
   );
   const setConversation = useSetRecoilState(conversationListAtom);
+  const setGroupMembersMap = useSetRecoilState(groupMembersAtom);
+  const setGroupTotalMembers = useSetRecoilState(groupTotalMembersAtom);
+  const setThreadTarget = useSetRecoilState(threadTargetAtom);
 
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
+
+  const [isLoadingMoreSearch, setIsLoadingMoreSearch] = useState(false);
+  const [hasMoreSearch, setHasMoreSearch] = useState(true);
+
   const [hasLeftGroup, setHasLeftGroup] = useState(false);
   const [bell] = useRecoilState(bellStateAtom);
   const [isInitialLoading, setIsInitialLoading] = useState(false);
@@ -76,8 +129,12 @@ export default function ChatWindow({ onBack }: ChatWindowProps) {
   const [pinnedMessages, setPinnedMessages] = useState<PinnedMessageDetail[]>(
     []
   );
-  
-  // ✅ Thêm ref để track conversation đã được fetch
+
+  // Video Call State
+  const [callState, setCallState] = useRecoilState(videoCallState);
+  const isCalling = callState.isCalling;
+
+  // ✅ Add ref to track fetched conversations
   const fetchedConversationsRef = useRef<Set<string>>(new Set());
 
   const isGroup =
@@ -131,13 +188,13 @@ export default function ChatWindow({ onBack }: ChatWindowProps) {
     if (!selectedChat || !user?.data.id) return;
 
     try {
-
       const res = await messageAPI.getPinned(
         selectedChat.user_id ?? "",
         selectedChat.group_id ?? ""
       );
+
       if (res.status === 200 && res.data?.data) {
-        // Sort by pinned_at desc để tin mới nhất lên đầu
+        // Sort by pinned_at desc to put newest messages first
         const sorted = res.data.data.sort(
           (a, b) =>
             new Date(b.pinned_at).getTime() - new Date(a.pinned_at).getTime()
@@ -149,22 +206,20 @@ export default function ChatWindow({ onBack }: ChatWindowProps) {
     }
   }, [selectedChat, user?.data.id]);
 
-  // ✅ REFACTOR: fetchMessages - CHỈ set loading khi thực sự gọi API
+  // ✅ REFACTOR: fetchMessages - ONLY set loading when actually calling the API
   const fetchMessages = useCallback(async () => {
     if (!user?.data.id || !conversationKey) return;
 
-    // ✅ QUAN TRỌNG: Kiểm tra cache TRƯỚC, không bật loading nếu có cache
-    
-    // Nếu có messageIDSearch, xử lý tìm kiếm
+    // If messageIDSearch exists, handle search
     if (messageIDSearch) {
-      // Kiểm tra trong search cache trước (ưu tiên hơn)
+      // Check search cache first (higher priority)
       const searchCachedMsgs = messagesSearchCache[conversationKey];
       const foundInSearchCache = searchCachedMsgs?.find(
         (msg) => msg.id === messageIDSearch
       );
 
       if (foundInSearchCache) {
-        // Tin nhắn đã có trong search cache - hiển thị search cache
+        // Message already in search cache - show search cache
         setMessages(searchCachedMsgs);
         setHighlightMessageId(messageIDSearch);
         setIsShowingSearchCache(true);
@@ -172,14 +227,14 @@ export default function ChatWindow({ onBack }: ChatWindowProps) {
         return;
       }
 
-      // Kiểm tra trong cache chính tiếp theo
+      // Check main cache next
       const cachedMsgs = messagesCache[conversationKey];
       const foundInMainCache = cachedMsgs?.find(
         (msg) => msg.id === messageIDSearch
       );
 
       if (foundInMainCache) {
-        // Tin nhắn đã có trong cache chính - hiển thị cache chính
+        // Message already in main cache - show main cache
         setMessages(cachedMsgs);
         setHighlightMessageId(messageIDSearch);
         setIsShowingSearchCache(false);
@@ -187,7 +242,7 @@ export default function ChatWindow({ onBack }: ChatWindowProps) {
         return;
       }
 
-      // ✅ CHỈ BẬT LOADING KHI GỌI API
+      // ✅ ONLY TURN ON LOADING WHEN CALLING API
       try {
         beginInitialLoading();
         const res = await messageAPI.getMessageById(
@@ -203,7 +258,7 @@ export default function ChatWindow({ onBack }: ChatWindowProps) {
               new Date(b.created_at).getTime()
           );
 
-          // Lưu vào search cache thay vì cache chính
+          // Save to search cache instead of main cache
           setMessagesSearchCache((prev) => ({
             ...prev,
             [conversationKey]: sorted,
@@ -212,13 +267,12 @@ export default function ChatWindow({ onBack }: ChatWindowProps) {
           setHighlightMessageId(messageIDSearch);
           setIsShowingSearchCache(true);
           setHasMore(sorted.length >= limit);
+          setHasMoreSearch(sorted.length >= limit);
         } else {
-          // Tin nhắn không tồn tại
           toast.warning("Tin nhắn này đã được bạn xóa!");
-          // Giữ nguyên messages hiện tại
         }
       } catch (error: unknown) {
-        // Xử lý lỗi
+        // Handle error
         if (axios.isAxiosError(error)) {
           const status = error.response?.status;
           const apiMsg =
@@ -264,7 +318,7 @@ export default function ChatWindow({ onBack }: ChatWindowProps) {
       return;
     }
 
-    // ✅ CHỈ BẬT LOADING KHI GỌI API VÀ CHƯA CÓ CACHE
+    // ✅ ONLY TURN ON LOADING WHEN CALLING API AND NO CACHE AVAILABLE
     try {
       beginInitialLoading();
       const res = await messageAPI.getMessage(
@@ -273,10 +327,21 @@ export default function ChatWindow({ onBack }: ChatWindowProps) {
         limit
       );
 
-      const sorted: Messages[] = (res.data.data || []).sort(
+      let sorted: Messages[] = (res.data.data || []).sort(
         (a, b) =>
           new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-      );
+      ).filter(m => !m.parent_id);
+
+      // ✅ Merge with pending messages (realtime arrived during fetch)
+      const pending = pendingRealtimeMessages.current[conversationKey];
+      if (pending && pending.length > 0) {
+        const pendingIds = new Set(pending.map(m => m.id));
+        sorted = [...sorted, ...pending.filter(m => !pendingIds.has(m.id))];
+        // Re-sort to ensure chronological order
+        sorted.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+        // Delete pending after merging
+        delete pendingRealtimeMessages.current[conversationKey];
+      }
 
       setMessagesCache((prev) => ({
         ...prev,
@@ -286,8 +351,8 @@ export default function ChatWindow({ onBack }: ChatWindowProps) {
       setIsShowingSearchCache(false);
       loadedCountRef.current[conversationKey] = sorted.length;
       setHasMore(sorted.length >= limit);
-      
-      // ✅ Đánh dấu conversation đã fetch
+
+      // ✅ Mark conversation as fetched
       fetchedConversationsRef.current.add(conversationKey);
     } catch (err) {
       console.error("Lỗi khi tải tin nhắn:", err);
@@ -309,68 +374,73 @@ export default function ChatWindow({ onBack }: ChatWindowProps) {
   ]);
 
   useEffect(() => {
+    setPinnedMessages([]); // Clear immediately when switching chats
     if (selectedChat) {
       fetchPinnedMessages();
-    } else {
-      setPinnedMessages([]);
     }
   }, [selectedChat, fetchPinnedMessages]);
 
-  // ✅ REFACTOR: Reset messages - KHÔNG bật loading, chỉ reset state
+  // ✅ REFACTOR: Reset messages - DO NOT turn on loading, only reset state
   useEffect(() => {
     if (!selectedChat) {
       setMessages([]);
       setHasMore(true);
       setHasLeftGroup(false);
-      // ✅ KHÔNG set isInitialLoading ở đây
       setHighlightMessageId(null);
       setIsShowingSearchCache(false);
+      // ✅ ADD: Reset all loading states
+      setIsLoadingMore(false);
+      setIsLoadingMoreSearch(false);
+      setHasMoreSearch(true);
       return;
     }
 
-    // Ưu tiên search cache nếu có
+    setMessages([]);
+
+    // Prioritize search cache if available
     const searchCachedMsgs = messagesSearchCache[conversationKey];
     if (searchCachedMsgs?.length && !messageIDSearch) {
       setMessages(searchCachedMsgs);
       setIsShowingSearchCache(true);
-      // ✅ KHÔNG set isInitialLoading ở đây
+      setHasMoreSearch(searchCachedMsgs.length >= limit);
     } else {
-      // Nếu không có search cache thì dùng main cache
       const mainCachedMsgs = messagesCache[conversationKey];
       if (mainCachedMsgs?.length && !messageIDSearch) {
         setMessages(mainCachedMsgs);
         setIsShowingSearchCache(false);
-        // ✅ KHÔNG set isInitialLoading ở đây
-      } 
+        setHasMore(mainCachedMsgs.length >= limit);
+      }
     }
 
-    setHasMore(true);
     setHasLeftGroup(false);
+    setIsLoadingMore(false);
+    setIsLoadingMoreSearch(false);
   }, [
     selectedChat,
     messageIDSearch,
     messagesSearchCache,
     messagesCache,
     conversationKey,
+    limit, // ✅ Thêm dependency
   ]);
 
-  // ✅ REFACTOR: CHỈ gọi fetchMessages khi chưa có cache
+  // ✅ REFACTOR: ONLY call fetchMessages when no cache exists
   useEffect(() => {
     if (!conversationKey) return;
-    
-    // ✅ CHỈ fetch nếu chưa có trong cache VÀ chưa từng fetch
-    const hasCache = 
+
+    // ✅ ONLY fetch if not in cache AND never fetched before
+    const hasCache =
       messagesCache[conversationKey]?.length > 0 ||
       messagesSearchCache[conversationKey]?.length > 0;
-    
+
     const alreadyFetched = fetchedConversationsRef.current.has(conversationKey);
-    
+
     if (!hasCache && !alreadyFetched) {
       fetchMessages();
     }
   }, [conversationKey, messagesCache, messagesSearchCache, fetchMessages]);
 
-  // ✅ REFACTOR: Fetch khi có messageIDSearch mới
+  // ✅ REFACTOR: Fetch when there is a new messageIDSearch
   useEffect(() => {
     if (messageIDSearch && conversationKey) {
       fetchMessages();
@@ -394,10 +464,12 @@ export default function ChatWindow({ onBack }: ChatWindowProps) {
         beforeTime
       );
 
-      const newMessages: Messages[] = (res.data.data || []).sort(
-        (a, b) =>
-          new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-      );
+      const newMessages: Messages[] = (res.data.data || [])
+        .filter((m: Messages) => !m.parent_id)
+        .sort(
+          (a: Messages, b: Messages) =>
+            new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+        );
 
       if (!newMessages.length) {
         setHasMore(false);
@@ -427,6 +499,79 @@ export default function ChatWindow({ onBack }: ChatWindowProps) {
     }
   };
 
+  // ✅ ADD: Load more for search cache
+  const loadMoreSearchMessages = async () => {
+    // ✅ Add conversationKey check
+    if (
+      !selectedChat ||
+      !conversationKey ||
+      isLoadingMoreSearch ||
+      !hasMoreSearch
+    )
+      return;
+
+    try {
+      setIsLoadingMoreSearch(true);
+
+      // ✅ Lấy tin nhắn từ search cache, không phải từ messages hiển thị
+      const searchMessages = messagesSearchCache[conversationKey];
+
+      // ✅ Phải có ít nhất 1 tin nhắn trong search cache
+      if (!searchMessages?.length) {
+        setHasMoreSearch(false);
+        return;
+      }
+
+      const beforeTime = searchMessages[0].created_at;
+
+      console.log("🔍 Loading more search messages, before:", beforeTime);
+
+      const res = await messageAPI.getMessage(
+        selectedChat.user_id ?? "",
+        selectedChat.group_id ?? "",
+        limit,
+        beforeTime
+      );
+
+      const newMessages: Messages[] = (res.data.data || []).sort(
+        (a, b) =>
+          new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+      );
+
+      console.log("📦 Received search messages:", newMessages.length);
+
+      if (!newMessages.length) {
+        setHasMoreSearch(false);
+        return;
+      }
+
+      // Cập nhật search cache
+      setMessagesSearchCache((prev) => {
+        const combined = [...newMessages, ...(prev[conversationKey] || [])];
+        const unique = combined.filter(
+          (msg, index, self) => self.findIndex((m) => m.id === msg.id) === index
+        );
+        console.log("✅ Updated search cache, total:", unique.length);
+        return { ...prev, [conversationKey]: unique };
+      });
+
+      // Cập nhật messages đang hiển thị
+      setMessages((prev) => {
+        const combined = [...newMessages, ...prev];
+        return combined.filter(
+          (msg, index, self) => self.findIndex((m) => m.id === msg.id) === index
+        );
+      });
+
+      setHasMoreSearch(newMessages.length >= limit);
+    } catch (err) {
+      console.error("Lỗi khi tải thêm tin nhắn tìm kiếm:", err);
+      setHasMoreSearch(false); // ✅ Set false khi có lỗi
+    } finally {
+      setIsLoadingMoreSearch(false);
+    }
+  };
+
   const handleDeleteForMe = useCallback(
     (payload: { user_id: string; message_ids: string[] }) => {
       if (!payload || payload.user_id !== user?.data.id) return;
@@ -453,6 +598,10 @@ export default function ChatWindow({ onBack }: ChatWindowProps) {
   const clearSearchCache = useCallback(() => {
     if (!conversationKey) return;
 
+    // ✅ Reset search loading states
+    setIsLoadingMoreSearch(false);
+    setHasMoreSearch(true);
+
     // Xóa search cache
     setMessagesSearchCache((prev) => {
       const updated = { ...prev };
@@ -465,11 +614,17 @@ export default function ChatWindow({ onBack }: ChatWindowProps) {
     if (mainCachedMsgs?.length) {
       setMessages(mainCachedMsgs);
       setIsShowingSearchCache(false);
+
+      // ✅ QUAN TRỌNG: Reset hasMore dựa trên số lượng tin nhắn trong main cache
       setHasMore(mainCachedMsgs.length >= limit);
+
+      // ✅ Reset isLoadingMore nếu đang load
+      setIsLoadingMore(false);
     } else {
       // Nếu cache chính không có, tải lại từ đầu
       setMessages([]);
       setHasMore(true);
+      setIsLoadingMore(false);
       fetchMessages();
     }
 
@@ -482,44 +637,157 @@ export default function ChatWindow({ onBack }: ChatWindowProps) {
     fetchMessages,
   ]);
 
-  // Thêm / cập nhật pinned message vào state và sort theo pinned_at desc
+  // Add / update pinned message in state and sort by pinned_at desc
   const upsertPinnedMessage = useCallback((p: PinnedMessageDetail) => {
     setPinnedMessages((prev) => {
+      // Find by message_id (most reliable for uniqueness of what is pinned)
       const foundIdx = prev.findIndex(
-        (x) => x.pin_id === p.pin_id || x.message_id === p.message_id
+        (x) => x.message_id === p.message_id
       );
       let next;
       if (foundIdx >= 0) {
         next = [...prev];
+        // Merge existing with new, prioritizing new data
         next[foundIdx] = { ...next[foundIdx], ...p };
       } else {
         next = [p, ...prev];
       }
+      
       // Sort newest pinned_at first
-      next.sort(
-        (a, b) =>
-          new Date(b.pinned_at).getTime() - new Date(a.pinned_at).getTime()
-      );
+      next.sort((a, b) => {
+        const dateA = new Date(a.pinned_at || a.created_at).getTime();
+        const dateB = new Date(b.pinned_at || b.created_at).getTime();
+        return dateB - dateA;
+      });
       return next;
     });
   }, []);
 
+  // const handleIncomingMessage = useCallback(
+  //   (msg: Messages) => {
+  //     if (!msg) return;
+  //     const msgKey =
+  //       msg.group_id && msg.group_id !== "000000000000000000000000"
+  //         ? `group_${msg.group_id}`
+  //         : `user_${
+  //             msg.sender_id === user?.data.id ? msg.receiver_id : msg.sender_id
+  //           }`;
+
+  //     if (msg.sender_id !== user?.data.id) playNotificationSound();
+
+  //     // If conversation not loaded (messagesCache empty)
+  //     const isLoaded = messagesCache[msgKey]?.length > 0;
+  //     if (!isLoaded) {
+  //       // Thêm vào pending queue
+  //       pendingRealtimeMessages.current[msgKey] = [
+  //         ...(pendingRealtimeMessages.current[msgKey] || []),
+  //         msg,
+  //       ];
+  //       return;
+  //     }
+
+  //     // Add to main cache
+  //     setMessagesCache((prev) => {
+  //       const oldMessages = prev[msgKey] || [];
+  //       if (oldMessages.some((m) => m.id === msg.id)) return prev;
+  //       return { ...prev, [msgKey]: [...oldMessages, msg] };
+  //     });
+
+  //     if (msgKey === conversationKey) {
+  //       setMessages((prev) => {
+  //         if (prev.some((m) => m.id === msg.id)) return prev;
+  //         return [...prev, msg];
+  //       });
+  //     }
+
+  //     if (
+  //       msg.type === "system" &&
+  //       msg.sender_id === user?.data.id &&
+  //       msg.group_id === selectedChat?.group_id
+  //     ) {
+  //       setHasLeftGroup(true);
+  //     }
+  //   },
+  //   [  
+  //     conversationKey,
+  //     playNotificationSound,
+  //     selectedChat?.group_id,
+  //     messagesCache,
+  //     user?.data.id,
+  //     setMessagesCache,
+  //   ]
+  // );
+
+
   const handleIncomingMessage = useCallback(
     (msg: Messages) => {
       if (!msg) return;
+
+      // 🔽 XỬ LÝ CẬP NHẬT COMMENT COUNT REALTIME
+      if (msg.parent_id) {
+        // 1. Cập nhật state messages hiện tại
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === msg.parent_id
+              ? { ...m, comment_count: (m.comment_count || 0) + 1 }
+              : m
+          )
+        );
+
+        // 2. Xác định key hội thoại để cập nhật cache
+        const msgKey =
+          msg.group_id && msg.group_id !== "000000000000000000000000"
+            ? `group_${msg.group_id}`
+            : `user_${msg.sender_id === user?.data.id ? msg.receiver_id : msg.sender_id}`;
+
+        // 3. Cập nhật cache chính
+        setMessagesCache((prev) => {
+          if (!prev[msgKey]) return prev;
+          return {
+            ...prev,
+            [msgKey]: prev[msgKey].map((m) =>
+              m.id === msg.parent_id
+                ? { ...m, comment_count: (m.comment_count || 0) + 1 }
+                : m
+            ),
+          };
+        });
+
+        // 4. Cập nhật search cache nếu đang hiển thị
+        setMessagesSearchCache((prev) => {
+          if (!prev[msgKey]) return prev;
+          return {
+            ...prev,
+            [msgKey]: prev[msgKey].map((m) =>
+              m.id === msg.parent_id
+                ? { ...m, comment_count: (m.comment_count || 0) + 1 }
+                : m
+            ),
+          };
+        });
+
+        // Nếu là comment thì không thêm vào luồng chính, dừng tại đây
+        return;
+      }
+
       const msgKey =
         msg.group_id && msg.group_id !== "000000000000000000000000"
           ? `group_${msg.group_id}`
-          : `user_${
-              msg.sender_id === user?.data.id ? msg.receiver_id : msg.sender_id
-            }`;
+          : `user_${msg.sender_id === user?.data.id
+            ? msg.receiver_id
+            : msg.sender_id
+          }`;
 
-      if (msg.sender_id !== user?.data.id) playNotificationSound();
+      if (msg.sender_id !== user?.data.id && msg.type !== "system") {
+        playNotificationSound();
+      }
 
-      // Nếu conversation chưa load (messagesCache trống)
-      const isLoaded = messagesCache[msgKey]?.length > 0;
-      if (!isLoaded) {
-        // Thêm vào pending queue
+      // ✅ Kiểm tra xem conversation đã được fetch hay chưa
+      const isFetched = fetchedConversationsRef.current.has(msgKey) || (messagesCache[msgKey]?.length > 0);
+
+      if (!isFetched) {
+        // Đưa vào pending queue để fetchMessages gộp sau
+        console.log(`[Queue] Tin nhắn mới cho ${msgKey} được đưa vào hàng chờ.`);
         pendingRealtimeMessages.current[msgKey] = [
           ...(pendingRealtimeMessages.current[msgKey] || []),
           msg,
@@ -527,13 +795,17 @@ export default function ChatWindow({ onBack }: ChatWindowProps) {
         return;
       }
 
-      // Thêm vào cache chính
+      // ✅ Đã fetch rồi thì add trực tiếp vào cache
       setMessagesCache((prev) => {
         const oldMessages = prev[msgKey] || [];
         if (oldMessages.some((m) => m.id === msg.id)) return prev;
-        return { ...prev, [msgKey]: [...oldMessages, msg] };
+        return {
+          ...prev,
+          [msgKey]: [...oldMessages, msg],
+        };
       });
 
+      // ✅ Nếu đang mở conversation
       if (msgKey === conversationKey) {
         setMessages((prev) => {
           if (prev.some((m) => m.id === msg.id)) return prev;
@@ -541,21 +813,47 @@ export default function ChatWindow({ onBack }: ChatWindowProps) {
         });
       }
 
-      if (
-        msg.type === "system" &&
-        msg.sender_id === user?.data.id &&
-        msg.group_id === selectedChat?.group_id
-      ) {
-        setHasLeftGroup(true);
+      // ✅ System message xử lý riêng
+      if (msg.type === "system") {
+        if (msg.system_action === "leave" &&
+            msg.sender_id === user?.data.id &&
+            msg.group_id === selectedChat?.group_id) {
+          setHasLeftGroup(true);
+        } else if (msg.system_action === "ownership_transferred") {
+          const groupId = msg.group_id;
+          const oldOwnerId = msg.old_owner_id;
+          const newOwnerId = msg.new_owner_id;
+
+          if (groupId && oldOwnerId && newOwnerId) {
+            setGroupMembersMap((prev) => {
+              const currentMembers = prev[groupId];
+              if (!currentMembers) return prev;
+
+              return {
+                ...prev,
+                [groupId]: currentMembers.map(m => {
+                  if (m.user_id === oldOwnerId) return { ...m, role: "member" as GroupRole, role_info: undefined };
+                  if (m.user_id === newOwnerId) return { ...m, role: "owner" as GroupRole, role_info: undefined };
+                  return m;
+                })
+              };
+            });
+
+            if (newOwnerId === user?.data.id) {
+              toast.success("Bạn đã trở thành Trưởng nhóm mới!");
+            }
+          }
+        }
       }
     },
     [
       conversationKey,
       playNotificationSound,
       selectedChat?.group_id,
-      messagesCache,
       user?.data.id,
       setMessagesCache,
+      messagesCache,
+      setGroupMembersMap,
     ]
   );
 
@@ -583,15 +881,15 @@ export default function ChatWindow({ onBack }: ChatWindowProps) {
       if (!last_seen_message_id) return;
 
       const seenConversationKey =
-        sender_id === user?.data.id
-          ? `user_${receiver_id}`
-          : `user_${sender_id}`;
+        receiver_id === user?.data.id
+          ? `user_${sender_id}`
+          : `group_${receiver_id}`;
 
-      // Hàm cập nhật status
+      // Status update function
       const updateStatus = (msgs: Messages[]) =>
         msgs.map((msg) =>
           msg.sender_id === user?.data.id &&
-          isObjectIdLE(msg.id, last_seen_message_id)
+            isObjectIdLE(msg.id, last_seen_message_id)
             ? { ...msg, status: "seen", is_read: true }
             : msg
         );
@@ -603,7 +901,7 @@ export default function ChatWindow({ onBack }: ChatWindowProps) {
         return { ...prev, [seenConversationKey]: updateStatus(cached) };
       });
 
-      // Update messages đang hiển thị
+      // Update currently displayed messages
       if (seenConversationKey === conversationKey) {
         setMessages((prev) => updateStatus(prev));
       }
@@ -620,10 +918,10 @@ export default function ChatWindow({ onBack }: ChatWindowProps) {
   );
 
   function isObjectIdLE(id1: string, id2: string) {
-    return (
-      new Date(parseInt(id1.substring(0, 8), 16) * 1000) <=
-      new Date(parseInt(id2.substring(0, 8), 16) * 1000)
-    );
+    if (id1 === id2) return true;
+    const t1 = parseInt(id1.substring(0, 8), 16);
+    const t2 = parseInt(id2.substring(0, 8), 16);
+    return t1 <= t2;
   }
 
   useEffect(() => {
@@ -632,50 +930,204 @@ export default function ChatWindow({ onBack }: ChatWindowProps) {
 
     const listener = (data: ChatSocketEvent) => {
       switch (data.type) {
-        case "pinned-message":
-          // Backend gửi TOÀN BỘ danh sách pinned mới nhất (không phải chỉ 1 cái)
-          // Hoặc nếu BE gửi từng cái → vẫn phải xử lý upsert đúng
+        case "task_comment": {
           if (data.message) {
+            const payload = data.message as TaskComment;
+            setCommentsCache(prev => {
+              const taskId = payload.task_id;
+
+              // ❌ task not loaded -> ignore (correct cache strategy)
+              if (!prev[taskId]) return prev;
+
+              const comments = prev[taskId];
+
+              switch (payload.type_act) {
+
+                /* ================= CREATE ================= */
+                case "created": {
+                  const exists = comments.some(c => c.id === payload.id);
+                  if (exists) return prev;
+
+                  return {
+                    ...prev,
+                    [taskId]: [...comments, payload as TaskComment],
+                  };
+                }
+
+                /* ================= UPDATE ================= */
+                case "updated": {
+                  const updatedAt = payload.updated_at ?? new Date().toISOString();
+
+                  return {
+                    ...prev,
+                    [taskId]: comments.map((c) => {
+                      // ✅ Update original comment
+                      if (c.id === payload.id) {
+                        return {
+                          ...c,
+                          content: payload.content,
+                          updated_at: updatedAt,
+                        };
+                      }
+
+                      // ✅ Update reply_to_content for reply
+                      if (c.reply_to_id === payload.id) {
+                        return {
+                          ...c,
+                          reply_to_content: payload.content,
+                          updated_at: updatedAt,
+                        };
+                      }
+
+                      return c;
+                    }),
+                  };
+                }
+
+
+                /* ================= DELETE ================= */
+                case "deleted": {
+                  return {
+                    ...prev,
+                    [taskId]: comments.filter(c => c.id !== payload.id),
+                  };
+                }
+
+                default:
+                  return prev;
+              }
+            });
+          }
+          break
+        }
+        case "rep-task": {
+          const msg = data.message as Messages;
+          const updatedTask = msg?.task;
+          if (!updatedTask?.id) {
+            console.warn("rep-task received without task.id");
+            break;
+          }
+
+          setMessagesCache((prevCache) => {
+            const newCache = { ...prevCache };
+
+            let hasUpdated = false;
+
+            // Iterate through all chats (group_id or receiver_id as key)
+            Object.keys(newCache).forEach((chatKey) => {
+              const messages = newCache[chatKey];
+              if (!messages || messages.length === 0) return;
+
+              let messagesUpdated = false;
+              const updatedMessages = messages.map((msg): Messages => {
+                // Only handle task types with matching task.id
+                if (msg.type === "task" && msg.task?.id === updatedTask.id) {
+                  messagesUpdated = true;
+                  hasUpdated = true;
+
+                  return {
+                    ...msg,
+                    task: {
+                      ...msg.task,
+                      ...updatedTask,
+                    } as Task,
+                  };
+                }
+                return msg;
+              });
+
+              if (messagesUpdated) {
+                newCache[chatKey] = updatedMessages;
+              }
+            });
+
+            if (hasUpdated) {
+              console.log(
+                `Task ${updatedTask.id} updated to status: ${updatedTask.status}`
+              );
+            }
+
+            return newCache;
+          });
+
+          break;
+        }
+        case "pinned-message":
+          if (data.message) {
+            console.log("pinned-message received", data.message);
             const payload = data.message as
               | PinnedMessageDetail
               | PinnedMessageDetail[];
+            
+            const isRelevant = (p: PinnedMessageDetail) => {
+              const currentChat = selectedChatRef.current;
+              const isGroupPin = p.group_id && p.group_id !== "000000000000000000000000";
+
+              return (
+                // Group chat
+                (isGroupPin &&
+                  currentChat?.group_id &&
+                  p.group_id === currentChat.group_id) ||
+
+                // 1-1 chat (ưu tiên conversation_id nếu có)
+                (!isGroupPin &&
+                  currentChat?.conversation_id &&
+                  p.conversation_id === currentChat.conversation_id) ||
+
+                // Fallback nếu backend chưa gửi conversation_id
+                (!isGroupPin &&
+                  currentChat?.user_id &&
+                  (p.receiver_id === currentChat.user_id ||
+                  p.sender_id === currentChat.user_id ||
+                  p.pinned_by_id === currentChat.user_id))
+              );
+            };
 
             if (Array.isArray(payload)) {
-              // Trường hợp BE gửi cả list (tốt nhất)
-              const sorted = payload.sort(
+              const relevant = payload.filter(isRelevant);
+              const sorted = relevant.sort(
                 (a, b) =>
                   new Date(b.pinned_at).getTime() -
                   new Date(a.pinned_at).getTime()
               );
               setPinnedMessages(sorted);
             } else {
-              // Trường hợp BE chỉ gửi 1 cái → upsert
-              upsertPinnedMessage(payload);
+              if (isRelevant(payload)) {
+                upsertPinnedMessage(payload);
+              }
             }
           }
           break;
 
         case "un-pinned-message":
           if (data.message) {
+            console.log("un-pinned-message", data.message);
             const payload = data.message as PinnedMessageDetail;
+            const currentChat = selectedChatRef.current;
 
-            // ĐÚNG: xóa theo message_id hoặc pin_id
-            setPinnedMessages((prev) =>
-              prev.filter(
-                (p) =>
-                  p.message_id !== payload.message_id &&
-                  p.pin_id !== payload.pin_id
-              )
-            );
+            const isGroupPin = payload.group_id && payload.group_id !== "000000000000000000000000";
+            const isRelevant = 
+              (currentChat?.group_id && isGroupPin && payload.group_id === currentChat.group_id) ||
+              (currentChat?.user_id && !isGroupPin && (payload.pinned_by_id === currentChat.user_id || payload.receiver_id === currentChat.user_id));
+
+            if (isRelevant) {
+              setPinnedMessages((prev) =>
+                prev.filter(
+                  (p) =>
+                    p.message_id !== payload.message_id
+                )
+              );
+            }
           }
           break;
         case "chat":
+
           if (data.message) {
+            console.log("message", data.message);
             handleIncomingMessage(data.message as Messages);
           }
           break;
         case "update_seen":
-          console.log("update_seen dưới BE gửi lên", data.message);
           if (data.message) {
             handleUpdateSeen(data.message);
           }
@@ -693,44 +1145,329 @@ export default function ChatWindow({ onBack }: ChatWindowProps) {
           }
           break;
 
+        case "edit_message_update": {
+          const payload = (data as any).payload as { id: string; content: string; edited_at: string };
+          if (payload && payload.id) {
+            const updateMsg = (m: Messages): Messages => 
+              m.id === payload.id ? { ...m, content: payload.content, edited_at: payload.edited_at } : m;
+
+            setMessages((prev) => prev.map(updateMsg));
+            
+            setMessagesCache((prev) => {
+              const updated = { ...prev };
+              Object.keys(updated).forEach(key => {
+                 updated[key] = updated[key].map(updateMsg);
+              });
+              return updated;
+            });
+
+            setMessagesSearchCache((prev) => {
+              const updated = { ...prev };
+              Object.keys(updated).forEach(key => {
+                 updated[key] = updated[key].map(updateMsg);
+              });
+              return updated;
+            });
+
+            setPinnedMessages(prev => prev.map(p => 
+              p.message_id === payload.id ? { ...p, content: payload.content } : p
+            ));
+
+            setThreadTarget((prev) => 
+              prev?.id === payload.id ? { ...prev, content: payload.content, edited_at: payload.edited_at } : prev
+            );
+          }
+          break;
+        }
         case "recall-message":
           if (data.message) {
             const recalledMsg = data.message as Messages;
 
-            // Update cache chính
+            // 🔽 1. Nếu là comment bị thu hồi -> Giảm comment_count của cha
+            if (recalledMsg.parent_id) {
+              const decrementCount = (m: Messages) =>
+                m.id === recalledMsg.parent_id
+                  ? { ...m, comment_count: Math.max(0, (m.comment_count || 0) - 1) }
+                  : m;
+
+              setMessages((prev) => prev.map(decrementCount));
+              
+              setMessagesCache((prev) => {
+                const updated = { ...prev };
+                Object.keys(updated).forEach(key => {
+                   updated[key] = updated[key].map(decrementCount);
+                });
+                return updated;
+              });
+
+              setMessagesSearchCache((prev) => {
+                const updated = { ...prev };
+                Object.keys(updated).forEach(key => {
+                   updated[key] = updated[key].map(decrementCount);
+                });
+                return updated;
+              });
+            }
+
+            // 🔽 2. Cập nhật trạng thái "đã thu hồi" cho chính tin nhắn đó
+            const updateRecalled = (m: Messages) =>
+              m.id === recalledMsg.id
+                ? {
+                    ...m,
+                    recalled_at: recalledMsg.recalled_at,
+                    recalled_by: recalledMsg.recalled_by,
+                    content: "", // Xóa nội dung hiển thị
+                  }
+                : m;
+
+            setMessages((prev) => prev.map(updateRecalled));
+
             setMessagesCache((prev) => {
-              const key =
-                recalledMsg.group_id &&
-                recalledMsg.group_id !== "000000000000000000000000"
-                  ? `group_${recalledMsg.group_id}`
-                  : `user_${
-                      recalledMsg.sender_id === user?.data.id
-                        ? recalledMsg.receiver_id
-                        : recalledMsg.sender_id
-                    }`;
-              console.log("key", key);
-              console.log("MessagesCache", messagesCache);
+              const updated = { ...prev };
+              Object.keys(updated).forEach(key => {
+                updated[key] = updated[key].map(updateRecalled);
+              });
+              return updated;
+            });
 
-              if (!prev[key]) return prev;
-
-              const updated = prev[key].map((msg) =>
-                msg.id === recalledMsg.id
-                  ? {
-                      ...msg,
-                      recalled_at: recalledMsg.recalled_at,
-                      recalled_by: recalledMsg.recalled_by,
-                    }
-                  : msg
-              );
-
-              return { ...prev, [key]: updated };
+            setMessagesSearchCache((prev) => {
+               const updated = { ...prev };
+               Object.keys(updated).forEach(key => {
+                 updated[key] = updated[key].map(updateRecalled);
+               });
+               return updated;
             });
           }
+          break;
+        case "reaction_update": {
+          if (data.message) {
+            const payload = data.message as {
+              type: "add" | "remove" | "remove_all";
+              message_id: string;
+              user_id: string;
+              user_name: string;
+              emoji: string;
+            };
+
+            // Update messages state
+            setMessages((prev) =>
+              prev.map((msg) => {
+                if (msg.id !== payload.message_id) return msg;
+
+                let newReactions = msg.reactions ? [...msg.reactions] : [];
+
+                if (payload.type === "add") {
+                  if (
+                    !newReactions.some(
+                      (r) =>
+                        r.user_id === payload.user_id && r.emoji === payload.emoji
+                    )
+                  ) {
+                    newReactions.push({
+                      user_id: payload.user_id,
+                      user_name: payload.user_name,
+                      emoji: payload.emoji,
+                    });
+                  }
+                }
+                else if (payload.type === "remove") {
+                  newReactions = newReactions.filter(
+                    (r) =>
+                      !(
+                        r.user_id === payload.user_id &&
+                        r.emoji === payload.emoji
+                      )
+                  );
+                }
+
+                else if (payload.type === "remove_all") {
+                  newReactions = newReactions.filter(
+                    (r) => r.user_id !== payload.user_id
+                  );
+                }
+
+
+                return { ...msg, reactions: newReactions };
+              })
+            );
+
+            // Update cache
+            setMessagesCache((prev) => {
+              const newCache = { ...prev };
+              let hasChange = false;
+              for (const key of Object.keys(newCache)) {
+                const msgs = newCache[key];
+                if (msgs.some((m) => m.id === payload.message_id)) {
+                  newCache[key] = msgs.map((msg) => {
+                    if (msg.id !== payload.message_id) return msg;
+
+                    hasChange = true;
+                    let newReactions = msg.reactions ? [...msg.reactions] : [];
+                    if (payload.type === "add") {
+                      if (
+                        !newReactions.some(
+                          (r) =>
+                            r.user_id === payload.user_id && r.emoji === payload.emoji
+                        )
+                      ) {
+                        newReactions.push({
+                          user_id: payload.user_id,
+                          user_name: payload.user_name,
+                          emoji: payload.emoji,
+                        });
+                      }
+                    }
+
+                    else if (payload.type === "remove") {
+                      newReactions = newReactions.filter(
+                        (r) =>
+                          !(
+                            r.user_id === payload.user_id &&
+                            r.emoji === payload.emoji
+                          )
+                      );
+                    }
+
+                    else if (payload.type === "remove_all") {
+                      newReactions = newReactions.filter(
+                        (r) => r.user_id !== payload.user_id
+                      );
+                    }
+
+                    return { ...msg, reactions: newReactions };
+                  });
+                }
+              }
+              return hasChange ? newCache : prev;
+            });
+          }
+          break;
+        }
+        case "group_member_removed": {
+          if (data.message) {
+            const payload = data.message as { group_id: string; user_id: string };
+            
+            // Sync group members list and total
+            setGroupMembersMap((prev) => {
+              const currentMembers = prev[payload.group_id] || [];
+              return {
+                ...prev,
+                [payload.group_id]: currentMembers.filter(m => m.user_id !== payload.user_id)
+              };
+            });
+            
+            setGroupTotalMembers((prev) => ({
+              ...prev,
+              [payload.group_id]: Math.max(0, (prev[payload.group_id] || 0) - 1)
+            }));
+
+            if (payload.user_id === user?.data.id && payload.group_id === selectedChat?.group_id) {
+              setHasLeftGroup(true);
+              toast.info("Bạn đã bị xóa khỏi nhóm");
+            }
+          }
+          break;
+        }
+
+        case "group_member_added": {
+          if (data.message) {
+            const payload = data.message as { group_id: string; members: GroupMember[]; total_members?: number };
+            const isMeAdded = payload.members.some(m => m.user_id === user?.data.id);
+
+            if (isMeAdded) {
+              // If I am added, clear the cache for this group to force a full fetch from API
+              // This is because the socket payload only contains the newly added members
+              setGroupMembersMap((prev) => {
+                const newState = { ...prev };
+                delete newState[payload.group_id];
+                return newState;
+              });
+            } else {
+              let addedCount = 0;
+              setGroupMembersMap((prev) => {
+                const currentMembers = prev[payload.group_id] || [];
+                const newMembers = payload.members.filter(
+                  (newMem) => !currentMembers.some((m) => m.user_id === newMem.user_id)
+                );
+
+                if (newMembers.length === 0) return prev;
+                addedCount = newMembers.length;
+
+                return {
+                  ...prev,
+                  [payload.group_id]: [...currentMembers, ...newMembers]
+                };
+              });
+
+              if (payload.total_members) {
+                setGroupTotalMembers((prev) => ({
+                  ...prev,
+                  [payload.group_id]: payload.total_members!
+                }));
+              } else {
+                setGroupTotalMembers((prev) => {
+                  const currentTotal = prev[payload.group_id] || 0;
+                  return {
+                    ...prev,
+                    [payload.group_id]: currentTotal + addedCount
+                  };
+                });
+              }
+            }
+          }
+          break;
+        }
+        case "group_member_promoted": {
+          const payload = (data as any).payload as { group_id: string; user_id: string; role: string };
+          if (payload) {
+            // Update member map in real-time
+            setGroupMembersMap((prev) => {
+              const currentMembers = prev[payload.group_id];
+              if (!currentMembers) return prev;
+
+              return {
+                ...prev,
+                [payload.group_id]: currentMembers.map(m =>
+                  m.user_id === payload.user_id ? { ...m, role: payload.role as GroupRole } : m
+                )
+              };
+            });
+
+            if (payload.user_id === user?.data.id) {
+              toast.info(`Bạn vừa được chỉ định làm ${payload.role === 'admin' ? 'Quản trị viên' : 'Trưởng nhóm'} mới của nhóm!`);
+            }
+          }
+          break;
+        }
+
+        case "group_ownership_transferred": {
+          const payload = (data as any).payload as { group_id: string; old_owner_id: string; new_owner_id: string };
+          if (payload) {
+            setGroupMembersMap((prev) => {
+              const currentMembers = prev[payload.group_id];
+              if (!currentMembers) return prev;
+
+              return {
+                ...prev,
+                [payload.group_id]: currentMembers.map(m => {
+                  if (m.user_id === payload.old_owner_id) return { ...m, role: "member" as GroupRole, role_info: undefined };
+                  if (m.user_id === payload.new_owner_id) return { ...m, role: "owner" as GroupRole, role_info: undefined };
+                  return m;
+                })
+              };
+            });
+
+            if (payload.new_owner_id === user?.data.id) {
+              toast.success("Bạn đã trở thành Trưởng nhóm mới!");
+            }
+          }
+          break;
+        }
       }
     };
 
-    socketManager.addListener(listener);
-    return () => socketManager.removeListener(listener);
+    socketManager.addListener(listener as any);
+    return () => socketManager.removeListener(listener as any);
   }, [
     user?.data.id,
     handleDeleteForMe,
@@ -746,8 +1483,19 @@ export default function ChatWindow({ onBack }: ChatWindowProps) {
   useEffect(() => {
     if (!messages.length || !selectedChat) return;
 
-    const lastMsg = messages[messages.length - 1];
-    if (lastMsg.sender_id === user?.data.id) return; // Không gửi seen cho tin nhắn của chính mình
+    // Find last message from others (not self and not system)
+    let lastPartnerMsg: Messages | undefined;
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (
+        messages[i].sender_id !== user?.data.id &&
+        messages[i].type !== "system"
+      ) {
+        lastPartnerMsg = messages[i];
+        break;
+      }
+    }
+
+    if (!lastPartnerMsg) return;
 
     const conversationKey =
       selectedChat.group_id &&
@@ -755,64 +1503,134 @@ export default function ChatWindow({ onBack }: ChatWindowProps) {
         ? `group_${selectedChat.group_id}`
         : `user_${selectedChat.user_id}`;
 
-    if (lastSeenRef.current[conversationKey] === lastMsg.id) return; // Đã gửi rồi
+    if (lastSeenRef.current[conversationKey] === lastPartnerMsg.id) return; // Already sent
 
-    lastSeenRef.current[conversationKey] = lastMsg.id;
+    lastSeenRef.current[conversationKey] = lastPartnerMsg.id;
 
     socketManager.sendSeenMessage(
-      lastMsg.id,
-      selectedChat.group_id ? selectedChat.group_id : selectedChat.user_id,
+      lastPartnerMsg.id,
+      selectedChat.group_id &&
+      selectedChat.group_id !== "000000000000000000000000"
+        ? selectedChat.group_id
+        : selectedChat.user_id,
       user?.data.id
     );
   }, [messages, selectedChat, user?.data.id]);
 
-  if (!selectedChat) return <EmptyChatWindow />;
+  // if (!selectedChat) return <EmptyChatWindow />;
 
   const handleUnpinPinnedMessage = (messageId: string) => {
     setPinnedMessages((prev) =>
       prev.filter((msg) => msg.message_id !== messageId)
     );
   };
-  
+
+  const toggleVideoCall = useCallback(() => {
+    if (isCalling) {
+      setCallState((prev) => ({ ...prev, isCalling: false, roomId: null, chatId: null, chatType: null }));
+    } else {
+      if (!selectedChat || !user?.data.id) return;
+
+      let roomName = "";
+      const isGroupChat = !!selectedChat.group_id && selectedChat.group_id !== "000000000000000000000000";
+
+      if (isGroupChat) {
+        roomName = `room_${selectedChat.group_id}`;
+      } else {
+        // 1-1 Chat: Sort 2 user IDs to create same room name for both sides
+        const otherId = selectedChat.user_id || "";
+        const myId = user.data.id;
+        const ids = [myId, otherId].sort();
+        roomName = `room_${ids.join("_")}`;
+      }
+
+      // const participantName = user?.data.display_name || user?.data.username || "Guest";
+
+      // Removed local fetchToken, auto handled by App.tsx global watcher
+
+
+      setCallState({
+        isCalling: true,
+        roomId: roomName,
+        chatId: isGroupChat ? selectedChat.group_id! : selectedChat.user_id!,
+        chatType: isGroupChat ? "group" : "user",
+      });
+    }
+  }, [isCalling, selectedChat, user?.data, setCallState]);
+
+  // Removed Auto-Join logic, now global in App.tsx
+
+  const activeCalls = useRecoilValue(activeCallsAtom);
+  const isActiveCallInRoom = selectedChat ? (
+    (!!selectedChat.group_id && activeCalls[selectedChat.group_id]) ||
+    (!!selectedChat.user_id && activeCalls[selectedChat.user_id])
+  ) : false;
+
   return (
-    <div className="flex flex-col w-full h-full max-h-screen bg-[#f5f7fb] text-[#1c2333]">
-      <ChatHeaderWindow
-        avatar={selectedChat.avatar}
-        display_name={selectedChat.display_name ?? "không tên"}
-        status={selectedChat.status}
-        update_at={selectedChat.update_at}
-        onBack={onBack}
-      />
+    <div className="flex flex-col w-full h-[100dvh] bg-[#f5f7fb] text-[#1c2333]">
+      {
+        !selectedChat ? (
+          <EmptyChatWindow />
+        ) : (
+          <>
+            <ChatHeaderWindow
+              display_name={selectedChat?.display_name || ""}
+              avatar={selectedChat?.avatar}
+              onBack={onBack}
+              status={selectedChat?.status || "offline"}
+              update_at={selectedChat?.update_at}
+              receiver_id={selectedChat?.user_id}
+              group_id={selectedChat?.group_id}
+              isDeleted={selectedChat?.status === "deleted"}
+              onToggleCall={toggleVideoCall}
+              isCalling={isCalling}
+              isActiveCallInRoom={isActiveCallInRoom}
+            />
 
-      <PinnedMessageBar
-        pinned={pinnedMessages}
-        onSelectPinned={handleSelectPinnedMessage}
-        onUnpin={handleUnpinPinnedMessage}
-        currentUserId={user?.data.id}
-        receiver_id={selectedChat.user_id}
-        group_id={selectedChat.group_id}
-      />
+            {/* VideoCallModal moved to App.tsx */}
 
-      <ChatContentWindow
-        display_name={selectedChat.display_name ?? "không tên"}
-        currentUserId={user?.data.id}
-        messages={messages}
-        loadMoreMessages={loadMoreMessages}
-        isLoadingMore={isLoadingMore}
-        isInitialLoading={isInitialLoading}
-        highlightMessageId={highlightMessageId}
-        onClearHighlight={() => setHighlightMessageId(null)}
-        isShowingSearchCache={isShowingSearchCache}
-        onClearSearchCache={clearSearchCache}
-      />
-      <ChatInputWindow
-        user_id={user?.data.id || ""}
-        receiver_id={selectedChat.user_id ?? ""}
-        group_id={selectedChat.group_id ?? ""}
-        hasLeftGroup={hasLeftGroup}
-        avatar={selectedChat.avatar}
-        display_name={selectedChat.display_name}
-      />
-    </div>
+            <div className="flex-1 flex flex-col min-h-0 relative">
+
+              <PinnedMessageBar
+                pinned={pinnedMessages}
+                onSelectPinned={handleSelectPinnedMessage}
+                onUnpin={handleUnpinPinnedMessage}
+                currentUserId={user?.data.id}
+                receiver_id={selectedChat.user_id}
+                group_id={selectedChat.group_id}
+              />
+
+              <ChatContentWindow
+                key={conversationKey}
+                conversationKey={conversationKey}
+                display_name={selectedChat.display_name ?? "không tên"}
+                currentUserId={user?.data.id}
+                messages={messages}
+                loadMoreMessages={
+                  isShowingSearchCache ? loadMoreSearchMessages : loadMoreMessages
+                } // ✅ Use appropriate function
+                isLoadingMore={
+                  isShowingSearchCache ? isLoadingMoreSearch : isLoadingMore
+                }
+                isInitialLoading={isInitialLoading}
+                highlightMessageId={highlightMessageId}
+                onClearHighlight={() => setHighlightMessageId(null)}
+                isShowingSearchCache={isShowingSearchCache}
+                onClearSearchCache={clearSearchCache}
+              />
+              <ChatInputWindow
+                user_id={user?.data.id || ""}
+                receiver_id={selectedChat.user_id ?? ""}
+                group_id={selectedChat.group_id ?? ""}
+                hasLeftGroup={hasLeftGroup}
+                avatar={selectedChat.avatar}
+                display_name={selectedChat.display_name}
+                isDeleted={selectedChat.is_deleted}
+              />
+            </div>
+          </>
+        )
+      }
+    </div >
   );
 }

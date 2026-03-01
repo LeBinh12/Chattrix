@@ -22,6 +22,8 @@ export interface Conversation {
     status: string,
     updated_at: string,
     last_message_type: string,
+    is_deleted?: boolean,
     recalled_at?: string,
     recalled_by?: string,
+    conversation_id?: string,
 }

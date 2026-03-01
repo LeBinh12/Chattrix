@@ -7,9 +7,19 @@ import { toast } from "react-toastify";
 import type { Media } from "../../types/upload";
 import { socketManager } from "../../api/socket";
 
+import { taskApi } from "../../api/taskApi";
+import AssignTaskForm, { type TaskData } from "../home/chat_window/AssignTaskForm"; // Adjust path if needed
+import { isMobileDevice } from "../../utils/mobileDetect";
+
 type ChatInputProps = {
   senderID: { id: string };
-  receiverID: { user_id?: string; GroupID?: string };
+  receiverID: {
+    user_id: string;
+    GroupID?: string;
+    display_name: string;
+    avatar: string;
+    online_status?: string;
+  };
 };
 
 export default function ChatInput({ senderID, receiverID }: ChatInputProps) {
@@ -18,13 +28,28 @@ export default function ChatInput({ senderID, receiverID }: ChatInputProps) {
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]); // tạm lưu file
   const [previewFile, setPreviewFile] = useState<File | null>(null); // xem lớn
   const [progress, setProgress] = useState<number[]>([]);
+  const [isMobile, setIsMobile] = useState(isMobileDevice()); // Track mobile device
   const pickerRef = useRef<HTMLDivElement>(null);
   const [uploading, setUploading] = useState(false);
+
+  // Task Modal State
+  const [isTaskFormOpen, setIsTaskFormOpen] = useState(false);
+  // const [taskTitle, setTaskTitle] = useState(""); // Init logic if needed
 
   const handleEmojiClick = (emojiData: EmojiClickData) =>
     setMessage((prev) => prev + emojiData.emoji);
 
   const handleSend = async () => {
+    // 1. Check for @giaoviec command
+    const TASK_REGEX = /@giaoviec\s*(.*)/i;
+    const taskMatch = message.match(TASK_REGEX);
+
+    if (taskMatch) {
+      // setTaskTitle(taskMatch[1] || ""); // Set title from command
+      setIsTaskFormOpen(true);
+      return;
+    }
+
     if (message.trim() === "" && selectedFiles.length === 0) return;
 
     setUploading(true);
@@ -59,7 +84,7 @@ export default function ChatInput({ senderID, receiverID }: ChatInputProps) {
     socketManager.sendMessage(
       senderID.id,
       receiverID.user_id,
-      receiverID.GroupID,
+      receiverID.GroupID || "",
       message,
       uploaded
     );
@@ -82,6 +107,28 @@ export default function ChatInput({ senderID, receiverID }: ChatInputProps) {
     setSelectedFiles((prev) => prev.filter((_, i) => i !== index));
   };
 
+  const handleCreateTask = async (data: TaskData) => {
+    try {
+      const res = await taskApi.createTask({
+        ...data,
+        group_id: receiverID.GroupID || "000000000000000000000000",
+      });
+      const createdTasks: any[] = Array.isArray(res.data.data)
+        ? res.data.data
+        : [res.data.data];
+      toast.success(
+        createdTasks.length > 1
+          ? `Đã giao việc cho ${createdTasks.length} người thành công!`
+          : "Đã giao việc thành công!"
+      );
+      setMessage("");
+      setIsTaskFormOpen(false);
+    } catch (error) {
+      console.error(error);
+      toast.error("Giao việc thất bại, vui lòng thử lại");
+    }
+  };
+
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (
@@ -93,6 +140,20 @@ export default function ChatInput({ senderID, receiverID }: ChatInputProps) {
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+ 
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(isMobileDevice());
+    };
+
+  
+    setIsMobile(isMobileDevice());
+
+   
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
   }, []);
 
   return (
@@ -209,9 +270,13 @@ export default function ChatInput({ senderID, receiverID }: ChatInputProps) {
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                handleSend();
+              if (e.key === "Enter" && !e.shiftKey) {
+        
+                if (!isMobile) {
+                  e.preventDefault();
+                  handleSend();
+                }
+
               }
             }}
             className="flex-1 bg-transparent outline-none text-sm sm:text-base"
@@ -245,9 +310,8 @@ export default function ChatInput({ senderID, receiverID }: ChatInputProps) {
             <button
               onClick={handleSend}
               disabled={uploading}
-              className={`ml-2 p-2 rounded-full text-[#1b4c8a] hover:bg-[#0f3461] cursor-pointer  hover:text-white transition-colors ${
-                uploading ? "opacity-50 cursor-not-allowed" : ""
-              }`}
+              className={`ml-2 p-2 rounded-full text-[#1b4c8a] hover:bg-[#0f3461] cursor-pointer  hover:text-white transition-colors ${uploading ? "opacity-50 cursor-not-allowed" : ""
+                }`}
             >
               <Send size={20} />
             </button>
@@ -258,6 +322,26 @@ export default function ChatInput({ senderID, receiverID }: ChatInputProps) {
           )}
         </motion.div>
       </div>
+
+      {/* Task Assignment Modal */}
+      {isTaskFormOpen && (
+        <AssignTaskForm
+          isOpen={isTaskFormOpen}
+          onClose={() => setIsTaskFormOpen(false)}
+          onSubmit={handleCreateTask}
+          groupId={receiverID.GroupID}
+          receiver={
+            !receiverID.GroupID
+              ? {
+                user_id: receiverID.user_id,
+                display_name: receiverID.display_name,
+                avatar: receiverID.avatar,
+                online_status: receiverID.online_status,
+              }
+              : undefined
+          }
+        />
+      )}
     </div>
   );
 }

@@ -1,19 +1,26 @@
-// Trạng thái online
+// Online status
 export type OnlineStatus = "online" | "offline";
 
-// Vai trò trong group
-export type GroupRole = "owner" | "admin" | "member";
+// Roles in group
+export type GroupRole = "owner" | "admin" | "member" | "number";
 
-// Trạng thái member
+// Member status
 export type GroupMemberStatus = "active" | "inactive" | "blocked";
 
-// Member trong group (trừ chính mình)
+export interface RoleInfo {
+  code: string;
+  name: string;
+  permissions: string[];
+}
+
+// Group member (excluding self)
 export interface GroupMember {
   id: string;
   group_id: string;
   user_id: string;
 
   role: GroupRole;
+  role_info?: RoleInfo;
   status: GroupMemberStatus;
   joined_at: string; // ISO date
 
@@ -27,7 +34,7 @@ export interface GroupMember {
   last_online_at: string | null;
 }
 
-// Response API chuẩn backend của bạn
+// Standard backend API response
 export interface ListGroupMembersResponse {
   status: number;
   message: string;

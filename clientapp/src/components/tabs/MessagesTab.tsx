@@ -148,10 +148,10 @@ export default function MessagesTab({ onFriend, onOpenId }: Props) {
 
   return (
     <div className="p-4 space-y-3">
-      <h1 className="text-4xl font-bold text-center text-white">Nhắn Tin</h1>
-      <h5 className="text-2xl font-extrabold text-[#ecf1fe] text-center">
+      <p className="text-4xl font-bold text-center text-white">Nhắn Tin</p>
+      <p className="text-2xl font-extrabold text-[#ecf1fe] text-center">
         Danh sách tin nhắn
-      </h5>
+      </p>
 
       {/* Search */}
       <motion.div

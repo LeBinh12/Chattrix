@@ -12,6 +12,8 @@ import {
   Type,
   Maximize,
   Underline,
+  Indent,
+  Outdent,
 } from "lucide-react";
 
 type MenuBarProps = {
@@ -53,31 +55,101 @@ function MenuBarContent({
     }),
   });
 
-  const btnClass = (active?: boolean, disabled?: boolean) =>
-    `p-1.5 rounded-md transition-colors ${
-      disabled
-        ? "opacity-50 cursor-not-allowed"
-        : active
-        ? "bg-blue-500 text-white"
-        : "hover:bg-gray-200 text-gray-800"
-    }`;
+const btnClass = (active?: boolean, disabled?: boolean) =>
+  `!p-1.5 !rounded-md !transition-colors !duration-200 ${
+    disabled
+      ? "!opacity-50 !cursor-not-allowed"
+      : active
+      ? "!bg-blue-50 !text-[#00568c] !shadow-sm" // Active: light blue bg, blue text
+      : "hover:!bg-gray-100 !text-gray-600 hover:!text-gray-900" // Default: hover gray bg, dark text
+  }`;
 
   // Hàm xử lý bullet list - chuyển đổi nhiều paragraphs thành list items
   const handleBulletList = () => {
-    // Chỉ cần gọi lệnh toggleBulletList là đủ
-    // TipTap sẽ tự động chuyển tất cả paragraphs trong selection thành list items
+    if (!editor) return;
+
+    if (!editor.isActive("bulletList")) {
+      const { from, to, empty } = editor.state.selection;
+      if (!empty) {
+        // Tham số thứ 3 là blockSeparator, thứ 4 là leafText (cho hard breaks <br>)
+        const text = editor.state.doc.textBetween(from, to, "\n", "\n");
+        
+        if (text.includes("\n")) {
+          // Xây dựng JSON structure cho bulletList
+          const listItems = text
+            .split("\n")
+            .filter((line) => line.trim() !== "")
+            .map((line) => ({
+              type: "listItem",
+              content: [
+                {
+                  type: "paragraph",
+                  content: [{ type: "text", text: line }],
+                },
+              ],
+            }));
+          
+          if (listItems.length > 0) {
+            editor
+              .chain()
+              .focus()
+              .insertContent({
+                type: "bulletList",
+                content: listItems,
+              })
+              .run();
+            return;
+          }
+        }
+      }
+    }
     editor.chain().focus().toggleBulletList().run();
   };
 
   // Hàm xử lý ordered list - chuyển đổi nhiều paragraphs thành numbered list
   const handleOrderedList = () => {
-    // Chỉ cần gọi lệnh toggleOrderedList là đủ
-    // TipTap sẽ tự động chuyển tất cả paragraphs trong selection thành list items
+    if (!editor) return;
+
+    if (!editor.isActive("orderedList")) {
+      const { from, to, empty } = editor.state.selection;
+      if (!empty) {
+        // Tham số thứ 3 là blockSeparator, thứ 4 là leafText (cho hard breaks <br>)
+        const text = editor.state.doc.textBetween(from, to, "\n", "\n");
+        
+        if (text.includes("\n")) {
+          // Xây dựng JSON structure cho orderedList
+          const listItems = text
+            .split("\n")
+            .filter((line) => line.trim() !== "")
+            .map((line) => ({
+              type: "listItem",
+              content: [
+                {
+                  type: "paragraph",
+                  content: [{ type: "text", text: line }],
+                },
+              ],
+            }));
+
+          if (listItems.length > 0) {
+            editor
+              .chain()
+              .focus()
+              .insertContent({
+                type: "orderedList",
+                content: listItems,
+              })
+              .run();
+            return;
+          }
+        }
+      }
+    }
     editor.chain().focus().toggleOrderedList().run();
   };
 
   return (
-    <div className="flex flex-wrap items-center gap-2 p-2 bg-white rounded-t-lg">
+    <div className="!flex !flex-wrap !items-center !gap-2 !p-2 !bg-white !rounded-t-lg">
       {/* Basic formatting */}
       <button
         className={btnClass(editorState.isBold, !editorState.canBold)}
@@ -124,21 +196,57 @@ function MenuBarContent({
         <Type size={16} />
       </button>
 
-      {[1, 2, 3, 4, 5, 6].map((level) => (
-        <button
-          key={level}
-          className={btnClass(editorState.headingLevel === level)}
-          onClick={() =>
-            editor
-              .chain()
-              .focus()
-              .toggleHeading({ level: level as 1 | 2 | 3 | 4 | 5 | 6 })
-              .run()
+
+
+      {/* Indent / Outdent */}
+      <button
+        className={btnClass(false)}
+        onClick={() => {
+          // Check if we're in a list item
+          if (editor.isActive('listItem') && editor.can().sinkListItem('listItem')) {
+            editor.chain().focus().sinkListItem('listItem').run();
+          } else {
+            // For regular text, use Tab key behavior
+            const { from, to } = editor.state.selection;
+            const selectedText = editor.state.doc.textBetween(from, to);
+            
+            if (selectedText) {
+              // Add indentation to each line
+              const indentedText = selectedText.split('\n').map(line => '\u00A0\u00A0\u00A0\u00A0' + line).join('\n');
+              editor.chain().focus().deleteSelection().insertContent(indentedText).run();
+            } else {
+              // Just insert spaces at cursor
+              editor.chain().focus().insertContent('\u00A0\u00A0\u00A0\u00A0').run();
+            }
           }
-        >
-          H{level}
-        </button>
-      ))}
+        }}
+      >
+        <Indent size={16} />
+      </button>
+
+      <button
+        className={btnClass(false)}
+        onClick={() => {
+          if (editor.isActive('listItem') && editor.can().liftListItem('listItem')) {
+            editor.chain().focus().liftListItem('listItem').run();
+          } else {
+            // For regular text, remove leading spaces
+            const { from, to } = editor.state.selection;
+            const selectedText = editor.state.doc.textBetween(from, to);
+            
+            if (selectedText) {
+              // Remove up to 4 leading spaces from each line
+              const outdentedText = selectedText.split('\n').map(line => {
+                // Remove up to 4 non-breaking spaces or regular spaces
+                return line.replace(/^[\u00A0 ]{1,4}/, '');
+              }).join('\n');
+              editor.chain().focus().deleteSelection().insertContent(outdentedText).run();
+            }
+          }
+        }}
+      >
+        <Outdent size={16} />
+      </button>
 
       {/* Lists - SỬA LẠI ĐÂY */}
       <button

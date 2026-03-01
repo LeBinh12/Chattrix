@@ -1,7 +1,8 @@
-export const API_BASE_URL = "http://localhost:3000/v1";
+import { API_URL } from "./config";
 
+export const API_BASE_URL = API_URL || "http://localhost:8088/v1";
 
 export const API_ENDPOINTS = {
-    UPLOAD_MEDIA: `${API_BASE_URL}/upload/media`,
-    STREAM_MEDIA: `${API_BASE_URL}/upload/media/stream`
+  UPLOAD_MEDIA: `${API_BASE_URL}/upload/media`,
+  STREAM_MEDIA: `${API_BASE_URL}/upload/media/stream`,
 };

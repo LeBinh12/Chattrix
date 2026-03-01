@@ -21,12 +21,16 @@ type ConversationPreview struct {
 	Status          string              `json:"status,omitempty"`         // online/offline
 	UpdatedAt       time.Time           `json:"updated_at,omitempty"`     // thời gian offline
 	IsMuted         bool                `bson:"is_muted" json:"is_muted"` // đã tắt thông báo chưa
+	ConversationID  string              `json:"conversation_id"`
+	IsDeleted       bool                `json:"is_deleted"`
 	RecalledAt      *time.Time          `bson:"recalled_at,omitempty" json:"recalled_at,omitempty"`
 	RecalledBy      *primitive.ObjectID `bson:"recalled_by,omitempty" json:"recalled_by,omitempty"`
 }
 
 type ConversationRequest struct {
-	Page    int    `form:"page,default=1" binding:"min=1"`
-	Limit   int    `form:"limit,default=10" binding:"min=1,max=100"`
-	Keyword string `form:"keyword"`
+	Page    int      `form:"page,default=1" binding:"min=1"`
+	Limit   int      `form:"limit,default=10" binding:"min=1,max=1000"`
+	Keyword string   `form:"keyword"`
+	Tags    []string `form:"tags"`
+	Type    string   `form:"type" binding:"omitempty,oneof=user group all"`
 }

@@ -11,13 +11,13 @@ import (
 // CORSMiddleware configures allowed origins/headers so the SPA can call APIs without browser errors.
 func CORSMiddleware() gin.HandlerFunc {
 	cfg := cors.Config{
-		AllowOrigins: []string{
-			"http://localhost:5173",
-			"http://192.168.1.14:5173", // FE chạy trong LAN
-		}, AllowMethods: []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
+		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
 		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization", "X-API-KEY"},
 		ExposeHeaders:    []string{"Content-Length"},
 		AllowCredentials: true,
+		AllowOriginFunc: func(origin string) bool {
+			return true // Allow all origins explicitly for convenience in this setup
+		},
 	}
 
 	return cors.New(cfg)

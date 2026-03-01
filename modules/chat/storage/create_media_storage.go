@@ -31,7 +31,7 @@ func (s *MongoChatStore) OpenMedia(ctx context.Context, ID primitive.ObjectID) (
 	}
 
 	// Lấy object từ MinIO
-	bucketName := "chat-media" // bucket của bạn
+	bucketName := "unichat" // bucket của bạn
 	obj, err := config.MinioClient.GetObject(ctx, bucketName, media.URL, minio.GetObjectOptions{})
 	if err != nil {
 		return nil, 0, time.Time{}, "", err
@@ -44,4 +44,23 @@ func (s *MongoChatStore) OpenMedia(ctx context.Context, ID primitive.ObjectID) (
 	}
 
 	return obj, stat.Size, stat.LastModified, media.Type, nil
+}
+
+func (s *MongoChatStore) GetMediasByIDs(ctx context.Context, ids []primitive.ObjectID) ([]models.Media, error) {
+	var medias []models.Media
+	if len(ids) == 0 {
+		return medias, nil
+	}
+
+	cursor, err := s.db.Collection("medias").Find(ctx, bson.M{"_id": bson.M{"$in": ids}})
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	if err := cursor.All(ctx, &medias); err != nil {
+		return nil, err
+	}
+
+	return medias, nil
 }

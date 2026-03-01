@@ -6,9 +6,19 @@ export const chatInfoPanelVisibleAtom = atom<boolean>({
     key: "chatInfoPanelVisible",
     default: true, // mặc định hiển thị
 });
-export const activePanelAtom = atom<"none" | "info" | "search" | "storage" | "members">({
+export const activePanelAtom = atom<"none" | "info" | "search" | "storage" | "members" | "thread">({
     key: "activePanel",
     default: "none", // mặc định không mở gì
+});
+
+export const threadTargetAtom = atom<any | null>({
+    key: "threadTarget",
+    default: null,
+});
+
+export const threadTargetTypeAtom = atom<"task" | "message">({
+    key: "threadTargetType",
+    default: "task",
 });
 // Atom mới cho ChatSearchModal
 export const chatSearchModalVisibleAtom = atom<boolean>({
@@ -32,6 +42,13 @@ export const groupModalAtom = atom<boolean>({
     default: false,
 });
 
+export const sidebarCollapsedAtom = atom<boolean>({
+    key: "sidebarCollapsedAtom",
+    default: (() => {
+        try { return localStorage.getItem("sidebarCollapsed") === "true"; } catch { return false; }
+    })(),
+});
+
 export const addMemberModalAtom = atom({
     key: "addMemberModalAtom",
     default: {
@@ -48,4 +65,14 @@ export const replyMessageState = atom<ReplyMessage | null>({
 export const groupDetailState = atom<GroupDetail | null>({
     key: "groupDetailState",
     default: null,
+});
+
+export const richTextVisibleAtom = atom<boolean>({
+    key: "richTextVisibleAtom",
+    default: false,
+});
+
+export const storageTabAtom = atom<"media" | "files" | "links">({
+    key: "storageTabAtom",
+    default: "media",
 });

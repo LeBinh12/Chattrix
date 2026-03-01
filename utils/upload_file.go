@@ -36,7 +36,7 @@ func UploadFileToCloudinary(ctx context.Context, fileHeader *multipart.FileHeade
 func UploadFileToMinio(file multipart.File, fileHeader *multipart.FileHeader) (string, error) {
 
 	objectName := fmt.Sprintf("%s-%s", uuid.New().String(), fileHeader.Filename)
-	bucketName := "chat-media"
+	bucketName := "unichat"
 	contentType := fileHeader.Header.Get("Content-Type")
 
 	_, err := config.MinioClient.PutObject(context.Background(),
@@ -73,7 +73,7 @@ func UploadImageFromURLToMinio(imageURL string) (string, error) {
 	}
 
 	objectName := fmt.Sprintf("%s.jpg", uuid.New().String())
-	bucketName := "chat-media"
+	bucketName := "unichat"
 	contentType := resp.Header.Get("Content-Type")
 	if contentType == "" {
 		contentType = "image/jpeg"

@@ -1,20 +1,21 @@
 /** @type {import('tailwindcss').Config} */
 export default {
   content: ["./index.html", "./src/**/*.{js,ts,jsx,tsx}"],
+  darkMode: "class",
   theme: {
     extend: {
       colors: {
         brand: {
-          50: "#F0F7FF",
-          100: "#E0EFFD",
-          200: "#B9DAFF",
-          300: "#8EC2FF",
-          400: "#5BA5FF",
-          500: "#2E88FF",
-          600: "#0068FF", // primary
-          700: "#0056D6",
-          800: "#0041A3",
-          900: "#002E73",
+          50: "#e5f0ff",
+          100: "#b8d5ff",
+          200: "#8ab9ff",
+          300: "#5c9dff",
+          400: "#2e82ff",
+          500: "#0068ff", // Primary Zalo Blue
+          600: "#0054cc",
+          700: "#003f99",
+          800: "#002a66",
+          900: "#001533",
         },
         surface: {
           DEFAULT: "#F5F7FB",

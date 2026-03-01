@@ -15,11 +15,11 @@ import (
 func ListGroupMembersExceptMeHandler(db *mongo.Database) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
-		// 1. Lấy userID từ context (middleware auth)
+		// 1. Get userID from context (auth middleware)
 		userIDStr, exists := c.Get("userID")
 		if !exists {
 			c.JSON(http.StatusUnauthorized, gin.H{
-				"error": "Không tìm thấy userID trong context",
+				"error": "userID not found in context",
 			})
 			return
 		}
@@ -27,7 +27,7 @@ func ListGroupMembersExceptMeHandler(db *mongo.Database) gin.HandlerFunc {
 		userIDHex, ok := userIDStr.(string)
 		if !ok {
 			c.JSON(http.StatusBadRequest, gin.H{
-				"error": "userID không hợp lệ",
+				"error": "invalid userID",
 			})
 			return
 		}
@@ -35,7 +35,7 @@ func ListGroupMembersExceptMeHandler(db *mongo.Database) gin.HandlerFunc {
 		userID, err := primitive.ObjectIDFromHex(userIDHex)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{
-				"error": "userID không phải ObjectID hợp lệ",
+				"error": "userID is not a valid ObjectID",
 			})
 			return
 		}
@@ -45,7 +45,7 @@ func ListGroupMembersExceptMeHandler(db *mongo.Database) gin.HandlerFunc {
 		keyword := c.Query("keyword")
 
 		page := 1
-		limit := 20 // mặc định
+		limit := 20 // default
 
 		if pageStr != "" {
 			page, err = strconv.Atoi(pageStr)
@@ -60,21 +60,21 @@ func ListGroupMembersExceptMeHandler(db *mongo.Database) gin.HandlerFunc {
 			}
 		}
 
-		// 2. Lấy groupID từ param
+		// 2. Get groupID from param
 		groupIDHex := c.Query("group_id")
 		groupID, err := primitive.ObjectIDFromHex(groupIDHex)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{
-				"error": "group_id không hợp lệ",
+				"error": "invalid group_id",
 			})
 			return
 		}
 
-		// 3. Khởi tạo store & biz
+		// 3. Initialize store & biz
 		store := storage.NewMongoStoreGroup(db)
 		business := biz.NewListGroupMembersExceptMeBiz(store)
 
-		// 4. Gọi nghiệp vụ
+		// 4. Call business logic
 		members, total, err := business.List(c, groupID, userID, page, limit, keyword)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, common.ErrDB(err))
@@ -84,11 +84,11 @@ func ListGroupMembersExceptMeHandler(db *mongo.Database) gin.HandlerFunc {
 		// 5. Response
 		c.JSON(http.StatusOK, common.NewResponse(
 			http.StatusOK,
-			"Lấy danh sách thành viên trong nhóm thành công",
+			"Group members retrieved successfully",
 			gin.H{
-				"members": members, // danh sách thành viên
-				"page":    page,    // trang hiện tại
-				"limit":   limit,   // số phần tử/trang
+				"members": members, // member list
+				"page":    page,    // current page
+				"limit":   limit,   // items per page
 				"total":   total,
 			},
 		))

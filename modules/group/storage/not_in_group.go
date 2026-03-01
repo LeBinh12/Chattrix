@@ -2,7 +2,6 @@ package storage
 
 import (
 	"context"
-	"my-app/modules/group/models"
 	userModel "my-app/modules/user/models"
 
 	"go.mongodb.org/mongo-driver/bson"
@@ -17,29 +16,40 @@ func (s *mongoStoreGroup) ListUsersNotInGroup(
 	skip int64,
 ) ([]userModel.User, error) {
 
-	groupMemberColl := s.db.Collection("group_members")
+	groupUserRoleColl := s.db.Collection("group_user_roles")
 	userColl := s.db.Collection("users")
 
-	// Lấy danh sách UserID đã nằm trong group
-	cursor, err := groupMemberColl.Find(ctx, bson.M{"group_id": groupID})
+	// Get active UserIDs in the group (from group_user_roles)
+	cursor, err := groupUserRoleColl.Find(ctx, bson.M{
+		"group_id":   groupID.Hex(),
+		"is_deleted": bson.M{"$ne": true},
+		"role_id":    bson.M{"$ne": ""},
+	})
 	if err != nil {
 		return nil, err
 	}
 	defer cursor.Close(ctx)
 
-	var members []models.GroupMember
-	if err := cursor.All(ctx, &members); err != nil {
+	var gurList []struct {
+		UserID string `bson:"user_id"`
+	}
+	if err := cursor.All(ctx, &gurList); err != nil {
 		return nil, err
 	}
 
-	// gom userID
+	// collect UserIDs that are already in the group
 	existUserIDs := make([]primitive.ObjectID, 0)
-	for _, m := range members {
-		existUserIDs = append(existUserIDs, m.UserID)
+	for _, m := range gurList {
+		oid, err := primitive.ObjectIDFromHex(m.UserID)
+		if err == nil {
+			existUserIDs = append(existUserIDs, oid)
+		}
 	}
 
-	// Điều kiện lọc
-	filter := bson.M{}
+	// Filter condition: Users not in the existUserIDs list
+	filter := bson.M{
+		"is_deleted": bson.M{"$ne": true},
+	}
 	if len(existUserIDs) > 0 {
 		filter["_id"] = bson.M{"$nin": existUserIDs}
 	}

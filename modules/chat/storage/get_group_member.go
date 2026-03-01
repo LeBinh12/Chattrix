@@ -10,15 +10,16 @@ import (
 func (s *MongoChatStore) GetGroupMembers(ctx context.Context, groupID primitive.ObjectID) ([]primitive.ObjectID, error) {
 
 	var members []struct {
-		UserID primitive.ObjectID `bson:"user_id"`
+		UserID string `bson:"user_id"`
 	}
 
 	filter := bson.M{
-		"group_id": groupID,
-		"status":   "active",
+		"group_id":   groupID.Hex(),
+		"is_deleted": bson.M{"$ne": true},
+		"role_id":    bson.M{"$ne": ""},
 	}
 
-	cursor, err := s.db.Collection("group_members").Find(ctx, filter)
+	cursor, err := s.db.Collection("group_user_roles").Find(ctx, filter)
 	if err != nil {
 		return nil, err
 	}
@@ -31,7 +32,10 @@ func (s *MongoChatStore) GetGroupMembers(ctx context.Context, groupID primitive.
 
 	userIDs := make([]primitive.ObjectID, 0, len(members))
 	for _, m := range members {
-		userIDs = append(userIDs, m.UserID)
+		oid, err := primitive.ObjectIDFromHex(m.UserID)
+		if err == nil {
+			userIDs = append(userIDs, oid)
+		}
 	}
 
 	return userIDs, nil

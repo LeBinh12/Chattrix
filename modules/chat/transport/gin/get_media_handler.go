@@ -18,7 +18,7 @@ func GetMediaHandler() gin.HandlerFunc {
 			return
 		}
 
-		bucketName := "chat-media"
+		bucketName := "unichat"
 
 		// Lấy object từ MinIO
 		obj, err := config.MinioClient.GetObject(context.Background(), bucketName, objectName, minio.GetObjectOptions{})
@@ -34,9 +34,11 @@ func GetMediaHandler() gin.HandlerFunc {
 			return
 		}
 
-		ctx.Header("Content-Type", info.ContentType)
-		ctx.Header("Content-Length", fmt.Sprintf("%d", info.Size))
-		ctx.Header("Content-Disposition", "inline; filename="+objectName)
+		disposition := "inline"
+		if ctx.Query("download") == "1" {
+			disposition = "attachment"
+		}
+		ctx.Header("Content-Disposition", fmt.Sprintf("%s; filename=%s", disposition, objectName))
 
 		// Trả về file
 		http.ServeContent(ctx.Writer, ctx.Request, objectName, info.LastModified, obj)

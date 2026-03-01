@@ -17,7 +17,6 @@ export const uploadAPI = {
             },
         });
 
-        // ✅ API trả về có cấu trúc { status, message, data: [ { type, filename, size, url } ] }
         const res = response.data;
 
         if (res && Array.isArray(res.data)) {
@@ -26,5 +25,8 @@ export const uploadAPI = {
         }
 
         throw new Error("Dữ liệu trả về từ API không hợp lệ: " + JSON.stringify(res));
+    },
+    deleteMedia: async (mediaId: string): Promise<void> => {
+        await axiosClient.delete(`/upload/media/${mediaId}`);
     },
 };

@@ -10,8 +10,9 @@ import {
   RotateCw,
   Play,
 } from "lucide-react";
-import type { MediaItem } from "../types/media";
+import { forceDownload } from "../utils/downloadUtil";
 import { API_ENDPOINTS } from "../config/api";
+import type { MediaItem } from "../types/media";
 
 interface MediaViewerModalProps {
   isOpen: boolean;
@@ -36,18 +37,16 @@ export default function MediaViewerModal({
 
   useEffect(() => {
     if (isOpen) {
-      setCurrentIndex(initialIndex); // Cập nhật currentIndex mỗi lần modal mở
+      setCurrentIndex(initialIndex);
     }
   }, [isOpen, initialIndex]);
 
-  // Reset zoom và rotation khi đổi ảnh
   useEffect(() => {
     setZoom(1);
     setRotation(0);
     setIsPlaying(false);
   }, [currentIndex]);
 
-  // Keyboard navigation
   const handlePrevious = useCallback(() => {
     setCurrentIndex((prev) => (prev > 0 ? prev - 1 : mediaItems.length - 1));
   }, [mediaItems.length]);
@@ -90,10 +89,12 @@ export default function MediaViewerModal({
   };
 
   const handleDownload = () => {
-    const link = document.createElement("a");
-    link.href = `${API_ENDPOINTS.UPLOAD_MEDIA}/${currentMedia.url}`;
-    link.download = currentMedia.filename;
-    link.click();
+    if (!currentMedia) return;
+    const url = isVideo
+      ? `${API_ENDPOINTS.STREAM_MEDIA}/${currentMedia.id}`
+      : `${API_ENDPOINTS.UPLOAD_MEDIA}/${currentMedia.url}`;
+    
+    forceDownload(url, currentMedia.filename || "download");
   };
 
   if (!isOpen || !currentMedia) return null;
@@ -108,17 +109,18 @@ export default function MediaViewerModal({
         onClick={onClose}
       >
         {/* Header Controls */}
-        <div className="absolute top-0 left-0 right-0 p-4 bg-gradient-to-b from-black/60 to-transparent z-10">
+        <div className="absolute top-0 left-0 right-0 px-3 py-2 md:p-4 bg-gradient-to-b from-black/60 to-transparent z-10">
           <div className="flex items-center justify-between max-w-7xl mx-auto">
-            <div className="text-white">
-              <p className="font-medium">{currentMedia.filename}</p>
-              <p className="text-sm text-gray-300">
-                {currentIndex + 1} / {mediaItems.length} •{" "}
-                {currentMedia.timestamp}
+            <div className="text-white min-w-0 flex-1 pr-4">
+              <p className="font-medium truncate" title={currentMedia.filename}>
+                {currentMedia.filename}
+              </p>
+              <p className="text-sm text-gray-300 truncate">
+                {currentIndex + 1} / {mediaItems.length} • {currentMedia.timestamp}
               </p>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 md:gap-2 flex-shrink-0">
               {!isVideo && (
                 <>
                   <button
@@ -232,7 +234,7 @@ export default function MediaViewerModal({
               </div>
             ) : (
               <img
-                src={`http://localhost:3000/v1/upload/media/${currentMedia.url}`}
+                src={`${API_ENDPOINTS.UPLOAD_MEDIA}/${currentMedia.url}`}
                 alt={currentMedia.filename}
                 className="max-w-full max-h-[85vh] object-contain rounded-lg select-none"
                 style={{
@@ -265,7 +267,7 @@ export default function MediaViewerModal({
                   {media.type === "video" ? (
                     <>
                       <video
-                        src={`http://localhost:3000/v1/upload/media/${media.url}`}
+                        src={`${API_ENDPOINTS.STREAM_MEDIA}/${media.id}`}
                         className="w-full h-full object-cover"
                       />
                       <div className="absolute inset-0 flex items-center justify-center bg-black/30">
@@ -274,7 +276,7 @@ export default function MediaViewerModal({
                     </>
                   ) : (
                     <img
-                      src={`http://localhost:3000/v1/upload/media/${media.url}`}
+                      src={`${API_ENDPOINTS.UPLOAD_MEDIA}/${media.url}`}
                       alt={media.filename}
                       className="w-full h-full object-cover"
                     />

@@ -9,7 +9,7 @@ import (
 )
 
 type GetMessageBelowStorage interface {
-	GetMessageBelow(ctx context.Context, SenderID, ReceiverID, GroupID primitive.ObjectID, limit int64, afterTime time.Time) ([]models.MessageResponse, error)
+	GetMessageBelow(ctx context.Context, SenderID, ReceiverID, GroupID primitive.ObjectID, limit int64, afterTime time.Time, parentID string) ([]models.MessageResponse, error)
 }
 
 type getMessageBelowBiz struct {
@@ -20,13 +20,13 @@ func NewGetMessageBelowBiz(store GetMessageBelowStorage) *getMessageBelowBiz {
 	return &getMessageBelowBiz{store: store}
 }
 
-func (biz *getMessageBelowBiz) GetMessageBelow(ctx context.Context, SenderID, ReceiverID, GroupID primitive.ObjectID, limit int64, afterTime time.Time) ([]models.MessageResponse, error) {
+func (biz *getMessageBelowBiz) GetMessageBelow(ctx context.Context, SenderID, ReceiverID, GroupID primitive.ObjectID, limit int64, afterTime time.Time, parentID string) ([]models.MessageResponse, error) {
 
 	if limit <= 0 {
 		limit = 20
 	}
 
-	messages, err := biz.store.GetMessageBelow(ctx, SenderID, ReceiverID, GroupID, limit, afterTime)
+	messages, err := biz.store.GetMessageBelow(ctx, SenderID, ReceiverID, GroupID, limit, afterTime, parentID)
 	if err != nil {
 		return nil, err
 	}

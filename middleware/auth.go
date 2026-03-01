@@ -37,6 +37,7 @@ func AuthMiddleware() gin.HandlerFunc {
 
 		// Lưu UserID vào context
 		ctx.Set("userID", claims.UserID)
+		ctx.Set("roles", claims.Roles)
 		ctx.Next()
 	}
 }

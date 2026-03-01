@@ -80,11 +80,12 @@ func GetMessages(db *mongo.Database) gin.HandlerFunc {
 		}
 
 		limit, _ := strconv.ParseInt(ctx.DefaultQuery("limit", "20"), 10, 64)
+		parentID := ctx.Query("parent_id")
 
 		store := storage.NewMongoChatStore(db)
 		business := biz.NewGetMessageBiz(store)
 
-		messages, err := business.GetMessage(ctx.Request.Context(), senderObjectID, receiverObjectID, groupObjectID, limit, beforeTimePtr, afterTimePtr)
+		messages, err := business.GetMessage(ctx.Request.Context(), senderObjectID, receiverObjectID, groupObjectID, limit, beforeTimePtr, afterTimePtr, parentID)
 
 		if err != nil {
 			ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})

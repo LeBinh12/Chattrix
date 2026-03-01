@@ -22,6 +22,7 @@ func (s *ESChatStore) IndexMessage(ctx context.Context, msg *models.Message, sen
 
 	doc := models.ESMessage{
 		ID:           msg.ID.Hex(),
+		ParentID:     hexIfPtrNotNil(msg.ParentMessageID),
 		SenderID:     msg.SenderID.Hex(),
 		ReceiverID:   msg.ReceiverID.Hex(),
 		GroupID:      msg.GroupID.Hex(),
@@ -32,6 +33,11 @@ func (s *ESChatStore) IndexMessage(ctx context.Context, msg *models.Message, sen
 		SenderAvatar: senderAvatar,
 		ReplyToID:    hexIfNotZero(msg.Reply.ID), // <- set reply id
 		Reply:        msg.Reply,
+		Type:         msg.Type,
+		Task:         msg.Task,
+		Status:       msg.Status,
+		DeletedFor:   hexSlice(msg.DeletedFor),
+		RecalledAt:   msg.RecalledAt,
 	}
 
 	body, err := json.Marshal(doc)
@@ -42,6 +48,7 @@ func (s *ESChatStore) IndexMessage(ctx context.Context, msg *models.Message, sen
 	res, err := s.client.Index(
 		"messages",
 		bytes.NewReader(body),
+		s.client.Index.WithDocumentID(doc.ID),
 		s.client.Index.WithRefresh("true"),
 	)
 	if err != nil {
@@ -58,6 +65,24 @@ func (s *ESChatStore) IndexMessage(ctx context.Context, msg *models.Message, sen
 
 func hexIfNotZero(id primitive.ObjectID) string {
 	if id.IsZero() {
+		return ""
+	}
+	return id.Hex()
+}
+
+func hexSlice(ids []primitive.ObjectID) []string {
+	if ids == nil {
+		return nil
+	}
+	res := make([]string, len(ids))
+	for i, id := range ids {
+		res[i] = id.Hex()
+	}
+	return res
+}
+
+func hexIfPtrNotNil(id *primitive.ObjectID) string {
+	if id == nil {
 		return ""
 	}
 	return id.Hex()

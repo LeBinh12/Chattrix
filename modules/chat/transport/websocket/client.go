@@ -1,12 +1,14 @@
 package websocket
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
 	"my-app/common/kafka"
 	"my-app/modules/chat/models"
 	"my-app/modules/chat/storage"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -28,12 +30,17 @@ type Client struct {
 }
 
 type WSMessage struct {
-	Type          string                        `json:"type"`
-	Message       *models.MessageResponse       `json:"message,omitempty"`
-	MessageStatus *models.MessageStatusRequest  `json:"message_status,omitempty"`
-	DeleteMsg     *models.DeleteMessageForMe    `json:"delete_msg,omitempty"`
-	MessageRes    *models.MessageResponseSocket `json:"message_res,omitempty"`
-	GroupMember   *models.GroupMemberRequest    `json:"group_member,omitempty"`
+	Type          string                              `json:"type"`
+	Message       *models.MessageResponse             `json:"message,omitempty"`
+	MessageStatus *models.MessageStatusRequest        `json:"message_status,omitempty"`
+	DeleteMsg     *models.DeleteMessageForMe          `json:"delete_msg,omitempty"`
+	MessageRes    *models.MessageResponseSocket       `json:"message_res,omitempty"`
+	GroupMember   *models.GroupMemberRequest          `json:"group_member,omitempty"`
+	Notification  *models.MessageNotificationResponse `json:"notification,omitempty"`
+	Reaction      *models.MessageReaction             `json:"reaction,omitempty"`
+	CommentTask   *models.TaskComment                 `json:"task_comment,omitempty"`
+	Forward       *models.ForwardMessageRequest       `json:"forward,omitempty"`
+	EditMessage   *models.EditMessageRequest          `json:"edit_message,omitempty"`
 }
 
 func (c *Client) ReadPump(db *mongo.Database) {
@@ -76,7 +83,147 @@ func (c *Client) ReadPump(db *mongo.Database) {
 			c.handleUnPinnedMessage(incoming.Message, incoming.MessageRes)
 		case "add-group-member":
 			c.handleGroupMember(incoming.GroupMember)
+		case "rep-task":
+			c.handleRepTask(incoming.Message)
+		case "notification":
+			c.handleNotificationMessage(incoming.Notification)
+		case "send-reaction":
+			c.handleReaction(incoming.Reaction)
+		case "task_comment":
+			c.handleTaskComment(incoming.CommentTask)
+		case "forward_message":
+			c.handleForwardMessage(incoming.Forward)
+		case "edit-message":
+			c.handleEditMessage(incoming.EditMessage)
 		}
+	}
+}
+
+func (c *Client) handleTaskComment(res *models.TaskComment) {
+	if res == nil {
+		return
+	}
+	fmt.Println("res1", res)
+	c.Hub.Broadcast <- HubEvent{
+		Type:    "task_comment",
+		Payload: res,
+	}
+}
+
+func (c *Client) handleEditMessage(req *models.EditMessageRequest) {
+	if req == nil || req.ID == "" || req.Content == "" {
+		return
+	}
+
+	ctx := context.Background()
+	store := storage.NewMongoChatStore(c.Hub.DB)
+
+	messageID, err := primitive.ObjectIDFromHex(req.ID)
+	if err != nil {
+		log.Println("handleEditMessage: invalid message id:", err)
+		return
+	}
+
+	senderID, err := primitive.ObjectIDFromHex(req.SenderID)
+	if err != nil {
+		log.Println("handleEditMessage: invalid sender id:", err)
+		return
+	}
+
+	// Update content and edited_at in MongoDB
+	if err := store.UpdateMessageContent(ctx, messageID, senderID, req.Content); err != nil {
+		log.Println("handleEditMessage error:", err)
+		return
+	}
+
+	// Broadcast the update to all clients
+	c.Hub.Broadcast <- HubEvent{
+		Type: "edit_message_update",
+		Payload: map[string]interface{}{
+			"id":          req.ID,
+			"content":     req.Content,
+			"sender_id":   req.SenderID,
+			"receiver_id": req.ReceiverID,
+			"group_id":    req.GroupID,
+			"edited_at":   time.Now().Format(time.RFC3339),
+		},
+	}
+}
+
+func (c *Client) handleReaction(req *models.MessageReaction) {
+	if req == nil {
+		return
+	}
+
+	ctx := context.Background()
+	store := storage.NewMongoChatStore(c.Hub.DB)
+
+	// 1. Get Message
+	msg, err := store.GetMessageOneByID(ctx, req.MessageID)
+	if err != nil {
+		log.Println("Error getting message for reaction:", err)
+		return
+	}
+
+	userID, err := primitive.ObjectIDFromHex(c.UserID)
+	if err != nil {
+		return
+	}
+
+	/////////////////////////////////Đẩy vào Kaffka
+	existing, err := store.FindReaction(ctx, req.MessageID, userID, req.Type)
+	if err != nil {
+		log.Println("Error finding reaction:", err)
+		return
+	}
+
+	eventType := "add"
+
+	if req.Action == models.ReactionRemoveAll {
+		/////////////////////////////////Đẩy vào Kaffka
+		if err := store.RemoveAllReactionsByUser(ctx, req.MessageID, userID); err != nil {
+			log.Println("Error removing reaction:", err)
+			return
+		}
+		eventType = "remove_all"
+	} else {
+		if existing != nil {
+			/////////////////////////////////Đẩy vào Kaffka
+			if err := store.RemoveReaction(ctx, req.MessageID, userID, req.Type); err != nil {
+				log.Println("Error removing reaction:", err)
+				return
+			}
+			eventType = "remove"
+		} else {
+			newReaction := models.Reaction{
+				UserID:    userID,
+				UserName:  req.SenderName,
+				Emoji:     req.Type,
+				CreatedAt: time.Now(),
+			}
+			if err := store.AddReaction(ctx, req.MessageID, newReaction); err != nil {
+				log.Println("Error adding reaction:", err)
+				return
+			}
+			eventType = "add"
+		}
+	}
+
+	// 3. Broadcast
+	payload := &models.ReactionEvent{
+		Type:            eventType,
+		MessageID:       req.MessageID,
+		UserID:          userID,
+		UserName:        req.SenderName,
+		Emoji:           req.Type,
+		GroupID:         msg.GroupID,
+		ReceiverID:      msg.ReceiverID,
+		MessageSenderID: msg.SenderID,
+	}
+
+	c.Hub.Broadcast <- HubEvent{
+		Type:    "reaction_update",
+		Payload: payload,
 	}
 }
 
@@ -89,7 +236,7 @@ func (c *Client) handleGroupMember(res *models.GroupMemberRequest) {
 		ID:        primitive.NewObjectID(),
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
-		Status:    models.StatusDelivered,
+		Status:    models.StatusSeen,
 		Type:      "system",
 		IsRead:    true,
 		GroupID:   res.GroupID,
@@ -133,18 +280,26 @@ func (c *Client) handleUnPinnedMessage(msg *models.MessageResponse, res *models.
 		return
 	}
 
-	res.ConversationID = storage.GetConversationID(msg.SenderID, msg.ReceiverID).Hex()
+	if msg.GroupID != primitive.NilObjectID {
+		res.ConversationID = msg.GroupID.Hex()
+	} else {
+		res.ConversationID = storage.GetConversationID(msg.SenderID, msg.ReceiverID).Hex()
+	}
+
 	msg.CreatedAt = time.Now()
 	msg.UpdatedAt = time.Now()
 	msg.ID = primitive.NewObjectID()
 	msg.Status = models.StatusDelivered
 
-	msg.Content = fmt.Sprintf("Người dùng %s đã gỡ một tin nhắn ghim", res.PinnedByName)
+	msg.Content = fmt.Sprintf("Người dùng đã gỡ ghim 1 tin nhắn")
 	msg.Type = "system"
+	msg.SystemAction = "unpin"
 	msg.Status = "seen"
 	msg.IsRead = true
 	res.GroupID = msg.GroupID
-	res.ReceiverID = string(msg.ReceiverID.Hex())
+	res.ReceiverID = msg.ReceiverID.Hex()
+	res.PinnedByID = msg.SenderID.Hex()
+	res.SenderID = msg.SenderID.Hex()
 	// tin nhắn
 	go c.sendToKafkaWithRetry("chat-topic", msg.SenderID.Hex(), msg)
 	// Update DB before broadcast (nếu cần)
@@ -168,19 +323,33 @@ func (c *Client) handlePinnedMessage(msg *models.MessageResponse, res *models.Me
 		return
 	}
 
-	res.ConversationID = storage.GetConversationID(msg.SenderID, msg.ReceiverID).Hex()
-	msg.CreatedAt = time.Now()
-	msg.UpdatedAt = time.Now()
+	if msg.GroupID != primitive.NilObjectID {
+		res.ConversationID = msg.GroupID.Hex()
+	} else {
+		res.ConversationID = storage.GetConversationID(msg.SenderID, msg.ReceiverID).Hex()
+	}
+	now := time.Now()
+	msg.CreatedAt = now
+	msg.UpdatedAt = now
 	msg.ID = primitive.NewObjectID()
 	msg.Status = models.StatusDelivered
 
 	msg.Content = fmt.Sprintf("Người dùng %s đã ghim 1 tin nhắn", res.PinnedByName)
 	msg.Type = "system"
+	msg.SystemAction = "pin"
 	msg.Status = "seen"
 	msg.IsRead = true
 
 	res.GroupID = msg.GroupID
-	res.ReceiverID = string(msg.ReceiverID.Hex())
+	res.ReceiverID = msg.ReceiverID.Hex()
+	res.SenderID = msg.SenderID.Hex()
+	res.PinnedByID = msg.SenderID.Hex() // The person who pinned it
+
+	// Populate realtime pinning fields
+	// Note: We use MessageID as a temporary PinID for realtime until it's saved to DB
+	res.PinID = res.MessageID
+	res.PinnedAt = now.Format(time.RFC3339)
+
 	// Update DB before broadcast (nếu cần)
 	go c.sendToKafkaWithRetry("pinned-message-topic", msg.SenderID.Hex(), res)
 
@@ -193,10 +362,20 @@ func (c *Client) handlePinnedMessage(msg *models.MessageResponse, res *models.Me
 	}
 
 	// Gửi sự kiện cho mọi client
-
 	c.Hub.Broadcast <- HubEvent{
 		Type:    "pinned-message",
 		Payload: res,
+	}
+}
+
+func (c *Client) handleRepTask(msg *models.MessageResponse) {
+	if msg == nil {
+		return
+	}
+
+	c.Hub.Broadcast <- HubEvent{
+		Type:    "rep-task",
+		Payload: msg,
 	}
 }
 
@@ -220,12 +399,38 @@ func (c *Client) handleRecallMessage(msg *models.MessageResponse) {
 	}
 }
 
+func (c *Client) handleNotificationMessage(msg *models.MessageNotificationResponse) {
+	if msg == nil {
+		return
+	}
+	msg.CreatedAt = time.Now()
+
+	msgCopy := msg
+	fmt.Println("msgCopy", msgCopy)
+	switch msg.NotificationType {
+	case models.NotificationTypeSystem:
+		go c.sendToKafkaWithRetry("chat-notification-all", msg.SenderID.Hex(), msg)
+	case models.NotificationTypeGroup:
+		go c.sendToKafkaWithRetry("chat-notification-group", msg.SenderID.Hex(), msg)
+	case models.NotificationTypePersonal:
+		go c.sendToKafkaWithRetry("chat-notification-personal", msg.SenderID.Hex(), msg)
+	}
+
+	c.Hub.Broadcast <- HubEvent{
+		Type:    "chat-notification",
+		Payload: msgCopy,
+	}
+}
+
 // ======================== FIX #4: Retry logic khi gửi Kafka ========================
 func (c *Client) handleChatMessage(msg *models.MessageResponse) {
 	if msg == nil {
 		return
 	}
 	newID := primitive.NewObjectID()
+	data, _ := json.Marshal(msg)
+	_ = os.WriteFile("modules/chat/transport/websocket/last_msg.json", data, 0644)
+	log.Printf("[WS] Incoming chat message logged to modules/chat/transport/websocket/last_msg.json")
 	// Xử lý group message
 	if msg.GroupID != primitive.NilObjectID {
 		msg.CreatedAt = time.Now()
@@ -269,21 +474,23 @@ func (c *Client) handleChatMessage(msg *models.MessageResponse) {
 	}
 
 	// Broadcast conversation preview
-	conversations := models.ConversationPreview{
-		UserID:          msg.ReceiverID.Hex(),
-		GroupID:         msg.GroupID.Hex(),
-		LastMessage:     msg.Content,
-		LastMessageID:   newID.Hex(),
-		LastMessageType: string(msg.Type),
-		Avatar:          msg.Avatar,
-		DisplayName:     msg.DisplayName,
-		LastDate:        msg.CreatedAt,
-		SenderID:        msg.SenderID.Hex(),
-	}
+	if msg.ParentID == "" {
+		conversations := models.ConversationPreview{
+			UserID:          msg.ReceiverID.Hex(),
+			GroupID:         msg.GroupID.Hex(),
+			LastMessage:     msg.Content,
+			LastMessageID:   newID.Hex(),
+			LastMessageType: string(msg.Type),
+			Avatar:          msg.Avatar,
+			DisplayName:     msg.DisplayName,
+			LastDate:        msg.CreatedAt,
+			SenderID:        msg.SenderID.Hex(),
+		}
 
-	c.Hub.Broadcast <- HubEvent{
-		Type:    "conversations",
-		Payload: &conversations,
+		c.Hub.Broadcast <- HubEvent{
+			Type:    "conversations",
+			Payload: &conversations,
+		}
 	}
 }
 
@@ -312,6 +519,7 @@ func (c *Client) handleMemberLeft(msg *models.MessageResponse) {
 	msg.UpdatedAt = time.Now()
 	msg.ID = primitive.NewObjectID()
 
+	msg.SystemAction = "leave"
 	msg.Status = "seen"
 	msg.IsRead = true
 
@@ -324,9 +532,17 @@ func (c *Client) handleMemberLeft(msg *models.MessageResponse) {
 		Payload: msg,
 	}
 
+	// c.Hub.Broadcast <- HubEvent{
+	// 	Type:    "member_left",
+	// 	Payload: msg,
+	// }
+
 	c.Hub.Broadcast <- HubEvent{
-		Type:    "member_left",
-		Payload: msg,
+		Type: "group_member_removed",
+		Payload: map[string]interface{}{
+			"group_id": msg.GroupID.Hex(),
+			"user_id":  msg.SenderID.Hex(),
+		},
 	}
 }
 
@@ -357,6 +573,76 @@ func (c *Client) handleDeleteForMe(delMsg *models.DeleteMessageForMe) {
 	}
 
 	go c.sendToKafkaWithRetry("delete-message-for-me-topic", userID.Hex(), *delMsg)
+}
+
+func (c *Client) handleForwardMessage(req *models.ForwardMessageRequest) {
+	if req == nil {
+		return
+	}
+
+	// Max 50 channels check
+	if len(req.ReceiverIDs)+len(req.GroupIDs) > 50 {
+		log.Println(" Forward: Too many channels")
+		return
+	}
+
+	senderID, err := primitive.ObjectIDFromHex(req.SenderID)
+	if err != nil {
+		log.Println(" Forward: Invalid SenderID")
+		return
+	}
+
+	// Handle GroupIDs
+	for _, gidStr := range req.GroupIDs {
+		gid, err := primitive.ObjectIDFromHex(gidStr)
+		if err != nil {
+			continue
+		}
+
+		newMsg := &models.MessageResponse{
+			ID:        primitive.NewObjectID(),
+			SenderID:  senderID,
+			GroupID:   gid,
+			Content:   req.Content,
+			Type:      req.Type,
+			MediaIDs:  req.MediaIDs,
+			CreatedAt: time.Now(),
+			UpdatedAt: time.Now(),
+			Status:    models.StatusDelivered,
+		}
+
+		go c.sendToKafkaWithRetry("chat-topic", req.SenderID, newMsg)
+		c.Hub.Broadcast <- HubEvent{Type: "chat", Payload: newMsg}
+	}
+
+	// Handle ReceiverIDs
+	for _, ridStr := range req.ReceiverIDs {
+		rid, err := primitive.ObjectIDFromHex(ridStr)
+		if err != nil {
+			continue
+		}
+
+		newMsg := &models.MessageResponse{
+			ID:         primitive.NewObjectID(),
+			SenderID:   senderID,
+			ReceiverID: rid,
+			Content:    req.Content,
+			Type:       req.Type,
+			MediaIDs:   req.MediaIDs,
+			CreatedAt:  time.Now(),
+			UpdatedAt:  time.Now(),
+		}
+
+		// Check if receiver is online to set status
+		if _, ok := c.Hub.Clients[rid.Hex()]; ok {
+			newMsg.Status = models.StatusDelivered
+		} else {
+			newMsg.Status = models.StatusSent
+		}
+
+		go c.sendToKafkaWithRetry("chat-topic", newMsg.SenderID.Hex(), newMsg)
+		c.Hub.Broadcast <- HubEvent{Type: "chat", Payload: newMsg}
+	}
 }
 
 // ======================== Retry logic với exponential backoff ========================

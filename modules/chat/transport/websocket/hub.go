@@ -12,6 +12,7 @@ import (
 	StorageUser "my-app/modules/user/storage"
 	"time"
 
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 )
@@ -72,12 +73,29 @@ func (h *Hub) Run() {
 				user, _ := StorageUser.NewMongoStore(h.DB).FindByID(context.Background(), msg.SenderID.Hex())
 				msg.SenderAvatar = user.Avatar
 				msg.SenderName = user.DisplayName
+
+				// Nếu là nhắn nhóm, đảm bảo có thông tin nhóm cho conversation preview
+				if msg.GroupID != primitive.NilObjectID && (msg.DisplayName == "" || msg.Avatar == "") {
+					var group struct {
+						Name  string `bson:"name"`
+						Image string `bson:"image"`
+					}
+					err := h.DB.Collection("group").FindOne(context.Background(), bson.M{"_id": msg.GroupID}).Decode(&group)
+					if err == nil {
+						if msg.DisplayName == "" {
+							msg.DisplayName = group.Name
+						}
+						if msg.Avatar == "" {
+							msg.Avatar = group.Image
+						}
+					}
+				}
+
 				data, _ := json.Marshal(map[string]interface{}{
 					"type":    "chat",
 					"message": msg,
 				})
 
-				// Nếu là nhắn nhóm
 				// Nếu là nhắn nhóm
 				if msg.GroupID != primitive.NilObjectID {
 					members, err := storage.NewMongoChatStore(h.DB).GetGroupMembers(context.Background(), msg.GroupID)
@@ -86,32 +104,34 @@ func (h *Hub) Run() {
 						break
 					}
 
-					for _, memberID := range members {
-						// Tạo conversation preview riêng cho từng member
-						convPreview := &models.ConversationPreview{
-							SenderID:        msg.SenderID.Hex(),
-							GroupID:         msg.GroupID.Hex(),
-							UserID:          "", // member nhận conversation
-							LastMessage:     msg.Content,
-							LastMessageID:   msg.ID.Hex(),
-							LastMessageType: string(msg.Type),
-							Avatar:          msg.Avatar,      // avatar nhóm
-							DisplayName:     msg.DisplayName, // tên nhóm
-							LastDate:        msg.CreatedAt,
-							IsMuted:         msg.IsMuted,
-						}
+					if msg.ParentID == "" {
+						for _, memberID := range members {
+							// Tạo conversation preview riêng cho từng member
+							convPreview := &models.ConversationPreview{
+								SenderID:        msg.SenderID.Hex(),
+								GroupID:         msg.GroupID.Hex(),
+								UserID:          "", // member nhận conversation
+								LastMessage:     msg.Content,
+								LastMessageID:   msg.ID.Hex(),
+								LastMessageType: string(msg.Type),
+								Avatar:          msg.Avatar,      // avatar nhóm
+								DisplayName:     msg.DisplayName, // tên nhóm
+								LastDate:        msg.CreatedAt,
+								IsMuted:         msg.IsMuted,
+							}
 
-						dataConv, _ := json.Marshal(map[string]interface{}{
-							"type":    "conversations",
-							"message": convPreview,
-						})
+							dataConv, _ := json.Marshal(map[string]interface{}{
+								"type":    "conversations",
+								"message": convPreview,
+							})
 
-						if sessions, ok := h.Clients[memberID.Hex()]; ok {
-							for _, c := range sessions {
-								select {
-								case c.Send <- dataConv:
-								default:
-									log.Printf("Buffer full — dropping conversation update for %s", memberID.Hex())
+							if sessions, ok := h.Clients[memberID.Hex()]; ok {
+								for _, c := range sessions {
+									select {
+									case c.Send <- dataConv:
+									default:
+										log.Printf("Buffer full — dropping conversation update for %s", memberID.Hex())
+									}
 								}
 							}
 						}
@@ -161,52 +181,53 @@ func (h *Hub) Run() {
 				}
 
 				// Sau khi gửi xong message...
-				senderPreview := &models.ConversationPreview{
-					SenderID:        msg.SenderID.Hex(),
-					UserID:          msg.ReceiverID.Hex(), // Người nhận
-					LastMessage:     msg.Content,
-					LastMessageID:   msg.ID.Hex(),
-					LastMessageType: string(msg.Type),
-					Avatar:          msg.Avatar,     // avatar của người nhận
-					DisplayName:     msg.SenderName, // tên người nhận
-					LastDate:        msg.CreatedAt,
-					IsMuted:         msg.IsMuted,
-				}
+				if msg.ParentID == "" {
+					senderPreview := &models.ConversationPreview{
+						SenderID:        msg.SenderID.Hex(),
+						UserID:          msg.ReceiverID.Hex(), // Người nhận
+						LastMessage:     msg.Content,
+						LastMessageID:   msg.ID.Hex(),
+						LastMessageType: string(msg.Type),
+						Avatar:          msg.Avatar,     // avatar của người nhận
+						DisplayName:     msg.SenderName, // tên người nhận
+						LastDate:        msg.CreatedAt,
+						IsMuted:         msg.IsMuted,
+					}
 
-				receiverPreview := &models.ConversationPreview{
-					SenderID:        msg.SenderID.Hex(),
-					UserID:          msg.SenderID.Hex(), // Người gửi
-					LastMessage:     msg.Content,
-					LastMessageID:   msg.ID.Hex(),
-					LastMessageType: string(msg.Type),
-					Avatar:          msg.SenderAvatar, // avatar của người gửi
-					DisplayName:     msg.SenderName,   // tên người gửi
-					LastDate:        msg.CreatedAt,
-				}
+					receiverPreview := &models.ConversationPreview{
+						SenderID:        msg.SenderID.Hex(),
+						UserID:          msg.SenderID.Hex(), // Người gửi
+						LastMessage:     msg.Content,
+						LastMessageID:   msg.ID.Hex(),
+						LastMessageType: string(msg.Type),
+						Avatar:          msg.SenderAvatar, // avatar của người gửi
+						DisplayName:     msg.SenderName,   // tên người gửi
+						LastDate:        msg.CreatedAt,
+					}
 
-				// Serialize JSON
-				senderDataConv, _ := json.Marshal(map[string]interface{}{
-					"type":    "conversations",
-					"message": senderPreview,
-				})
+					// Serialize JSON
+					senderDataConv, _ := json.Marshal(map[string]interface{}{
+						"type":    "conversations",
+						"message": senderPreview,
+					})
 
-				receiverDataConv, _ := json.Marshal(map[string]interface{}{
-					"type":    "conversations",
-					"message": receiverPreview,
-				})
+					receiverDataConv, _ := json.Marshal(map[string]interface{}{
+						"type":    "conversations",
+						"message": receiverPreview,
+					})
 
-				// Gửi realtime riêng biệt
-				if sessions, ok := h.Clients[msg.SenderID.Hex()]; ok {
-					for _, c := range sessions {
-						c.Send <- senderDataConv
+					// Gửi realtime riêng biệt
+					if sessions, ok := h.Clients[msg.SenderID.Hex()]; ok {
+						for _, c := range sessions {
+							c.Send <- senderDataConv
+						}
+					}
+					if sessions, ok := h.Clients[msg.ReceiverID.Hex()]; ok {
+						for _, c := range sessions {
+							c.Send <- receiverDataConv
+						}
 					}
 				}
-				if sessions, ok := h.Clients[msg.ReceiverID.Hex()]; ok {
-					for _, c := range sessions {
-						c.Send <- receiverDataConv
-					}
-				}
-
 			case "update_seen":
 				msg := event.Payload.(*models.MessageStatusRequest)
 				data, _ := json.Marshal(map[string]interface{}{
@@ -251,6 +272,44 @@ func (h *Hub) Run() {
 						case c.Send <- data:
 						default:
 							log.Printf("Buffer full — dropping delete_for_me for %s", payload.UserID)
+						}
+					}
+				}
+
+			case "edit_message_update":
+				payload := event.Payload.(map[string]interface{})
+				data, _ := json.Marshal(map[string]interface{}{
+					"type":    "edit_message_update",
+					"payload": payload,
+				})
+
+				groupIDStr, _ := payload["group_id"].(string)
+				receiverIDStr, _ := payload["receiver_id"].(string)
+				senderIDStr, _ := payload["sender_id"].(string)
+
+				// Nếu là nhắn nhóm
+				if groupIDStr != "" && groupIDStr != "000000000000000000000000" {
+					groupID, _ := primitive.ObjectIDFromHex(groupIDStr)
+					members, err := storage.NewMongoChatStore(h.DB).GetGroupMembers(context.Background(), groupID)
+					if err == nil {
+						for _, memberID := range members {
+							if sessions, ok := h.Clients[memberID.Hex()]; ok {
+								for _, c := range sessions {
+									c.Send <- data
+								}
+							}
+						}
+					}
+				} else {
+					// Nếu là nhắn 1-1
+					if sessions, ok := h.Clients[receiverIDStr]; ok {
+						for _, c := range sessions {
+							c.Send <- data
+						}
+					}
+					if sessions, ok := h.Clients[senderIDStr]; ok {
+						for _, c := range sessions {
+							c.Send <- data
 						}
 					}
 				}
@@ -407,6 +466,123 @@ func (h *Hub) Run() {
 					}
 				}
 
+			case "rep-task":
+				resSocket := event.Payload.(*models.MessageResponse)
+
+				dataRecall, _ := json.Marshal(map[string]interface{}{
+					"type":    "rep-task",
+					"message": resSocket,
+				})
+				// Nếu là nhắn nhóm
+				if resSocket.GroupID != primitive.NilObjectID {
+					members, err := storage.NewMongoChatStore(h.DB).GetGroupMembers(context.Background(), resSocket.GroupID)
+					if err != nil {
+						log.Println("Lỗi GetGroupMembers:", err)
+						break
+					}
+
+					for _, memberID := range members {
+
+						if sessions, ok := h.Clients[memberID.Hex()]; ok {
+							for _, c := range sessions {
+								// Gửi type recall-message
+								select {
+								case c.Send <- dataRecall:
+								default:
+									log.Printf("Buffer full — dropping recall for %s", memberID.Hex())
+								}
+							}
+						}
+					}
+
+					break
+				}
+
+				users := []primitive.ObjectID{resSocket.SenderID, resSocket.ReceiverID} // Nếu là nhắn 1-1
+
+				for _, uid := range users {
+					if sessions, ok := h.Clients[uid.Hex()]; ok {
+						for _, c := range sessions {
+							// Gửi type recall-message
+							select {
+							case c.Send <- dataRecall:
+							default:
+								log.Printf("Buffer full — dropping recall for %s", uid.Hex())
+							}
+						}
+					}
+				}
+
+			case "chat-notification":
+				resSocket := event.Payload.(*models.MessageNotificationResponse)
+
+				if resSocket == nil {
+					log.Println("[chat-notification] Payload is nil")
+					break
+				}
+
+				// Chuẩn bị message chính - hiển thị như tin nhắn chat bình thường
+				dataMsg, err := json.Marshal(map[string]interface{}{
+					"type":    "chat",
+					"message": resSocket,
+				})
+				if err != nil {
+					log.Printf("[chat-notification] Marshal chat message error: %v", err)
+					break
+				}
+
+				// Đếm số user nhận được để log chính xác
+				broadcastCount := 0
+
+				// Duyệt qua tất cả client đang online
+				for userID, sessions := range h.Clients {
+					if sessions == nil {
+						continue
+					}
+
+					for _, client := range sessions {
+						// 1. Gửi tin nhắn chính (hiển thị trong khung chat)
+						select {
+						case client.Send <- dataMsg:
+							// thành công
+						default:
+							log.Printf("Buffer full — dropping chat-notification message for user %s", userID)
+							continue // thử client tiếp theo
+						}
+
+						// 2. Tạo và gửi conversation preview riêng cho user này
+						convPreview := &models.ConversationPreview{
+							SenderID:        resSocket.SenderID.Hex(),
+							UserID:          userID, // quan trọng: user này thấy conversation với kênh hệ thống
+							LastMessage:     resSocket.Content,
+							LastMessageID:   resSocket.ID.Hex(),
+							LastMessageType: string(resSocket.Type),
+							Avatar:          resSocket.SenderAvatar,
+							DisplayName:     resSocket.SenderName,
+							LastDate:        resSocket.CreatedAt,
+							// Có thể thêm: UnreadCount: 1, IsMuted: false,...
+						}
+
+						dataConv, err := json.Marshal(map[string]interface{}{
+							"type":    "conversations",
+							"message": convPreview,
+						})
+						if err != nil {
+							log.Printf("[chat-notification] Marshal conversation preview error for user %s: %v", userID, err)
+							continue
+						}
+
+						select {
+						case client.Send <- dataConv:
+							broadcastCount++
+						default:
+							log.Printf("Buffer full — dropping conversation preview for user %s", userID)
+						}
+					}
+				}
+
+				// Log chính xác số lượng user thực tế nhận được
+				log.Printf("[chat-notification] Successfully broadcast to %d online users (from channel %s)", broadcastCount, resSocket.SenderID.Hex())
 			case "group_member_added":
 				payload := event.Payload.(map[string]interface{})
 				members := payload["members"].([]models.Member)
@@ -434,7 +610,6 @@ func (h *Hub) Run() {
 
 				for _, mem := range members {
 					uid := mem.UserID.Hex()
-					fmt.Println("uid", uid)
 					// Nếu user đang online → gửi realtime
 					if sessions, ok := h.Clients[uid]; ok {
 
@@ -476,17 +651,236 @@ func (h *Hub) Run() {
 							}
 						}
 					}
+				}
+				break
+			case "account_deleted":
+				deletedUserID := event.Payload.(string)
+				data, _ := json.Marshal(map[string]interface{}{
+					"type":    "account_deleted",
+					"message": "Tài khoản của bạn đã bị xóa khỏi hệ thống.",
+				})
+
+				if sessions, ok := h.Clients[deletedUserID]; ok {
+					for _, c := range sessions {
+						select {
+						case c.Send <- data:
+						default:
+						}
+						// Ta không close ngay lập tức để client nhận được message
+					}
+				}
+			case "task_comment":
+				resSocket := event.Payload.(*models.TaskComment)
+
+				dataRecall, _ := json.Marshal(map[string]interface{}{
+					"type":    "task_comment",
+					"message": resSocket,
+				})
+				// Nếu là nhắn nhóm
+				if resSocket.GroupID != primitive.NilObjectID {
+					members, err := storage.NewMongoChatStore(h.DB).GetGroupMembers(context.Background(), resSocket.GroupID)
+					if err != nil {
+						log.Println("Lỗi GetGroupMembers:", err)
+						break
+					}
+
+					for _, memberID := range members {
+
+						if sessions, ok := h.Clients[memberID.Hex()]; ok {
+							for _, c := range sessions {
+								// Gửi type recall-message
+								select {
+								case c.Send <- dataRecall:
+								default:
+									log.Printf("Buffer full — dropping recall for %s", memberID.Hex())
+								}
+							}
+						}
+					}
 
 					break
 				}
 
-				if sessions, ok := h.Clients[resSocket.SenderID.Hex()]; ok {
+				users := []primitive.ObjectID{resSocket.SenderID, resSocket.ReceiverID} // Nếu là nhắn 1-1
+
+				for _, uid := range users {
+					if sessions, ok := h.Clients[uid.Hex()]; ok {
+						for _, c := range sessions {
+							// Gửi type recall-message
+							select {
+							case c.Send <- dataRecall:
+							default:
+								log.Printf("Buffer full — dropping recall for %s", uid.Hex())
+							}
+						}
+					}
+				}
+
+			case "reaction_update":
+				payload := event.Payload.(*models.ReactionEvent)
+				data, _ := json.Marshal(map[string]interface{}{
+					"type":    "reaction_update",
+					"message": payload,
+				})
+
+				// Send to Group
+				if payload.GroupID != primitive.NilObjectID {
+					members, err := storage.NewMongoChatStore(h.DB).GetGroupMembers(context.Background(), payload.GroupID)
+					if err != nil {
+						log.Println("Lỗi GetGroupMembers reaction:", err)
+						break
+					}
+
+					for _, memberID := range members {
+						if sessions, ok := h.Clients[memberID.Hex()]; ok {
+							for _, c := range sessions {
+								select {
+								case c.Send <- data:
+								default:
+								}
+							}
+						}
+					}
+				} else {
+					// Send to 1-1 (Sender & Receiver)
+					// Note: payload.UserID is the reactor.
+					// payload.MessageSenderID is who sent message.
+					// payload.ReceiverID is the other person in 1-1.
+
+					// Logic: Broadcast to MessageSenderID AND ReceiverID.
+					// Why? Because in 1-1, these are the two participants.
+
+					recipients := []string{payload.MessageSenderID.Hex(), payload.ReceiverID.Hex()}
+					// Dedup just in case
+					if payload.MessageSenderID == payload.ReceiverID {
+						recipients = []string{payload.MessageSenderID.Hex()}
+					}
+
+					for _, uid := range recipients {
+						if sessions, ok := h.Clients[uid]; ok {
+							for _, c := range sessions {
+								select {
+								case c.Send <- data:
+								default:
+								}
+							}
+						}
+					}
+				}
+
+			case "video-call":
+				log.Println("[Hub] Received video-call event") // DEBUG
+				payload := event.Payload.(map[string]interface{})
+				log.Printf("[Hub] Payload: %+v\n", payload) // DEBUG
+				data, _ := json.Marshal(map[string]interface{}{
+					"type":    "video-call",
+					"message": payload,
+				})
+
+				ctx := context.Background()
+
+				// Handle Group Call
+				if groupID, ok := payload["group_id"].(string); ok && groupID != "" {
+					log.Printf("[Hub] Broadcasting group call to group: %s\n", groupID) // DEBUG
+					oid, err := primitive.ObjectIDFromHex(groupID)
+					if err == nil {
+						members, err := storage.NewMongoChatStore(h.DB).GetGroupMembers(ctx, oid)
+						if err == nil {
+							for _, memberID := range members {
+								if sessions, ok := h.Clients[memberID.Hex()]; ok {
+									for _, c := range sessions {
+										select {
+										case c.Send <- data:
+										default:
+											log.Printf("Buffer full — dropping video-call for %s", memberID.Hex())
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+
+				// Handle DM Call (User to User)
+				if receiverID, ok := payload["receiver_id"].(string); ok && receiverID != "" {
+					log.Printf("[Hub] Processing DM call for receiver: %s\n", receiverID) // DEBUG
+					// Send to Receiver
+					if sessions, ok := h.Clients[receiverID]; ok {
+						log.Printf("[Hub] Receiver %s is ONLINE. Sending socket message.\n", receiverID) // DEBUG
+						for _, c := range sessions {
+							select {
+							case c.Send <- data:
+							default:
+								log.Printf("Buffer full — dropping video-call for %s", receiverID)
+							}
+						}
+					} else {
+						log.Printf("[Hub] Receiver %s is OFFLINE (not in h.Clients).\n", receiverID) // DEBUG
+					}
+					// Send to Sender (Caller) - though they likely know, it keeps state in sync
+					if callerID, ok := payload["caller_id"].(string); ok && callerID != "" {
+						if sessions, ok := h.Clients[callerID]; ok {
+							for _, c := range sessions {
+								select {
+								case c.Send <- data:
+								default:
+									log.Printf("Buffer full — dropping video-call for %s", callerID)
+								}
+							}
+						}
+					}
+				}
+			case "group_dissolved":
+				payload := event.Payload.(map[string]interface{})
+				groupIDStr := payload["group_id"].(string)
+
+				var members []primitive.ObjectID
+				if mIDs, ok := payload["member_ids"].([]primitive.ObjectID); ok {
+					members = mIDs
+				} else {
+					groupID, err := primitive.ObjectIDFromHex(groupIDStr)
+					if err != nil {
+						log.Println("Lỗi group_id không hợp lệ trong group_dissolved:", groupIDStr)
+						break
+					}
+					members, err = storage.NewMongoChatStore(h.DB).GetGroupMembers(context.Background(), groupID)
+					if err != nil {
+						log.Println("Lỗi GetGroupMembers trong group_dissolved:", err)
+						break
+					}
+				}
+
+				data, _ := json.Marshal(map[string]interface{}{
+					"type":    "group_dissolved",
+					"payload": payload,
+				})
+
+				for _, memberID := range members {
+					if sessions, ok := h.Clients[memberID.Hex()]; ok {
+						for _, c := range sessions {
+							select {
+							case c.Send <- data:
+							default:
+								log.Printf("Buffer full — dropping group_dissolved for %s", memberID.Hex())
+							}
+						}
+					}
+				}
+
+			case "group_member_removed":
+				payload := event.Payload.(map[string]interface{})
+				targetUserID := payload["user_id"].(string)
+				data, _ := json.Marshal(map[string]interface{}{
+					"type":    "group_member_removed",
+					"message": payload,
+				})
+
+				if sessions, ok := h.Clients[targetUserID]; ok {
 					for _, c := range sessions {
-						// Gửi type recall-message
 						select {
-						case c.Send <- dataRecall:
+						case c.Send <- data:
 						default:
-							log.Printf("Buffer full — dropping recall for %s", resSocket.SenderID.Hex())
+							log.Printf("Buffer full — dropping group_member_removed for %s", targetUserID)
 						}
 					}
 				}

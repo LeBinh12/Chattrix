@@ -8,17 +8,34 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
-func (s *MongoChatStore) getGroupConversations(ctx context.Context, userObjectID primitive.ObjectID, page, limit int, keyword string) ([]groupTemp, error) {
-	groupMemberCollection := s.db.Collection("group_members")
+func (s *MongoChatStore) getGroupConversations(ctx context.Context, userObjectID primitive.ObjectID, page, limit int, keyword string, filterIDs []primitive.ObjectID) ([]groupTemp, error) {
+	groupMemberCollection := s.db.Collection("group_user_roles")
 
-	matchGroups := bson.D{{"$match", bson.M{"user_id": userObjectID}}}
+	// Match groups for current user (convert ObjectID to string hex for this collection)
+	matchGroupsFilter := bson.M{
+		"user_id":    userObjectID.Hex(),
+		"is_deleted": bson.M{"$ne": true},
+		"role_id":    bson.M{"$ne": ""},
+	}
+
+	if len(filterIDs) > 0 {
+		groupIDsHex := make([]string, len(filterIDs))
+		for i, id := range filterIDs {
+			groupIDsHex[i] = id.Hex()
+		}
+		matchGroupsFilter["group_id"] = bson.M{"$in": groupIDsHex}
+	}
+
+	matchGroups := bson.D{{"$match", matchGroupsFilter}}
 
 	lookupGroup := bson.D{{
 		"$lookup", bson.M{
-			"from":         "group",
-			"localField":   "group_id",
-			"foreignField": "_id",
-			"as":           "group_info",
+			"from": "group",
+			"let":  bson.M{"gid": "$group_id"},
+			"pipeline": mongo.Pipeline{
+				{{"$match", bson.M{"$expr": bson.M{"$eq": []interface{}{"$_id", bson.M{"$toObjectId": "$$gid"}}}}}},
+			},
+			"as": "group_info",
 		}}}
 
 	unwindGroup := bson.D{{"$unwind", "$group_info"}}
@@ -30,31 +47,94 @@ func (s *MongoChatStore) getGroupConversations(ctx context.Context, userObjectID
 		}}}
 	}
 
-	// 🔹 Lookup tin nhắn mới nhất - GIỮ NGUYÊN AS ARRAY
+	// 🔹 Lookup ChatSeenStatus để lấy last_seen_message_id
+	lookupSeenStatus := bson.D{{
+		"$lookup", bson.M{
+			"from": "chat_seen_status",
+			"let":  bson.M{"groupId": bson.M{"$toObjectId": "$group_id"}, "userId": userObjectID},
+			"pipeline": []bson.M{
+				{"$match": bson.M{
+					"$expr": bson.M{
+						"$and": []bson.M{
+							{"$eq": []interface{}{"$conversation_id", "$$groupId"}},
+							{"$eq": []interface{}{"$user_id", "$$userId"}},
+						},
+					},
+				}},
+				{"$sort": bson.M{"last_seen_message_id": -1}},
+				{"$limit": 1},
+			},
+			"as": "seen_status",
+		},
+	}}
+
+	unwindSeenStatus := bson.D{{"$unwind", bson.M{"path": "$seen_status", "preserveNullAndEmptyArrays": true}}}
+
+	// 🔹 Lookup unread count based on last_seen_message_id
+	// Use created_at as joined_at fallback for GroupUserRole records
+	lookupUnread := bson.D{{
+		"$lookup", bson.M{
+			"from": "messages",
+			"let":  bson.M{"groupId": bson.M{"$toObjectId": "$group_id"}, "lastSeenId": "$seen_status.last_seen_message_id", "joinedAt": "$created_at"},
+			"pipeline": []bson.M{
+				{"$match": bson.M{
+					"$expr": bson.M{
+						"$and": []bson.M{
+							{"$eq": []interface{}{"$group_id", "$$groupId"}},
+							{"$gt": []interface{}{"$_id", bson.M{"$ifNull": []interface{}{"$$lastSeenId", primitive.NilObjectID}}}},
+							{"$gte": []interface{}{"$created_at", "$$joinedAt"}},
+						},
+					},
+					"deleted_for":       bson.M{"$ne": userObjectID},
+					"sender_id":         bson.M{"$ne": userObjectID},
+					"type":              bson.M{"$ne": "system"},
+					"parent_message_id": bson.M{"$exists": false},
+				}},
+				{"$count": "count"},
+			},
+			"as": "unread_messages",
+		},
+	}}
+
+	addUnreadCount := bson.D{{"$addFields", bson.M{
+		"unread_count": bson.M{
+			"$cond": bson.A{
+				bson.M{"$gt": bson.A{bson.M{"$size": "$unread_messages"}, 0}},
+				bson.M{"$arrayElemAt": bson.A{"$unread_messages.count", 0}},
+				0,
+			},
+		},
+	}}}
+
 	lookupLastMessage := bson.D{{
 		"$lookup", bson.M{
 			"from": "messages",
-			"let":  bson.M{"groupId": "$group_id"},
+			"let":  bson.M{"groupId": bson.M{"$toObjectId": "$group_id"}, "joinedAt": "$created_at"},
 			"pipeline": []bson.M{
 				{"$match": bson.M{
-					"$expr":       bson.M{"$eq": []interface{}{"$group_id", "$$groupId"}},
-					"deleted_for": bson.M{"$ne": userObjectID},
+					"$expr": bson.M{
+						"$and": []bson.M{
+							{"$eq": []interface{}{"$group_id", "$$groupId"}},
+							{"$gte": []interface{}{"$created_at", "$$joinedAt"}},
+						},
+					},
+					"deleted_for":       bson.M{"$ne": userObjectID},
+					"parent_message_id": bson.M{"$exists": false},
 				}},
 				{"$sort": bson.M{"created_at": -1}},
 				{"$limit": 1},
 			},
-			"as": "last_message_array", //  Đổi tên để tránh nhầm lẫn
+			"as": "last_message_array",
 		},
 	}}
 
-	// 🔹 THÊM $addFields ĐỂ TRANSFORM ARRAY -> OBJECT
 	addLastMessageField := bson.D{{
 		"$addFields", bson.M{
 			"last_message": bson.M{
 				"$cond": bson.A{
 					bson.M{"$gt": bson.A{bson.M{"$size": "$last_message_array"}, 0}},
 					bson.M{"$arrayElemAt": bson.A{"$last_message_array", 0}},
-					nil, // Nếu không có tin nhắn thì set nil
+					nil,
 				},
 			},
 		},
@@ -65,8 +145,12 @@ func (s *MongoChatStore) getGroupConversations(ctx context.Context, userObjectID
 		pipeline = append(pipeline, matchKeyword)
 	}
 	pipeline = append(pipeline,
+		lookupSeenStatus,
+		unwindSeenStatus,
+		lookupUnread,
+		addUnreadCount,
 		lookupLastMessage,
-		addLastMessageField, //  Thêm stage này
+		addLastMessageField,
 		bson.D{{"$skip", int64((page - 1) * limit)}},
 		bson.D{{"$limit", int64(limit)}},
 	)

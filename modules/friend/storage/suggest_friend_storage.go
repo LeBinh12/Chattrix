@@ -63,7 +63,8 @@ func (s *mongoStore) GetFriendSuggestions(ctx context.Context, userID string, ke
 	}
 
 	filter := bson.M{
-		"_id": bson.M{"$ne": userObjID}, // loại bỏ chính mình
+		"_id":        bson.M{"$ne": userObjID}, // loại bỏ chính mình
+		"is_deleted": bson.M{"$ne": true},
 	}
 
 	if len(friendIDs) > 0 {

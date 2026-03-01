@@ -1,131 +1,125 @@
-import { Route, Routes } from "react-router-dom";
-import AuthLayout from "./layouts/AuthLayout";
-import LoginScreen from "./pages/LoginScreen";
-import MainLayout from "./layouts/MainLayout";
-import HomeScreen from "./pages/HomeScreen";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
-import AdminGuard, { PrivateRoute, PublicRoute } from "./routes/Guard";
-import RegisterScreen from "./pages/RegisterScreen";
-import SuggestionScreen from "./pages/SuggestionScreen";
 import { useLoadUser } from "./hooks/useLoadUser";
-import SuggestionLayout from "./layouts/SuggestionLayout";
-import { useRecoilValue } from "recoil";
+import { useRecoilValue, useRecoilState } from "recoil";
 import { userAtom } from "./recoil/atoms/userAtom";
-import { useEffect } from "react";
-import { socketManager } from "./api/socket";
-import AdminLayout from "./layouts/AdminLayout";
-import AuthOpenDictCallback from "./pages/AuthOpenDictCallback";
-import CompleteProfileScreen from "./pages/RegisterOAuth2Screen";
-import GroupScreen from "./pages/GroupScreen";
-import ContactsScreen from "./pages/ContactsScreen";
-import "ad99-ag-grid-table/style.css";
-import UserManagerScreen from "./pages/admin/UserManagerScreen";
-import DashboardScreen from "./pages/admin/DashboardScreen";
-import GroupManagerScreen from "./pages/admin/GroupManagerScreen";
-import ChatManagerScreen from "./pages/admin/ChatManagerScreen";
-import MediaManagerScreen from "./pages/admin/MediaManagerScreen";
-import SystemLogManagerScreen from "./pages/admin/SystemLogManagerScreen";
-import NotificationManagerScreen from "./pages/admin/NotificationManager";
-import LoginAdminScreen from "./pages/admin/LoginAdminScreen";
+import { useEffect, useRef } from "react";
 import FavicoNotifier from "./components/FavicoNotifier";
+import { IncomingCallModal } from "./components/LiveKit/IncomingCallModal";
+import { videoCallState } from "./recoil/atoms/videoCallAtom";
+import { VideoCallModal } from "./components/LiveKit/VideoCallModal";
+import { useVideoCall } from "./hooks/useVideoCall";
+import "rsuite/dist/rsuite.min.css";
+import MobileNotificationBanner from "./components/MobileNotificationBanner";
+import { useAppSocket } from "./hooks/useAppSocket";
+import { AppRoutes } from "./components/AppRoutes";
 
 function App() {
   useLoadUser();
   const user = useRecoilValue(userAtom);
+  const [videoCall, setVideoCall] = useRecoilState(videoCallState);
+
+  const { mobileNotif, setMobileNotif, isMobile } = useAppSocket();
 
   useEffect(() => {
-    if (user?.data.id) {
-      socketManager.connect(user.data.id);
-      sessionStorage.setItem("socket_user", user.data.id);
+    if (Notification.permission === "default") {
+      Notification.requestPermission();
     }
-  }, [user?.data.id]);
+  }, []);
+
+  // Global Video Call Handling
+  const {
+    token,
+    serverUrl,
+    fetchToken,
+    resetCall,
+    loading: loadingCall,
+    error: errorCall,
+  } = useVideoCall();
+  const hasFetchedTokenForRoom = useRef<string | null>(null);
+
+  // Auto-fetch token when calls start globally
+  useEffect(() => {
+    if (videoCall.isCalling && videoCall.roomId && !token) {
+      if (hasFetchedTokenForRoom.current === videoCall.roomId) return;
+      if (!user?.data.id) return;
+
+      const participantName =
+        user.data.display_name || user.data.username || "Guest";
+      console.log("🚀 [App.tsx] Joining room:", videoCall.roomId);
+      hasFetchedTokenForRoom.current = videoCall.roomId;
+
+      fetchToken(
+        videoCall.roomId,
+        participantName,
+        videoCall.chatType === "group" ? videoCall.chatId! : undefined,
+        videoCall.chatType === "user" ? videoCall.chatId! : undefined
+      ).catch((err) => {
+        console.error("[App.tsx] Token fetch failed:", err);
+        hasFetchedTokenForRoom.current = null;
+      });
+    }
+  }, [
+    videoCall.isCalling,
+    videoCall.roomId,
+    token,
+    user?.data,
+    fetchToken,
+    videoCall.chatType,
+    videoCall.chatId,
+  ]);
+
+  // Reset ref and token when call ends
+  useEffect(() => {
+    if (!videoCall.isCalling) {
+      hasFetchedTokenForRoom.current = null;
+      resetCall(); // Ensure token is cleared so next call fetches fresh
+    }
+  }, [videoCall.isCalling, resetCall]);
+
   return (
     <>
       <FavicoNotifier />
-      <Routes>
-        <Route
-          element={
-            <PublicRoute>
-              <AuthLayout />
-            </PublicRoute>
-          }
-        >
-          <Route path="/login" element={<LoginScreen />} />
-          <Route path="/register" element={<RegisterScreen />} />
-        </Route>
-        <Route
-          element={
-            <PrivateRoute>
-              <AuthLayout />
-            </PrivateRoute>
-          }
-        >
-          <Route path="/register-oauth" element={<CompleteProfileScreen />} />
-        </Route>
-
-        <Route
-          element={
-            <PrivateRoute>
-              <SuggestionLayout />
-            </PrivateRoute>
-          }
-        >
-          <Route path="/suggestion" element={<SuggestionScreen />} />
-        </Route>
-
-        <Route
-          element={
-            <PrivateRoute>
-              <MainLayout />
-            </PrivateRoute>
-          }
-        >
-          <Route path="/" element={<HomeScreen />} />
-          <Route path="/home" element={<HomeScreen />} />
-          <Route path="/group" element={<GroupScreen />} />
-          <Route path="/contact" element={<ContactsScreen />} />
-        </Route>
-        <Route
-          path="/auth/opendict/callback"
-          element={<AuthOpenDictCallback />}
-        />
-        <Route path="/admin/login" element={<LoginAdminScreen />} />
-        {/* Page Admin */}
-        <Route
-          element={
-            <AdminGuard>
-              <AdminLayout />
-            </AdminGuard>
-          }
-        >
-          <Route path="/admin" element={<DashboardScreen />} />
-          <Route path="/admin/dashboard" element={<DashboardScreen />} />
-          <Route path="/admin/manager-user" element={<UserManagerScreen />} />
-          <Route path="/admin/manager-group" element={<GroupManagerScreen />} />
-          <Route path="/admin/manager-chat" element={<ChatManagerScreen />} />
-          <Route path="/admin/manager-media" element={<MediaManagerScreen />} />
-          <Route
-            path="/admin/manager-system-logs"
-            element={<SystemLogManagerScreen />}
-          />
-          <Route
-            path="/admin/manager-notification"
-            element={<NotificationManagerScreen />}
-          />
-        </Route>
-      </Routes>
+      <MobileNotificationBanner
+        isVisible={!!mobileNotif}
+        title={mobileNotif?.title || ""}
+        body={mobileNotif?.body || ""}
+        onClose={() => setMobileNotif(null)}
+        onClick={mobileNotif?.onClick}
+      />
+      <IncomingCallModal />
+      <VideoCallModal
+        isOpen={videoCall.isCalling}
+        onClose={() => {
+          setVideoCall((prev) => ({
+            ...prev,
+            isCalling: false,
+            roomId: null,
+            chatId: null,
+            chatType: null,
+          }));
+          resetCall();
+        }}
+        token={token}
+        serverUrl={serverUrl}
+        loading={loadingCall}
+        error={errorCall}
+      />
+      
+      <AppRoutes />
 
       <ToastContainer
-        position="top-right"
-        autoClose={3000}
+        position={isMobile ? "top-center" : "top-right"}
+        autoClose={isMobile ? 5000 : 3000}
         hideProgressBar={false}
         newestOnTop={false}
         closeOnClick
         pauseOnHover
         draggable
         theme="light"
-        toastClassName="bg-white shadow-lg rounded-lg p-4 sm:p-5 text-sm sm:text-base"
+        toastClassName={`bg-white shadow-xl rounded-2xl p-4 sm:p-5 text-sm sm:text-base border border-slate-100 ${
+          isMobile ? "mx-4 mt-2 w-auto min-w-[320px] max-w-[90vw]" : ""
+        }`}
       />
     </>
   );

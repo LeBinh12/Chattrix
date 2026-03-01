@@ -5,11 +5,27 @@ import App from "./App.tsx";
 import { AuthProvider } from "./context/AuthProvider.tsx";
 import { BrowserRouter } from "react-router-dom";
 import { RecoilRoot } from "recoil";
-import { ModuleRegistry } from "ag-grid-community";
-import { ClientSideRowModelModule } from "ag-grid-community";
+import { 
+  ModuleRegistry, 
+  ClientSideRowModelModule, 
+  PaginationModule, 
+  TextFilterModule, 
+  NumberFilterModule, 
+  DateFilterModule,
+  ValidationModule,
+  InfiniteRowModelModule
+} from "ag-grid-community";
 import { CssVarsProvider } from "@mui/joy/styles";
 
-ModuleRegistry.registerModules([ClientSideRowModelModule]);
+ModuleRegistry.registerModules([
+  ClientSideRowModelModule, 
+  PaginationModule, 
+  TextFilterModule, 
+  NumberFilterModule, 
+  DateFilterModule,
+  ValidationModule,
+  InfiniteRowModelModule
+]);
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

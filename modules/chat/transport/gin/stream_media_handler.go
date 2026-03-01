@@ -27,6 +27,12 @@ func StreamMediaHandler(db *mongo.Database) gin.HandlerFunc {
 		}
 		defer file.(io.Closer).Close()
 
+		disposition := "inline"
+		if c.Query("download") == "1" {
+			disposition = "attachment"
+		}
+		c.Header("Content-Disposition", fmt.Sprintf("%s; filename=%s", disposition, mediaID))
+
 		var contentType string
 		switch mediaType {
 		case "image":

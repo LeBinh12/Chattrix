@@ -13,5 +13,6 @@ func UploadRoutes(rg *gin.RouterGroup, db *mongo.Database) {
 		upload.POST("/media", ginMessage.UploadMediaHandler(db))
 		upload.GET("/media/:objectName", ginMessage.GetMediaHandler())
 		upload.GET("/media/stream/:id", ginMessage.StreamMediaHandler(db))
+		upload.DELETE("/media/:mediaID", ginMessage.DeleteMediaHandler(db))
 	}
 }

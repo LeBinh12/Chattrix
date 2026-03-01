@@ -5,7 +5,9 @@ export const conversationApi = {
   getConversation: async (
     page: number = 1,
     limit: number = 10,
-    keyword: string
+    keyword: string,
+    tags: string[] = [],
+    type: string = ""
   ): Promise<ConversationResponse> => {
     const response = await axiosClient.get<ConversationResponse>(
       `/conversations/list`,
@@ -13,11 +15,25 @@ export const conversationApi = {
         params: {
           page,
           limit,
-          keyword
+          keyword,
+          tags,
+          type
         },
       }
     );
 
     return response.data;
+  },
+
+  updateTags: async (target_id: string, is_group: boolean, tags: string[]) => {
+    return await axiosClient.post("/conversations/tags", {
+      target_id,
+      is_group,
+      tags,
+    });
+  },
+
+  getTags: async () => {
+    return await axiosClient.get("/conversations/tags");
   },
 };
