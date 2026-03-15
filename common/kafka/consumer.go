@@ -11,6 +11,7 @@ import (
 	BizUser "my-app/modules/user/biz"
 	ModelsUser "my-app/modules/user/models"
 	StorageUser "my-app/modules/user/storage"
+	"strings"
 
 	BizGroup "my-app/modules/group/biz"
 	ModelsGroup "my-app/modules/group/models"
@@ -126,60 +127,72 @@ func (bp *BatchProcessor) flushLocked() {
 func (bp *BatchProcessor) processBatch(messages []messageWithCommit) {
 	defer bp.processingWg.Done()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 
+	// Tái sử dụng Store cho toàn bộ batch
 	chatStore := storage.NewMongoChatStore(bp.db)
 	esChatStore := storage.NewESChatStore(bp.es)
 	chatBiz := biz.NewChatBiz(chatStore, esChatStore)
 
+	// Giới hạn số lượng goroutine xử lý đồng thời TRONG một batch (ví dụ: 50)
+	// Tránh nổ goroutine khi batch size lớn (1000+)
+	semaphore := make(chan struct{}, 50)
+	var batchWg sync.WaitGroup
+
 	for _, msgWithCommit := range messages {
-		msg := msgWithCommit.message
-		log.Printf("[Kafka-Consumer] Processing message: %s, has_reply: %v, parent_id: %s", msg.ID.Hex(), msg.Reply.ID != primitive.NilObjectID, msg.ParentID)
-		if msg.Reply.ID != primitive.NilObjectID {
-			log.Printf("[Kafka-Consumer] Reply content: %s", msg.Reply.Content)
-		}
+		batchWg.Add(1)
+		semaphore <- struct{}{} // Acquire
 
-		// Retry logic: max 3 attempts
-		var err error
-		for retry := 0; retry < 3; retry++ {
-			_, err = chatBiz.HandleMessage(ctx,
-				msg.ID,
-				msg.SenderID.Hex(),
-				msg.ReceiverID.Hex(),
-				msg.Content,
-				msg.Status,
-				msg.GroupID.Hex(),
-				msg.Type,
-				msg.MediaIDs,
-				msg.CreatedAt,
-				msg.Reply,
-				msg.Task,
-				msg.ParentID,
-			)
+		go func(mwc messageWithCommit) {
+			defer batchWg.Done()
+			defer func() { <-semaphore }() // Release
 
-			if err == nil {
-				// SUCCESS: Commit offset only if insert is successful
-				bp.commitQueue <- &commitTask{
-					session: msgWithCommit.session,
-					message: msgWithCommit.kafkaMsg,
+			msg := mwc.message
+
+			// Retry logic: max 3 attempts
+			var err error
+			for retry := 0; retry < 3; retry++ {
+				_, err = chatBiz.HandleMessage(ctx,
+					msg.ID,
+					msg.SenderID.Hex(),
+					msg.ReceiverID.Hex(),
+					msg.Content,
+					msg.Status,
+					msg.GroupID.Hex(),
+					msg.Type,
+					msg.MediaIDs,
+					msg.CreatedAt,
+					msg.Reply,
+					msg.Task,
+					msg.ParentID,
+				)
+
+				if err == nil {
+					bp.commitQueue <- &commitTask{
+						session: mwc.session,
+						message: mwc.kafkaMsg,
+					}
+					return
 				}
-				break
+
+				// Nếu là lỗi logic (không tìm thấy người gửi), không cần retry tốn tài nguyên
+				if strings.Contains(err.Error(), "người gửi") || strings.Contains(err.Error(), "không tồn tại") {
+					break
+				}
+
+				if retry < 2 {
+					time.Sleep(time.Duration(retry+1) * 100 * time.Millisecond)
+				}
 			}
 
-			// Retry with exponential backoff
-			if retry < 2 {
-				time.Sleep(time.Duration(retry+1) * 100 * time.Millisecond)
-				log.Printf(" Retry %d/3 for message %s: %v", retry+1, msg.ID.Hex(), err)
+			if err != nil {
+				log.Printf(" [Consumer] Failed to insert message %s: %v", msg.ID.Hex(), err)
 			}
-		}
-
-		if err != nil {
-			// FAILED after 3 retries: DO NOT commit offset -> message will be reprocessed
-			log.Printf(" CRITICAL: Failed to insert message %s after 3 retries: %v", msg.ID.Hex(), err)
-			// Optional: send to Dead Letter Queue here
-		}
+		}(msgWithCommit)
 	}
+
+	batchWg.Wait()
 }
 
 func (bp *BatchProcessor) Close() {
@@ -218,11 +231,10 @@ func StartConsumer(ctx context.Context, brokers []string, groupID string, topics
 	handler := &chatConsumer{
 		db:             db,
 		es:             es,
-		workerPool:     make(chan struct{}, 100),
-		batchProcessor: NewBatchProcessor(db, es, 100, commitQueue),
+		workerPool:     make(chan struct{}, 200),
+		batchProcessor: NewBatchProcessor(db, es, 500, commitQueue),
 		commitQueue:    commitQueue,
 	}
-
 	// Dedicated commit goroutine
 	go handler.commitWorker(ctx)
 

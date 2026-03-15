@@ -6,16 +6,16 @@ export default {
     extend: {
       colors: {
         brand: {
-          50: "#e5f0ff",
-          100: "#b8d5ff",
-          200: "#8ab9ff",
-          300: "#5c9dff",
-          400: "#2e82ff",
-          500: "#0068ff", // Primary Zalo Blue
-          600: "#0054cc",
-          700: "#003f99",
-          800: "#002a66",
-          900: "#001533",
+          50: "#e0f2fe",
+          100: "#bae6fd",
+          200: "#7dd3fc",
+          300: "#38bdf8",
+          400: "#0ea5e9",
+          500: "#00568c", 
+          600: "#004a78", // Darker for hover
+          700: "#003e64",
+          800: "#003250",
+          900: "#00263c",
         },
         surface: {
           DEFAULT: "#F5F7FB",
@@ -25,6 +25,9 @@ export default {
         line: {
           DEFAULT: "#E6EAF1",
         },
+      },
+      fontFamily: {
+        roboto: ["Roboto", "sans-serif"],
       },
     },
   },

@@ -49,7 +49,6 @@ func (s *ESChatStore) IndexMessage(ctx context.Context, msg *models.Message, sen
 		"messages",
 		bytes.NewReader(body),
 		s.client.Index.WithDocumentID(doc.ID),
-		s.client.Index.WithRefresh("true"),
 	)
 	if err != nil {
 		return err

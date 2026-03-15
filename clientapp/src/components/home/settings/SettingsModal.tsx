@@ -122,7 +122,7 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                                     <button
                                         key={tab.id}
                                         onClick={() => setActiveTab(tab.id)}
-                                        className={`!w-full !text-left !px-4 !py-3 !rounded-lg !flex !items-center !gap-3 !text-sm !font-medium !transition-colors ${activeTab === tab.id ? "!bg-white !text-[#be8b43] !shadow-sm" : "!text-gray-600 hover:!bg-gray-100"
+                                        className={`!w-full !text-left !px-4 !py-3 !rounded-lg !flex !items-center !gap-3 !text-sm !font-medium !transition-colors ${activeTab === tab.id ? "!bg-white !text-[#00568c] !shadow-sm" : "!text-gray-600 hover:!bg-gray-100"
                                             }`}
                                     >
                                         {tab.icon}
@@ -213,7 +213,7 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                                                     required
                                                     value={oldPassword}
                                                     onChange={(e) => setOldPassword(e.target.value)}
-                                                    className="!w-full !px-4 !py-2.5 !bg-gray-50 !text-gray-900 !border !border-gray-100 !rounded-sm focus:!ring-2 focus:!ring-[#be8b43] focus:!bg-white !outline-none !transition-all placeholder:!text-gray-400"
+                                                    className="!w-full !px-4 !py-2.5 !bg-gray-50 !text-gray-900 !border !border-gray-100 !rounded-sm focus:!ring-2 focus:!ring-[#00568c] focus:!bg-white !outline-none !transition-all placeholder:!text-gray-400"
                                                     placeholder="Nhập mật khẩu hiện tại"
                                                 />
                                                 <button
@@ -234,7 +234,7 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                                                     required
                                                     value={newPassword}
                                                     onChange={(e) => setNewPassword(e.target.value)}
-                                                    className="!w-full !px-4 !py-2.5 !bg-gray-50 !text-gray-900 !border !border-gray-100 !rounded-sm focus:!ring-2 focus:!ring-[#be8b43] focus:!bg-white !outline-none !transition-all placeholder:!text-gray-400"
+                                                    className="!w-full !px-4 !py-2.5 !bg-gray-50 !text-gray-900 !border !border-gray-100 !rounded-sm focus:!ring-2 focus:!ring-[#00568c] focus:!bg-white !outline-none !transition-all placeholder:!text-gray-400"
                                                     placeholder="Tối thiểu 6 ký tự"
                                                 />
                                                 <button
@@ -255,7 +255,7 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                                                     required
                                                     value={confirmPassword}
                                                     onChange={(e) => setConfirmPassword(e.target.value)}
-                                                    className="!w-full !px-4 !py-2.5 !bg-gray-50 !text-gray-900 !border !border-gray-100 !rounded-sm focus:!ring-2 focus:!ring-[#be8b43] focus:!bg-white !outline-none !transition-all placeholder:!text-gray-400"
+                                                    className="!w-full !px-4 !py-2.5 !bg-gray-50 !text-gray-900 !border !border-gray-100 !rounded-sm focus:!ring-2 focus:!ring-[#00568c] focus:!bg-white !outline-none !transition-all placeholder:!text-gray-400"
                                                     placeholder="Nhập lại mật khẩu mới"
                                                 />
                                                 <button
@@ -279,7 +279,7 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                                             <button
                                                 type="submit"
                                                 disabled={isLoading}
-                                                className="!flex-1 !px-4 !py-2.5 !bg-[#be8b43] !text-white !font-semibold !rounded-lg hover:!opacity-90 disabled:!opacity-50 disabled:!cursor-not-allowed !transition-all !shadow-md active:!scale-[0.98] !flex !items-center !justify-center !gap-2"
+                                                className="!flex-1 !px-4 !py-2.5 !bg-[#00568c] !text-white !font-semibold !rounded-lg hover:!opacity-90 disabled:!opacity-50 disabled:!cursor-not-allowed !transition-all !shadow-md active:!scale-[0.98] !flex !items-center !justify-center !gap-2"
                                                 style={{ color: '#fff' }}
                                             >
                                                 {isLoading ? (

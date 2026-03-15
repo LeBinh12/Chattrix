@@ -107,7 +107,7 @@ export default function SettingsScreen() {
                                 key={tab.id}
                                 onClick={() => setActiveTab(tab.id)}
                                 className={`!flex-1 !flex !items-center !justify-center !gap-2 !py-1.5 !rounded-sm !text-[13px] !font-semibold !transition-all !duration-200 ${activeTab === tab.id
-                                        ? "!text-[#be8b43] !border-b-2 !border-[#be8b43]"
+                                        ? "!text-[#00568c] !border-b-2 !border-[#00568c]"
                                         : `!text-gray-500 hover:!text-gray-700 ${BUTTON_HOVER}`
                                     }`}
                             >
@@ -200,7 +200,7 @@ export default function SettingsScreen() {
                                             required
                                             value={oldPassword}
                                             onChange={(e) => setOldPassword(e.target.value)}
-                                            className="!w-full !px-3 !py-2 !bg-gray-50 !text-gray-900 !border !border-gray-100 !rounded-md focus:!ring-1 focus:!ring-[#be8b43] focus:!bg-white !outline-none !transition-all placeholder:!text-gray-400 !text-sm"
+                                            className="!w-full !px-3 !py-2 !bg-gray-50 !text-gray-900 !border !border-gray-100 !rounded-md focus:!ring-1 focus:!ring-[#00568c] focus:!bg-white !outline-none !transition-all placeholder:!text-gray-400 !text-sm"
                                             placeholder="Nhập mật khẩu hiện tại"
                                         />
                                         <button
@@ -221,7 +221,7 @@ export default function SettingsScreen() {
                                             required
                                             value={newPassword}
                                             onChange={(e) => setNewPassword(e.target.value)}
-                                            className="!w-full !px-3 !py-2 !bg-gray-50 !text-gray-900 !border !border-gray-100 !rounded-md focus:!ring-1 focus:!ring-[#be8b43] focus:!bg-white !outline-none !transition-all placeholder:!text-gray-400 !text-sm"
+                                            className="!w-full !px-3 !py-2 !bg-gray-50 !text-gray-900 !border !border-gray-100 !rounded-md focus:!ring-1 focus:!ring-[#00568c] focus:!bg-white !outline-none !transition-all placeholder:!text-gray-400 !text-sm"
                                             placeholder="Tối thiểu 6 ký tự"
                                         />
                                         <button
@@ -242,7 +242,7 @@ export default function SettingsScreen() {
                                             required
                                             value={confirmPassword}
                                             onChange={(e) => setConfirmPassword(e.target.value)}
-                                            className="!w-full !px-3 !py-2 !bg-gray-50 !text-gray-900 !border !border-gray-100 !rounded-md focus:!ring-1 focus:!ring-[#be8b43] focus:!bg-white !outline-none !transition-all placeholder:!text-gray-400 !text-sm"
+                                            className="!w-full !px-3 !py-2 !bg-gray-50 !text-gray-900 !border !border-gray-100 !rounded-md focus:!ring-1 focus:!ring-[#00568c] focus:!bg-white !outline-none !transition-all placeholder:!text-gray-400 !text-sm"
                                             placeholder="Nhập lại mật khẩu mới"
                                         />
                                         <button
@@ -266,7 +266,7 @@ export default function SettingsScreen() {
                                     <button
                                         type="submit"
                                         disabled={isLoading}
-                                        className="!flex-[2] !px-3 !py-2.5 !bg-[#be8b43] !text-white !font-bold !text-sm !rounded-xl hover:!opacity-90 disabled:!opacity-50 disabled:!cursor-not-allowed !transition-all !shadow-md active:!scale-95 !flex !items-center !justify-center !gap-2"
+                                        className="!flex-[2] !px-3 !py-2.5 !bg-[#00568c] !text-white !font-bold !text-sm !rounded-xl hover:!opacity-90 disabled:!opacity-50 disabled:!cursor-not-allowed !transition-all !shadow-md active:!scale-95 !flex !items-center !justify-center !gap-2"
                                     >
                                         {isLoading ? (
                                             <Loader2 size={16} className="!animate-spin" />

@@ -136,7 +136,7 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
                         className="!fixed !left-1/2 !top-1/2 !-translate-x-1/2 !-translate-y-1/2 !w-full !max-w-md !rounded-3xl !shadow-2xl !z-[1001] !overflow-visible !bg-transparent"
                     >
                         {/* Header with rounded bottom */}
-                        <div className="!h-40 !bg-gradient-to-br !from-indigo-500 !via-purple-500 !to-pink-500 !relative" style={{ borderBottomLeftRadius: '60px', borderBottomRightRadius: '60px' }}>
+                        <div className="!h-40 !bg-gradient-to-br !from-sky-600 !via-blue-700 !to-cyan-800 !relative" style={{ borderBottomLeftRadius: '60px', borderBottomRightRadius: '60px' }}>
                             {/* Decorative circles */}
                             <div className="!absolute !top-0 !right-0 !w-32 !h-32 !bg-white/10 !rounded-full !-translate-y-1/2 !translate-x-1/2 !blur-2xl"></div>
                             <div className="!absolute !bottom-0 !left-0 !w-24 !h-24 !bg-black/10 !rounded-full !translate-y-1/2 !-translate-x-1/2 !blur-xl"></div>
@@ -198,7 +198,7 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
                                             type="text"
                                             value={form.display_name}
                                             onChange={(e) => setForm({ ...form, display_name: e.target.value })}
-                                            className="!text-2xl !font-bold !text-gray-900 !border-b !border-gray-300 focus:!border-blue-500 focus:!outline-none !w-full !bg-transparent !p-0"
+                                            className="!text-2xl !font-bold !text-gray-900 !border-b !border-gray-300 focus:!border-[#00568c] focus:!outline-none !w-full !bg-transparent !p-0"
                                             placeholder="Tên hiển thị"
                                         />
                                     ) : (
@@ -232,7 +232,7 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
                                                     className={`!text-sm !text-gray-900 !w-full focus:!outline-none !bg-transparent !border-b !pb-1 transition-colors ${
                                                         phoneError
                                                             ? "!border-red-300 !text-red-600"
-                                                            : "!border-gray-300 focus:!border-blue-500"
+                                                            : "!border-gray-300 focus:!border-[#00568c]"
                                                     }`}
                                                     placeholder="Nhập số điện thoại"
                                                 />
@@ -316,7 +316,7 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
                                             <button
                                                 onClick={handleSave}
                                                 disabled={isLoading || !!phoneError}
-                                                className="!flex-1 !px-4 !py-2 !text-sm !font-semibold !text-white !bg-blue-600 hover:!bg-blue-700 !rounded-lg !transition !flex !items-center !justify-center !gap-2 disabled:!opacity-50 disabled:!cursor-not-allowed"
+                                                 className="!flex-1 !px-4 !py-2 !text-sm !font-semibold !text-white !bg-[#00568c] hover:!bg-[#004d7d] !rounded-lg !transition !flex !items-center !justify-center !gap-2 disabled:!opacity-50 disabled:!cursor-not-allowed"
                                             >
                                                 {isLoading ? <Loader2 size={16} className="!animate-spin" /> : <Save size={16} />}
                                                 Lưu thay đổi
@@ -325,7 +325,7 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
                                     ) : (
                                         <button
                                             onClick={() => setIsEditing(true)}
-                                            className="!w-full !px-4 !py-2.5 !text-sm !font-semibold !text-white !bg-blue-600 hover:!bg-blue-700 !rounded-lg !transition !flex !items-center !justify-center !gap-2"
+                                             className="!w-full !px-4 !py-2.5 !text-sm !font-semibold !text-white !bg-[#00568c] hover:!bg-[#004d7d] !rounded-lg !transition !flex !items-center !justify-center !gap-2"
                                         >
                                             <Edit3 size={18} />
                                             Chỉnh sửa hồ sơ

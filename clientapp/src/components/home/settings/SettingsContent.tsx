@@ -178,11 +178,11 @@ export default function SettingsContent({ activeTab, onOpenChangePassword }: Set
                                 </p>
                             </div>
                         </div>
-                        <ChevronRight size={14} className={`!text-gray-300 !transition-transform !duration-200 ${showProfile ? "!rotate-90 !text-[#be8b43]" : ""}`} />
+                        <ChevronRight size={14} className={`!text-gray-300 !transition-transform !duration-200 ${showProfile ? "!rotate-90 !text-[#00568c]" : ""}`} />
                     </button>
 
                     {showProfile && (
-                        <div className="!mt-4 !px-1.5 !space-y-4 !border-l-2 !border-[#be8b43]/10 !ml-5 !pl-4">
+                        <div className="!mt-4 !px-1.5 !space-y-4 !border-l-2 !border-[#00568c]/10 !ml-5 !pl-4">
                             {/* Display Name */}
                             <div className="!space-y-1">
                                 <label className="!text-xs !font-bold !text-gray-400 !uppercase !tracking-wider !flex !items-center !gap-2">
@@ -193,7 +193,7 @@ export default function SettingsContent({ activeTab, onOpenChangePassword }: Set
                                         type="text"
                                         value={form.display_name}
                                         onChange={(e) => setForm({ ...form, display_name: e.target.value })}
-                                        className="!w-full !text-sm !font-semibold !text-gray-900 !bg-gray-50/50 !px-2 !py-1.5 !rounded-md !border !border-gray-100 focus:!outline-none focus:!ring-1 focus:!ring-[#be8b43] focus:!bg-white"
+                                        className="!w-full !text-sm !font-semibold !text-gray-900 !bg-gray-50/50 !px-2 !py-1.5 !rounded-md !border !border-gray-100 focus:!outline-none focus:!ring-1 focus:!ring-[#00568c] focus:!bg-white"
                                     />
                                 ) : (
                                     <p className="!text-sm !font-semibold !text-gray-800">{userData?.display_name}</p>
@@ -222,7 +222,7 @@ export default function SettingsContent({ activeTab, onOpenChangePassword }: Set
                                             className={`!w-full !text-sm !font-semibold !text-gray-900 !bg-gray-50/50 !px-2 !py-1.5 !rounded-md !border focus:!outline-none focus:!ring-1 focus:!bg-white ${
                                                 phoneError
                                                     ? "!border-red-300 focus:!ring-red-500"
-                                                    : "!border-gray-100 focus:!ring-[#be8b43]"
+                                                    : "!border-gray-100 focus:!ring-[#00568c]"
                                             }`}
                                             placeholder="Chưa cập nhật"
                                         />
@@ -243,7 +243,7 @@ export default function SettingsContent({ activeTab, onOpenChangePassword }: Set
                                         type="date"
                                         value={form.birthday}
                                         onChange={(e) => setForm({ ...form, birthday: e.target.value })}
-                                        className="!w-full !text-sm !font-semibold !text-gray-900 !bg-gray-50/50 !px-2 !py-1.5 !rounded-md !border !border-gray-100 focus:!outline-none focus:!ring-1 focus:!ring-[#be8b43] focus:!bg-white"
+                                        className="!w-full !text-sm !font-semibold !text-gray-900 !bg-gray-50/50 !px-2 !py-1.5 !rounded-md !border !border-gray-100 focus:!outline-none focus:!ring-1 focus:!ring-[#00568c] focus:!bg-white"
                                     />
                                 ) : (
                                     <p className="!text-sm !font-semibold !text-gray-800">
@@ -308,7 +308,7 @@ export default function SettingsContent({ activeTab, onOpenChangePassword }: Set
                                         <button
                                             onClick={handleSaveProfile}
                                             disabled={isLoading || !!phoneError}
-                                            className="!px-4 !py-1.5 !text-[12px] !font-bold !text-white !bg-[#be8b43] !rounded-lg !shadow-sm hover:!opacity-90 !transition-all !flex !items-center !gap-1.5 disabled:!opacity-50 disabled:!cursor-not-allowed"
+                                            className="!px-4 !py-1.5 !text-[12px] !font-bold !text-white !bg-[#00568c] !rounded-lg !shadow-sm hover:!opacity-90 !transition-all !flex !items-center !gap-1.5 disabled:!opacity-50 disabled:!cursor-not-allowed"
                                         >
                                             {isLoading ? <Loader2 size={14} className="!animate-spin" /> : <Save size={14} />}
                                             Lưu thay đổi
@@ -317,7 +317,7 @@ export default function SettingsContent({ activeTab, onOpenChangePassword }: Set
                                 ) : (
                                     <button
                                         onClick={() => setIsEditing(true)}
-                                        className="!px-4 !py-1.5 !text-[12px] !font-bold !text-[#be8b43] !bg-[#fcf8f4] !border !border-[#f5ede4] !rounded-lg !transition-all"
+                                        className="!px-4 !py-1.5 !text-[12px] !font-bold !text-[#00568c] !bg-[#f0f7ff] !border !border-[#e1effe] !rounded-lg !transition-all"
                                     >
                                         Chỉnh sửa hồ sơ
                                     </button>
@@ -348,8 +348,8 @@ export default function SettingsContent({ activeTab, onOpenChangePassword }: Set
                         className={`!w-full !flex !items-center !justify-between !group !p-1.5 !-mx-1.5 !rounded-xl !transition-all !relative !z-10 active:!bg-gray-50 ${BUTTON_HOVER}`}
                     >
                         <div className="!flex !gap-3">
-                            <div className="!p-2 !bg-[#fcf8f4] !rounded-xl !h-fit group-hover:!bg-[#f5ede4] !transition-colors">
-                                <Lock size={18} className="!text-[#be8b43]" />
+                            <div className="!p-2 !bg-[#f0f7ff] !rounded-xl !h-fit group-hover:!bg-[#e1effe] !transition-colors">
+                                <Lock size={18} className="!text-[#00568c]" />
                             </div>
                             <div className="!text-left">
                                 <p className="!text-[13px] !font-bold !text-gray-900 !tracking-tight">
@@ -360,7 +360,7 @@ export default function SettingsContent({ activeTab, onOpenChangePassword }: Set
                                 </p>
                             </div>
                         </div>
-                        <ChevronRight size={14} className="!text-gray-300 group-hover:!text-[#be8b43] !transition-colors" />
+                        <ChevronRight size={14} className="!text-gray-300 group-hover:!text-[#00568c] !transition-colors" />
                     </button>
                 </div>
             </div>

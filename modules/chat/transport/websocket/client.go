@@ -62,9 +62,18 @@ func (c *Client) ReadPump(db *mongo.Database) {
 	for {
 		var incoming WSMessage
 		if err := c.Conn.ReadJSON(&incoming); err != nil {
-			log.Println("❌ Read error:", err)
+			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
+				log.Printf("❌ [VUser %s] Unexpected Close Error: %v", c.UserID, err)
+			} else {
+				log.Printf("❌ [VUser %s] Read error (likely timeout or disconnect): %v", c.UserID, err)
+			}
 			break
 		}
+
+		// FIX: Reset deadline mỗi khi nhận được một tin nhắn hợp lệ (không chỉ Pong)
+		// Điều này đảm bảo kết nối luôn sống nếu user vẫn đang gửi data.
+		c.Conn.SetReadDeadline(time.Now().Add(60 * time.Second))
+		c.LastSeen = time.Now()
 
 		switch incoming.Type {
 		case "chat":

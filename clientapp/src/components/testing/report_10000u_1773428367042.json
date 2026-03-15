@@ -1,0 +1,25 @@
+{
+  "test_case": "10000 user (01:59)",
+  "config": {
+    "target_users": 10000,
+    "ramp_up_seconds": 180,
+    "test_duration": 3600,
+    "message_interval": 2000,
+    "server_url": "ws://localhost:8088/v1/chat/ws"
+  },
+  "stats": {
+    "timestamp": "2026-03-14T01:59:11+07:00",
+    "active_connections": 5424,
+    "total_messages_sent": 7754975,
+    "success_messages": 7742880,
+    "error_messages": 12095,
+    "messages_per_sec": 2940.706418533992,
+    "error_rate_percent": 0.1559643970483464,
+    "avg_latency_ms": 0.024978592136350036,
+    "cpu_usage_percent": 99.79421831262968,
+    "memory_mb": 802.4132766723633,
+    "status": "stopped",
+    "elapsed_seconds": 2633
+  },
+  "exported_at": "2026-03-13T18:59:27.016Z"
+}

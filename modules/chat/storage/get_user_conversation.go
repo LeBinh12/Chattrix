@@ -74,7 +74,10 @@ func (s *MongoChatStore) getUserConversations(ctx context.Context, userObjectID 
 							{"$eq": []interface{}{"$receiver_id", "$$userId"}},
 							{"$eq": []interface{}{"$is_read", false}},
 							{"$ne": []interface{}{"$type", "system"}},
-							{"$eq": []interface{}{"$parent_message_id", nil}},
+							{"$or": []bson.M{
+								{"$eq": []interface{}{"$parent_message_id", nil}},
+								{"$not": []interface{}{bson.M{"$ifNull": []interface{}{"$parent_message_id", false}}}},
+							}},
 						},
 					},
 				}},
@@ -179,6 +182,10 @@ func (s *MongoChatStore) getUserConversationsOptimized(ctx context.Context, user
 							bson.M{"$eq": []interface{}{"$is_read", false}},
 							bson.M{"$ne": []interface{}{"$sender_id", userObjectID}},
 							bson.M{"$ne": []interface{}{"$type", "system"}},
+							bson.M{"$or": []interface{}{
+								bson.M{"$eq": []interface{}{"$parent_message_id", nil}},
+								bson.M{"$not": []interface{}{bson.M{"$ifNull": []interface{}{"$parent_message_id", false}}}},
+							}},
 						},
 					},
 					"then": 1,

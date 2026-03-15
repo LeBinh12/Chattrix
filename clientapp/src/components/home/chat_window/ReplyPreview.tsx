@@ -52,7 +52,7 @@ export default function ReplyPreview() {
                 <Reply className="w-3.5 h-3.5 text-gray-700 flex-shrink-0" />
                 <span className="text-xs font-semibold text-gray-700 truncate">
                   Trả lời {replyTo.sender}
-                </span>
+                </span>0
               </div>
 
               <div className="text-xs text-gray-800 line-clamp-2 break-words">

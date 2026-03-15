@@ -20,10 +20,27 @@ function App() {
   const [videoCall, setVideoCall] = useRecoilState(videoCallState);
 
   const { mobileNotif, setMobileNotif, isMobile } = useAppSocket();
+const isInAppWebView = () => {
+  const ua = navigator.userAgent || "";
 
-  useEffect(() => {
+    return (
+      /Zalo/i.test(ua) ||          // Zalo
+      /FBAN|FBAV/i.test(ua) ||     // Facebook / Messenger
+      /Instagram/i.test(ua) ||     // Instagram
+      (window as any).ReactNativeWebView !== undefined // React Native WebView
+    );
+  };
+ useEffect(() => {
+    if (isInAppWebView()) {
+      console.log("🚫 Running inside WebView - skip Notification");
+      return;
+    }
+
+    if (!("Notification" in window)) return;
+
     if (Notification.permission === "default") {
       Notification.requestPermission();
+      Notification.requestPermission().catch(() => {});
     }
   }, []);
 

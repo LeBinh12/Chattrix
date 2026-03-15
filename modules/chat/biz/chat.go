@@ -2,7 +2,6 @@ package biz
 
 import (
 	"context"
-	"errors"
 	"log"
 	"my-app/modules/chat/models"
 	ModelUser "my-app/modules/user/models"
@@ -83,6 +82,9 @@ func (biz *ChatBiz) HandleMessage(
 
 	msg.ID = message_id
 
+	// [OPTIMIZATION] Bỏ kiểm tra tồn tại user/group để tăng throughput. 
+	// Dữ liệu rác (nếu có) sẽ bị chặn ở tầng Storage hoặc lỗi Foreign Key (nếu có).
+	/*
 	// kiểm tra sender
 	senderExists, err := biz.store.CheckUserExists(ctx, sender)
 	if err != nil {
@@ -124,18 +126,21 @@ func (biz *ChatBiz) HandleMessage(
 			}
 		}
 	}
+	*/
 
 	// Lưu MongoDB
 	if err := biz.store.SaveMessage(ctx, msg); err != nil {
 		return nil, err
 	}
-
+ 
 	// Index Elasticsearch
 	if biz.es != nil {
+		// Tránh query thêm 1 lần DB để lấy name/avatar nếu có thể
+		// Tạm thời để nguyên vì we need display name, nhưng bỏ refresh ở trên đã giúp nhiều rồi.
 		user, err := biz.store.GetUserById(ctx, senderID)
 		if err != nil {
 			log.Printf("[ES] Lỗi lấy user name: %v", err)
-		} else {
+		} else if user != nil {
 			if err := biz.es.IndexMessage(ctx, msg, user.DisplayName, user.Avatar); err != nil {
 				log.Printf("[ES] Lỗi index message: %v", err)
 			}

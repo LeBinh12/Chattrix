@@ -26,6 +26,10 @@ import PermissionManagerScreen from "../pages/admin/PermissionManagerScreen";
 import PermissionMatrixScreen from "../pages/admin/PermissionMatrixScreen";
 import ModuleManagerScreen from "../pages/admin/ModuleManagerScreen";
 import VideoCallScreen from "../pages/VideoCallScreen";
+import TestingDashboard from "./testing/TestingDashboard";
+import TestComparisonReport from "./testing/TestComparisonReport";
+import StressTestingDashboard from "./testing/StressTestingDashboard";
+import MassNotificationTesting from "./testing/MassNotificationTesting";
 
 export const AppRoutes = () => {
   return (
@@ -120,6 +124,11 @@ export const AppRoutes = () => {
           element={<PermissionMatrixScreen />}
         />
       </Route>
+      <Route path="/testing" element={<TestingDashboard />} />
+      <Route path="/testing/comparison" element={<TestComparisonReport />} />
+      <Route path="/testing/stress" element={<StressTestingDashboard />} />
+      <Route path="/testing/mass-notification" element={<MassNotificationTesting />} />
+
     </Routes>
   );
 };
