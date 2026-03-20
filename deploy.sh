@@ -10,7 +10,7 @@ set -e
 APP_NAME="Unichat-DTHU"
 REMOTE_HOST="180.93.144.15"
 REMOTE_USER="root"
-REMOTE_DIR="~/UniChat-Dthu"
+REMOTE_DIR="/home/websites/UnitChat-Dthu"
 COMPOSE_FILE="docker-compose.dthu.yml"
 
 # --- Colors ---
