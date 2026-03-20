@@ -46,39 +46,35 @@ ENV=${1:-"dthu"}
 # REMOTE DEPLOYMENT (DTHU)
 # =============================================================================
 if [ "$ENV" = "dthu" ]; then
-    echo -e "${BOLD}-------------------------------------------${NC}"
-    echo -e "  Moi truong  : ${YELLOW}REMOTE (DTHU)${NC}"
-    echo -e "  Server      : ${BLUE}${REMOTE_USER}@${REMOTE_HOST}${NC}"
-    echo -e "  Folder      : ${BLUE}${REMOTE_DIR}${NC}"
-    echo -e "  Compose file: ${BLUE}docker-compose.dthu.yml${NC}"
-    echo -e "  Hanh dong   : Sync + Build + Deploy (DIRECT)${NC}"
-    echo -e "${BOLD}-------------------------------------------${NC}"
+    echo -e "${BLUE}${BOLD}=================================================${NC}"
+    echo -e "🚀 ${BOLD}DEPLOYING TO REMOTE SERVER (DTHU)${NC}"
+    echo -e "${BLUE}${BOLD}=================================================${NC}"
+    echo -e "🌐 ${BOLD}Host:   ${NC}${YELLOW}${REMOTE_USER}@${REMOTE_HOST}${NC}"
+    echo -e "📂 ${BOLD}Path:   ${NC}${YELLOW}${REMOTE_DIR}${NC}"
+    echo -e "📄 ${BOLD}Config: ${NC}${YELLOW}docker-compose.dthu.yml${NC}"
+    echo -e "🛠️  ${BOLD}Action: ${NC}${YELLOW}Git Pull + Docker Build + Restart${NC}"
+    echo -e "🕒 ${BOLD}Time:   ${NC}${YELLOW}$(date '+%Y-%m-%d %H:%M:%S')${NC}"
+    echo -e "${BLUE}${BOLD}=================================================${NC}"
     echo ""
 
-    # Step 1: Create remote folder if not exists
-    print_info "Dang kiem tra thu muc tren server..."
-    ssh ${REMOTE_USER}@${REMOTE_HOST} "mkdir -p ${REMOTE_DIR}"
+    # Step 1: Pull latest code on server
+    print_info "[1/3] Dang cập nhật code mới từ Git trên server..."
+    # Lấy branch hiện tại từ local để pull đúng branch đó trên server
+    CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "main")
+    ssh ${REMOTE_USER}@${REMOTE_HOST} "cd ${REMOTE_DIR} && git pull origin ${CURRENT_BRANCH}"
 
-    # Step 2: Sync files to server
-    print_info "Dang tai code len server (rsync/scp)..."
-    if command -v rsync &> /dev/null; then
-        rsync -avz --exclude '.git' --exclude 'node_modules' --exclude 'clientapp/node_modules' --exclude 'data' --exclude 'mongo-data' ./ ${REMOTE_USER}@${REMOTE_HOST}:${REMOTE_DIR}/
-    else
-        print_warning "Rsync khong tim thay, su dung scp (cham hon)..."
-        tar -czf project.tar.gz --exclude='.git' --exclude='node_modules' --exclude='clientapp/node_modules' --exclude='data' --exclude='mongo-data' .
-        scp project.tar.gz ${REMOTE_USER}@${REMOTE_HOST}:${REMOTE_DIR}/
-        ssh ${REMOTE_USER}@${REMOTE_HOST} "cd ${REMOTE_DIR} && tar -xzf project.tar.gz && rm project.tar.gz"
-        rm project.tar.gz
-    fi
-    print_success "Da tai code len server."
-
-    # Step 3: Run docker-compose on server
-    print_info "Dang build va khoi dong containers tren server..."
+    # Step 2: Run docker-compose on server
+    print_info "[2/3] Dang build va khoi dong containers tren server..."
     ssh ${REMOTE_USER}@${REMOTE_HOST} "cd ${REMOTE_DIR} && \
         docker compose -f docker-compose.dthu.yml up -d --build --remove-orphans && \
         docker image prune -f"
     
-    print_success "Deploy REMOTE [${REMOTE_HOST}] hoan tat! ($(date '+%Y-%m-%d %H:%M:%S'))"
+    # Step 3: Health check
+    print_info "[3/3] Dang kiem tra trang thai sau khi deploy..."
+    sleep 5
+    ssh ${REMOTE_USER}@${REMOTE_HOST} "cd ${REMOTE_DIR} && docker compose -f docker-compose.dthu.yml ps"
+    
+    print_success "Deploy REMOTE [${REMOTE_HOST}] (GIT PULL) hoan tat! ($(date '+%Y-%m-%d %H:%M:%S'))"
     exit 0
 fi
 
