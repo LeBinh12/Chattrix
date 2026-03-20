@@ -17,10 +17,10 @@ export default function AuthForm({ title, onSubmit, children }: AuthFormProps) {
     >
       {/* Header */}
       <div className="mb-8">
-        <h2 className="text-3xl font-bold text-gray-900 mb-3">
+        <p className="text-3xl font-bold text-[#00568c] mb-4 text-center">
           {title}
-        </h2>
-        <div className="h-1 w-16 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-full" />
+        </p>
+        <div className="h-1 w-20 bg-gradient-to-r from-[#00568c] to-[#003d63] rounded-full mx-auto" />
       </div>
       
       {/* Form Content */}

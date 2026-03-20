@@ -6,7 +6,6 @@ import {
   Shield,
   MoreVertical,
   UserMinus,
-  UserPlus,
   Search,
   Users,
   Loader2,
@@ -15,116 +14,152 @@ import { selectedChatState } from "../../recoil/atoms/chatAtom";
 import { activePanelAtom } from "../../recoil/atoms/uiAtom";
 import { userAtom } from "../../recoil/atoms/userAtom";
 import ConfirmModal from "../notification/ConfirmModal";
-import { groupMembersAtom } from "../../recoil/atoms/groupAtom";
+import { groupMembersAtom, groupTotalMembersAtom } from "../../recoil/atoms/groupAtom";
 import { groupApi } from "../../api/group";
-import type { GroupMember } from "../../types/group-member";
+import type { GroupMember, GroupRole } from "../../types/group-member";
 import UserAvatar from "../UserAvatar";
+import { BUTTON_HOVER } from "../../utils/className";
+import AddMemberModal from "../group/AddMemberModal";
+import { socketManager } from "../../api/socket";
+import { toast } from "react-toastify";
 
 export default function GroupMembersPanel() {
   const selectedChat = useRecoilValue(selectedChatState);
   const groupId = selectedChat?.group_id;
   const setActivePanel = useSetRecoilState(activePanelAtom);
   const activePanel = useRecoilValue(activePanelAtom);
-
+  console.log("groupId",groupId);
   const currentUser = useRecoilValue(userAtom);
 
   const groupMembersMap = useRecoilValue(groupMembersAtom);
   const setGroupMembersMap = useSetRecoilState(groupMembersAtom);
+  const setGroupTotalMembers = useSetRecoilState(groupTotalMembersAtom);
   const [loading, setLoading] = useState(false);
-
   const [loadingMore, setLoadingMore] = useState(false);
 
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
-
+  const [isOwner, setIsOwner] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [canRemove, setCanRemove] = useState(false);
+  const [canTransfer, setCanTransfer] = useState(false);
+  const [canPromote, setCanPromote] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedMember, setSelectedMember] = useState<GroupMember | null>(
-    null
-  );
+  const [selectedMember, setSelectedMember] = useState<GroupMember | null>(null);
   const [showMemberMenu, setShowMemberMenu] = useState(false);
   const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
   const [showPromoteConfirm, setShowPromoteConfirm] = useState(false);
+  const [showTransferConfirm, setShowTransferConfirm] = useState(false);
+  const [showAddMemberModal, setShowAddMemberModal] = useState(false);
+  // Helper function to deduplicate members with role priority
+  const deduplicateMembers = useCallback((members: GroupMember[]) => {
+    const roleWeight = { owner: 3, admin: 2, member: 1, number: 4 };
+    const emailMap = new Map<string, GroupMember>();
+
+    members.forEach((member) => {
+      if (!member.email) {
+        // If no email, add with user_id as key
+        emailMap.set(`no-email-${member.user_id}`, member);
+        return;
+      }
+
+      const existing = emailMap.get(member.email);
+      
+      // If not exists or new member has higher role
+      if (!existing || roleWeight[member.role] > roleWeight[existing.role]) {
+        emailMap.set(member.email, member);
+      }
+    });
+
+    return Array.from(emailMap.values());
+  }, []);
 
   const loadMembers = useCallback(
-  async (isInitial = false, limit = 20) => {
-    if (!groupId || loadingMore || !hasMore) return;
+    async (pageToLoad: number, isInitial = false, limit = 20) => {
+      if (!groupId || loadingMore) return;
 
-    if (isInitial) {
-      setLoading(true);
-    } else {
-      setLoadingMore(true);
-    }
+      if (isInitial) {
+        setLoading(true);
+      } else {
+        setLoadingMore(true);
+      }
 
-    try {
-      const res = await groupApi.getGroupMembers(groupId, page, limit);
+      try {
+        const res = await groupApi.getGroupMembers(groupId, pageToLoad, limit);
 
-      setGroupMembersMap((prev) => {
-        const existingMembers = prev[groupId] || [];
-        const updatedMembers = isInitial
-          ? res.data.members
-          : [...existingMembers, ...res.data.members];
+        setGroupMembersMap((prev) => {
+          const existingMembers = prev[groupId] || [];
+          const updatedMembers = isInitial
+            ? res.data.members
+            : [...existingMembers, ...res.data.members];
 
-        // Loại trùng email
-        const seenEmails = new Set<string>();
-        const uniqueMembers = updatedMembers.filter((member) => {
-          if (!member.email) return true;
-          if (seenEmails.has(member.email)) return false;
-          seenEmails.add(member.email);
-          return true;
+          // Deduplicate with higher role priority
+          const uniqueMembers = deduplicateMembers(updatedMembers);
+
+          return {
+            ...prev,
+            [groupId]: uniqueMembers,
+          };
         });
 
-        setHasMore(uniqueMembers.length < res.data.total);
-
-        return {
+        setGroupTotalMembers((prev) => ({
           ...prev,
-          [groupId]: uniqueMembers,
-        };
-      });
+          [groupId]: res.data.total,
+        }));
 
-      setPage((prev) => prev + 1);
-    } catch (error) {
-      console.error("Fetch group members error:", error);
-    } finally {
-      if (isInitial) {
-        setLoading(false);
-      } else {
-        setLoadingMore(false);
+        // Update hasMore and page
+        setHasMore(res.data.members.length >= limit);
+        setPage(pageToLoad + 1);
+      } catch (error) {
+        console.error("Fetch group members error:", error);
+      } finally {
+        if (isInitial) {
+          setLoading(false);
+        } else {
+          setLoadingMore(false);
+        }
       }
+    },
+    [groupId, loadingMore, setGroupMembersMap, deduplicateMembers]
+  );
+
+  // Effect when switching panel/group
+  useEffect(() => {
+    if (activePanel !== "members") return;
+    if (!groupId) return;
+
+    // Reset state
+    setPage(1);
+    setHasMore(true);
+    setSearchQuery("");
+
+    // Check cache
+    const cachedMembers = groupMembersMap[groupId];
+    if (cachedMembers && cachedMembers.length > 0) {
+      // Log for debugging
+      const ownerCount = cachedMembers.filter(m => m.role === "owner").length;
+      console.log("ownerCount", ownerCount)
+      return;
     }
-  },
-  [
-    groupId,
-    page,
-    hasMore,
-    loadingMore,
-    setGroupMembersMap,
-  ]
-);
 
+    // Load initial data
+    loadMembers(1, true);
+  }, [activePanel, groupId]);
 
-useEffect(() => {
-  if (activePanel !== "members") return;
-  if (!groupId) return;
-
-  setPage(1);
-  setHasMore(true);
-
-  // Kiểm tra cache trước
-  const cachedMembers = groupMembersMap[groupId];
-  if (cachedMembers && cachedMembers.length > 0) {
-    console.log("Lấy members từ cache");
-    return; // không gọi API nếu đã có cache
-  }
-
-  // Nếu không có cache thì gọi API
-  loadMembers(true);
-}, [activePanel, groupId, groupMembersMap, loadMembers]);
-
-
-
+  // Effect for search
   useEffect(() => {
     if (!groupId) return;
-    if (!searchQuery) return;
+    
+    if (!searchQuery) {
+      // When clearing search, reset to cache or reload
+      const cachedMembers = groupMembersMap[groupId];
+      if (!cachedMembers || cachedMembers.length === 0) {
+        setPage(1);
+        setHasMore(true);
+        loadMembers(1, true);
+      }
+      return;
+    }
 
     const fetchSearchResults = async () => {
       setLoading(true);
@@ -133,12 +168,17 @@ useEffect(() => {
 
       try {
         const res = await groupApi.getGroupMembers(groupId, 1, 20, searchQuery);
+        console.log("res.data.my_role",res.data.members.find(m => m.user_id === currentUser?.data.id))        
+        // Dedup search results
+        const uniqueResults = deduplicateMembers(res.data.members);
+        
         setGroupMembersMap((prev) => ({
           ...prev,
-          [groupId]: res.data.members,
+          [`${groupId}-search`]: uniqueResults, // Separate search results
         }));
+        
         setPage(2);
-        setHasMore(res.data.members.length < res.data.total);
+        setHasMore(res.data.members.length >= 50);
       } catch (error) {
         console.error("Search group members error:", error);
       } finally {
@@ -146,45 +186,91 @@ useEffect(() => {
       }
     };
 
-    fetchSearchResults();
-  }, [searchQuery, groupId, setGroupMembersMap]);
+    const debounceTimer = setTimeout(fetchSearchResults, 300);
+    return () => clearTimeout(debounceTimer);
+  }, [searchQuery, groupId, setGroupMembersMap, deduplicateMembers]);
 
-  // Lấy members từ cache
-  // Lấy members từ cache và loại bỏ trùng email
+  // Get members from cache (NO more deduplication as it's filtered in loadMembers)
   const members = useMemo(() => {
     if (!groupId) return [];
+    
+    // If searching, take from search results
+    if (searchQuery) {
+      return groupMembersMap[`${groupId}-search`] || [];
+    }
+    
+    // If not searching, take from normal cache
     const allMembers = groupMembersMap[groupId] || [];
+    
+    return allMembers;
+  }, [groupId, groupMembersMap, searchQuery]);
 
-    const seenEmails = new Set<string>();
-    const uniqueMembers = allMembers.filter((member) => {
-      if (!member.email) return true; // nếu không có email thì giữ
-      if (seenEmails.has(member.email)) return false; // đã xuất hiện => bỏ
-      seenEmails.add(member.email);
-      return true;
-    });
-
-    return uniqueMembers;
-  }, [groupId, groupMembersMap]);
-
-  // Filter members based on search query
+  // Filter members based on search query (filter display_name only)
   const filteredMembers = useMemo(() => {
+    if (!searchQuery) return members;
+    
     return members.filter((member) =>
       member.display_name.toLowerCase().includes(searchQuery.toLowerCase())
     );
   }, [members, searchQuery]);
 
-  // Group members by role
+  // Effect to check owner/admin role based on members data
+  useEffect(() => {
+    if (!members || !currentUser) {
+      setIsOwner(false);
+      setIsAdmin(false);
+      setCanRemove(false);
+      setCanTransfer(false);
+      setCanPromote(false);
+      return;
+    }
+
+    const myMember = members.find(m => m.user_id === currentUser.data.id);
+    if (myMember) {
+      const role = myMember.role;
+      const localIsOwner = role === "owner";
+      const localIsAdmin = role === "owner" || role === "admin";
+      
+      setIsOwner(localIsOwner);
+      setIsAdmin(localIsAdmin);
+
+      const permissions = myMember.role_info?.permissions || [];
+      const hasRemovePerm = permissions.includes("group:member:remove");
+      const hasTransferPerm = permissions.includes("group:member:transfer_owner");
+      const hasPromotePerm = permissions.includes("group:member:promote_admin");
+
+      // Use local constants to avoid race condition with state updates
+      setCanRemove(localIsAdmin || hasRemovePerm);
+      setCanTransfer(localIsOwner || hasTransferPerm);
+      setCanPromote(localIsOwner || hasPromotePerm);
+    } else {
+      setIsOwner(false);
+      setIsAdmin(false);
+      setCanRemove(false);
+      setCanTransfer(false);
+      setCanPromote(false);
+    }
+  }, [members, currentUser]);
+
+  // No longer filtering out self, so everyone appears in the list
+  const displayMembers = filteredMembers;
+
+  // Group members by role (using displayMembers)
   const owners = useMemo(
-    () => filteredMembers.filter((m) => m.role === "owner"),
-    [filteredMembers]
+    () => displayMembers.filter((m) => m.role === "owner"),
+    [displayMembers]
   );
   const admins = useMemo(
-    () => filteredMembers.filter((m) => m.role === "admin"),
-    [filteredMembers]
+    () => displayMembers.filter((m) => m.role === "admin"),
+    [displayMembers]
   );
   const regularMembers = useMemo(
-    () => filteredMembers.filter((m) => m.role === "member"),
-    [filteredMembers]
+    () =>
+  displayMembers.filter(
+    (m) => m.role === "member" || m.role === "number"
+  ),
+
+    [displayMembers]
   );
 
   const getRoleBadge = (role: GroupMember["role"]) => {
@@ -213,55 +299,149 @@ useEffect(() => {
   };
 
   const handleMemberClick = (member: GroupMember) => {
-    // Only show menu if current user is admin/owner and target is not owner
-    const currentUserMember = members.find(
-      (m) => m.user_id === currentUser?.data.id
-    );
-    const isCurrentUserAdmin =
-      currentUserMember?.role === "owner" ||
-      currentUserMember?.role === "admin";
+    // 1. Don't open menu for self
+    if (member.user_id === currentUser?.data.id) return;
 
-    if (isCurrentUserAdmin && member.role !== "owner") {
-      setSelectedMember(member);
-      setShowMemberMenu(true);
+    // 2. Only Owner or Admin can open menu
+    if (!isAdmin) return;
+
+    // 3. Admin (not Owner) cannot open menu for Owner
+    if (!isOwner && member.role === "owner") return;
+
+    setSelectedMember(member);
+    setShowMemberMenu(true);
+  };
+
+  const handleTransferLeadership = () => {
+    if (!selectedMember) return;
+    setShowMemberMenu(false);
+    setShowTransferConfirm(true);
+  };
+
+  const executeTransferLeadership = async () => {
+    if (!groupId || !selectedMember || !currentUser) return;
+
+    try {
+      await groupApi.transferOwner(groupId, selectedMember.user_id);
+
+      // Update Recoil state: Self becomes member, other person becomes owner
+      setGroupMembersMap((prev) => {
+        const currentMembers = prev[groupId] || [];
+        const updatedMembers = currentMembers.map((m) => {
+          if (m.user_id === currentUser.data.id) {
+            return { ...m, role: "member" as GroupRole, role_info: undefined };
+          }
+          if (m.user_id === selectedMember.user_id) {
+            return { ...m, role: "owner" as GroupRole, role_info: undefined }; // backend will provide updated role_info on next fetch or we can let it be undefined until refreshed
+          }
+          return m;
+        });
+
+        return {
+          ...prev,
+          [groupId]: updatedMembers,
+        };
+      });
+
+      toast.success(`Đã nhường quyền Trưởng nhóm cho ${selectedMember.display_name}!`);
+      
+      // Close panel info or refresh if needed - UI updates automatically via Recoil here
+    } catch (error) {
+      console.error("Failed to transfer leadership:", error);
+      toast.error("Không thể nhường quyền trưởng nhóm!");
+    } finally {
+      setShowTransferConfirm(false);
+      setSelectedMember(null);
     }
   };
 
-  const handleRemoveMember = () => {
-    console.log("Removing member:", selectedMember);
-    // TODO: Call API to remove member
-    // await groupApi.removeMember(groupId, selectedMember.id);
-    setShowRemoveConfirm(false);
-    setShowMemberMenu(false);
-    setSelectedMember(null);
+  const handleRemoveMember = async () => {
+    if (!groupId || !selectedMember) return;
+    
+    try {
+      await groupApi.removeMember(groupId, selectedMember.user_id);
+      
+      // Update Recoil state for immediate UI feedback
+      setGroupMembersMap((prev) => {
+        const currentMembers = prev[groupId] || [];
+        const updatedMembers = currentMembers.filter(
+          (m) => m.user_id !== selectedMember.user_id
+        );
+        
+        return {
+          ...prev,
+          [groupId]: updatedMembers,
+        };
+      });
+
+      setGroupTotalMembers((prev) => ({
+        ...prev,
+        [groupId]: Math.max(0, (prev[groupId] || 0) - 1),
+      }));
+
+      console.log("Removed member successfully:", selectedMember.display_name);
+    } catch (error) {
+      console.error("Failed to remove member:", error);
+    } finally {
+      setShowRemoveConfirm(false);
+      setShowMemberMenu(false);
+      setSelectedMember(null);
+    }
   };
 
-  const handlePromoteMember = () => {
-    console.log("Promoting member:", selectedMember);
-    // TODO: Call API to promote member
-    // await groupApi.promoteMember(groupId, selectedMember.id);
-    setShowPromoteConfirm(false);
-    setShowMemberMenu(false);
-    setSelectedMember(null);
+  const handlePromoteMember = async () => {
+    if (!groupId || !selectedMember) return;
+
+    try {
+      await groupApi.promoteAdmin(groupId, selectedMember.user_id);
+
+      // Update Recoil state for immediate UI feedback
+      setGroupMembersMap((prev) => {
+        const currentMembers = prev[groupId] || [];
+        const updatedMembers = currentMembers.map((m) =>
+          m.user_id === selectedMember.user_id ? { ...m, role: "admin" as GroupRole } : m
+        );
+
+        return {
+          ...prev,
+          [groupId]: updatedMembers,
+        };
+      });
+
+      // Notify via socket for the other person to refresh page or permissions
+      socketManager.sendPromoteAdmin(groupId, selectedMember.user_id);
+
+      toast.success(`Đã chỉ định ${selectedMember.display_name} làm quản trị viên!`);
+    } catch (error) {
+      console.error("Failed to promote member:", error);
+      toast.error("Không thể chỉ định quản trị viên!");
+    } finally {
+      setShowPromoteConfirm(false);
+      setShowMemberMenu(false);
+      setSelectedMember(null);
+    }
   };
 
   const renderMemberItem = (member: GroupMember) => {
-    const isOnline = member.online_status === "online";
+    // const isOnline = member.online_status === "online";
+    const canClick = 
+      isAdmin && 
+      member.user_id !== currentUser?.data.id && 
+      (isOwner || member.role !== "owner");
 
-    console.log("filteredMembers",filteredMembers)
     return (
       <div
-        key={member.id}
-        onClick={() => handleMemberClick(member)}
+        key={`${member.id}-${member.email || member.user_id}`}
+        onClick={() => canClick && handleMemberClick(member)}
         className={`flex items-center gap-3 px-4 py-3 transition ${
-          member.role !== "owner" ? "hover:bg-[#f0f3fb] cursor-pointer" : ""
+          canClick ? "hover:bg-gray-50 cursor-pointer" : ""
         }`}
       >
         <div className="flex-shrink-0">
           <UserAvatar
             avatar={member.avatar}
             display_name={member.display_name}
-            isOnline={isOnline}
+            showOnlineStatus={false}
             size={40}
           />
         </div>
@@ -269,17 +449,20 @@ useEffect(() => {
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <p className="text-sm font-medium text-[#2e3a59] truncate">
-              {member.display_name}
+              {member.display_name} {member.user_id === currentUser?.data.id && "(Bạn)"}
             </p>
             {getRoleBadge(member.role)}
           </div>
-          <p className="text-xs text-[#7d89a8] mt-0.5">
-            {isOnline ? "Đang hoạt động" : "Không hoạt động"}
-          </p>
         </div>
 
-        {member.role !== "owner" && (
-          <button className="p-1.5 hover:bg-[#e3e8f2] rounded-lg transition opacity-0 group-hover:opacity-100">
+        {member.role !== "owner" && isAdmin && member.user_id !== currentUser?.data.id && (
+          <button 
+            onClick={(e) => {
+              e.stopPropagation();
+              handleMemberClick(member);
+            }}
+            className="p-1.5 hover:bg-[#e3e8f2] rounded-lg transition opacity-100"
+          >
             <MoreVertical size={16} className="text-[#7d89a8]" />
           </button>
         )}
@@ -316,15 +499,14 @@ useEffect(() => {
           <div className="flex items-center gap-3">
             <button
               onClick={() => setActivePanel("info")}
-              className="hover:bg-[#f0f3fb] p-1.5 rounded-lg transition"
+              className={`${BUTTON_HOVER} p-1.5 rounded-lg transition`}
             >
               <ChevronLeft size={20} />
             </button>
-            <h2 className="text-base font-semibold">
+            <p className="text-base font-semibold">
               Thành viên ({members.length})
-            </h2>
-          </div>
-        </div>
+            </p>
+          </div>        </div>
 
         {/* Search Bar */}
         <div className="px-4 py-3 border-b border-[#e3e8f2]">
@@ -338,7 +520,7 @@ useEffect(() => {
               placeholder="Tìm kiếm thành viên..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 bg-[#f8f9fc] border border-[#e3e8f2] rounded-lg text-sm text-[#2e3a59] placeholder:text-[#7d89a8] focus:outline-none focus:ring-2 focus:ring-[#4f6eda] focus:border-transparent"
+              className="w-full pl-9 pr-4 py-2 bg-gray-50 rounded-lg text-sm text-gray-700 placeholder:text-[#7d89a8] focus:outline-none focus:ring-2 focus:ring-[#00568c] focus:bg-white"
             />
           </div>
         </div>
@@ -349,12 +531,13 @@ useEffect(() => {
           onScroll={(e) => {
             const target = e.currentTarget;
             if (
-              target.scrollHeight - target.scrollTop <=
-                target.clientHeight + 100 &&
+              target.scrollHeight - target.scrollTop <= target.clientHeight + 100 &&
               hasMore &&
-              !loadingMore
+              !loadingMore &&
+              !loading &&
+              !searchQuery
             ) {
-              loadMembers(false); // false = load thêm
+              loadMembers(page, false);
             }
           }}
         >
@@ -371,10 +554,10 @@ useEffect(() => {
             <>
               {/* Owners */}
               {owners.length > 0 && (
-                <div className="mb-4">
-                  <h3 className="text-xs font-semibold px-4 py-2 text-[#7d89a8] bg-[#f8f9fc] sticky top-0 z-10">
-                    TRƯỞNG NHÓM
-                  </h3>
+                <div className="mb-2">
+                  <p className="text-xs font-semibold px-4 py-1 text-[#7d89a8] bg-[#f8f9fc] sticky top-0 z-10">
+                    TRƯỞNG NHÓM ({owners.length})
+                  </p>
                   <div className="group">
                     {owners.map((member) => renderMemberItem(member))}
                   </div>
@@ -383,10 +566,10 @@ useEffect(() => {
 
               {/* Admins */}
               {admins.length > 0 && (
-                <div className="mb-4">
-                  <h3 className="text-xs font-semibold px-4 py-2 text-[#7d89a8] bg-[#f8f9fc] sticky top-0 z-10">
+                <div className="mb-2">
+                  <p className="text-xs font-semibold px-4 py-1 text-[#7d89a8] bg-[#f8f9fc] sticky top-0 z-10">
                     QUẢN TRỊ VIÊN ({admins.length})
-                  </h3>
+                  </p>
                   <div className="group">
                     {admins.map((member) => renderMemberItem(member))}
                   </div>
@@ -395,10 +578,10 @@ useEffect(() => {
 
               {/* Members */}
               {regularMembers.length > 0 && (
-                <div className="mb-4">
-                  <h3 className="text-xs font-semibold px-4 py-2 text-[#7d89a8] bg-[#f8f9fc] sticky top-0 z-10">
+                <div className="mb-2">
+                  <p className="text-xs font-semibold px-4 py-1 text-[#7d89a8] bg-[#f8f9fc] sticky top-0 z-10">
                     THÀNH VIÊN ({regularMembers.length})
-                  </h3>
+                  </p>
                   <div className="group">
                     {regularMembers.map((member) => renderMemberItem(member))}
                   </div>
@@ -414,8 +597,7 @@ useEffect(() => {
                 </div>
               )}
 
-              {/* End of List */}
-              {!hasMore && members.length > 0 && (
+              {!hasMore && members.length > 0 && !searchQuery && (
                 <div className="flex justify-center py-4 px-4">
                   <span className="text-xs text-[#7d89a8]">
                     Đã hiển thị tất cả thành viên
@@ -424,14 +606,6 @@ useEffect(() => {
               )}
             </>
           )}
-        </div>
-
-        {/* Add Member Button */}
-        <div className="px-4 py-3 border-t border-[#e3e8f2]">
-          <button className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg bg-[#4f6eda] text-white text-sm font-medium hover:bg-[#3d5bc9] transition">
-            <UserPlus size={16} />
-            <span>Thêm thành viên</span>
-          </button>
         </div>
       </div>
 
@@ -452,7 +626,7 @@ useEffect(() => {
               <UserAvatar
                 avatar={selectedMember.avatar}
                 display_name={selectedMember.display_name}
-                isOnline={selectedMember.online_status === "online"}
+                showOnlineStatus={false}
                 size={48}
               />
               <div>
@@ -467,7 +641,7 @@ useEffect(() => {
               </div>
             </div>
 
-            {selectedMember.role === "member" && (
+            { canPromote && (
               <button
                 onClick={() => {
                   setShowMemberMenu(false);
@@ -477,21 +651,35 @@ useEffect(() => {
               >
                 <Shield size={18} className="text-[#4f6eda]" />
                 <span className="text-sm text-[#2e3a59]">
-                  Chỉ định làm quản trị viên
+                  Chỉ định làm nhóm phó
                 </span>
               </button>
             )}
 
-            <button
-              onClick={() => {
-                setShowMemberMenu(false);
-                setShowRemoveConfirm(true);
-              }}
-              className="w-full flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-[#fff5f6] transition text-left"
-            >
-              <UserMinus size={18} className="text-[#d93434]" />
-              <span className="text-sm text-[#d93434]">Xóa khỏi nhóm</span>
-            </button>
+            {canTransfer && (
+              <button
+                onClick={handleTransferLeadership}
+                className="w-full flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-[#f0f3fb] transition text-left"
+              >
+                <Crown size={18} className="text-yellow-600" />
+                <span className="text-sm text-[#2e3a59]">
+                  Nhường quyền trưởng nhóm
+                </span>
+              </button>
+            )}
+
+            {canRemove && (
+              <button
+                onClick={() => {
+                  setShowMemberMenu(false);
+                  setShowRemoveConfirm(true);
+                }}
+                className="w-full flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-[#fff5f6] transition text-left"
+              >
+                <UserMinus size={18} className="text-[#d93434]" />
+                <span className="text-sm text-[#d93434]">Xóa khỏi nhóm</span>
+              </button>
+            )}
 
             <button
               onClick={() => {
@@ -520,7 +708,6 @@ useEffect(() => {
         }}
       />
 
-      {/* Promote Member Confirmation Modal */}
       <ConfirmModal
         isOpen={showPromoteConfirm}
         title="Chỉ định quản trị viên"
@@ -531,6 +718,30 @@ useEffect(() => {
         onCancel={() => {
           setShowPromoteConfirm(false);
           setSelectedMember(null);
+        }}
+      />
+
+      {/* Transfer Leadership Confirmation Modal */}
+      <ConfirmModal
+        isOpen={showTransferConfirm}
+        title="Nhường quyền trưởng nhóm"
+        description={`Khi xác nhận, ${selectedMember?.display_name} sẽ trở thành Trưởng nhóm mới. Bạn sẽ trở thành Thành viên và không thể thu hồi hành động này. Bạn có chắc chắn?`}
+        confirmText="Nhường quyền"
+        cancelText="Hủy"
+        onConfirm={executeTransferLeadership}
+        onCancel={() => {
+          setShowTransferConfirm(false);
+          setSelectedMember(null);
+        }}
+      />
+
+      <AddMemberModal
+        isOpen={showAddMemberModal}
+        onClose={() => setShowAddMemberModal(false)}
+        groupId={groupId || ""}
+        onAddMembers={() => {
+          // Re-load members or update cache if needed
+          loadMembers(1, true);
         }}
       />
     </>

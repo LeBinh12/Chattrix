@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { useRecoilState, useRecoilValue } from "recoil";
-import { Bell, BellOff, UserPlus, X } from "lucide-react";
+import { useRecoilState, useRecoilValue, useSetRecoilState } from "recoil";
+import { Bell, BellOff, UserPlus, Users, ChevronLeft } from "lucide-react";
 import { bellStateAtom } from "../../../recoil/atoms/bellAtom";
 import { selectedChatState } from "../../../recoil/atoms/chatAtom";
 import { userApi } from "../../../api/userApi";
@@ -9,20 +9,25 @@ import { userAtom } from "../../../recoil/atoms/userAtom";
 import { API_ENDPOINTS } from "../../../config/api";
 import { LOGO } from "../../../assets/paths";
 import AddMemberModal from "../../group/AddMemberModal";
-import { chatInfoPanelVisibleAtom } from "../../../recoil/atoms/uiAtom";
+import { activePanelAtom } from "../../../recoil/atoms/uiAtom";
+import UserAvatar from "../../UserAvatar";
+// import { BUTTON_HOVER } from "../../../utils/className";
+// import { motion } from "framer-motion";
 
 interface ChatInfoHeaderProps {
   avatar: string;
   displayName: string;
-  status?: string;
   isGroup: boolean;
+  isOwner?: boolean;
+  canAdd?: boolean;
 }
 
 export default function ChatInfoHeader({
   avatar,
   displayName,
-  status,
   isGroup,
+  isOwner = false,
+  canAdd = false,
 }: ChatInfoHeaderProps) {
   const [bell, setBell] = useRecoilState(bellStateAtom);
   const [showMuteModal, setShowMuteModal] = useState(false);
@@ -30,8 +35,9 @@ export default function ChatInfoHeader({
   const selectedChat = useRecoilValue(selectedChatState);
   const [loading, setLoading] = useState(false);
   const user = useRecoilValue(userAtom);
-  const [, setPanelVisible] = useRecoilState(chatInfoPanelVisibleAtom);
-
+  // const [] = useRecoilState(chatInfoPanelVisibleAtom);
+  const setActivePanel = useSetRecoilState(activePanelAtom);
+  console.log("isOwner", isOwner)
   useEffect(() => {
     (async () => {
       setLoading(true);
@@ -131,12 +137,6 @@ export default function ChatInfoHeader({
     }
   };
 
-  const handleAddMembers = () => {
-    // Callback khi thêm thành viên thành công
-    // Có thể refresh danh sách thành viên hoặc làm gì đó ở đây
-    console.log("Đã thêm thành viên thành công");
-  };
-
   const avatarUrl =
     avatar && avatar.trim() !== "" && avatar !== "null"
       ? `${API_ENDPOINTS.UPLOAD_MEDIA}/${avatar}`
@@ -147,124 +147,107 @@ export default function ChatInfoHeader({
   }
   return (
     <>
-      <div className="flex flex-col items-center py-5 px-4 gap-3 bg-white text-sm relative">
-        {/* Nút đóng trên mobile */}
+      <div className="flex flex-col items-center pt-6 relative">
+        {/* Close button - only shown on mobile */}
         <button
-          onClick={() => setPanelVisible(false)}
-          className="absolute top-3 right-3 lg:hidden w-8 h-8 rounded-full border border-[#e1e7fb] text-[#4f5f87] hover:bg-[#f4f6fb] transition flex items-center justify-center"
-          title="Đóng"
+          onClick={() => setActivePanel("none")}
+          className="absolute top-3 left-3 lg:hidden w-8 h-8 rounded-full text-gray-500 hover:bg-gray-100 flex items-center justify-center transition z-10"
         >
-          <X size={18} />
+          <ChevronLeft size={24} />
         </button>
 
-        <div className="w-20 h-20 rounded-2xl overflow-hidden border-2 border-[#e1e7fb] shadow-inner">
-          <img
-            src={avatarUrl}
-            alt={displayName}
-            className="w-full h-full object-cover"
-            onError={(e) => {
-              e.currentTarget.onerror = null;
-              e.currentTarget.src = LOGO;
-            }}
-          />
+        {/* Avatar */}
+        <div className="relative">
+            <UserAvatar 
+              avatar={avatar}
+              display_name={displayName}
+              showOnlineStatus={false}
+              size={65}
+            />
         </div>
 
-        <div className="text-center space-y-1">
-          <h3 className="font-semibold text-sm text-[#1f2a44]">
-            {displayName}
-          </h3>
-          {!isGroup && status && (
-            <span className="text-[11px] text-[#7f89a6]">
-              {status === "online" ? "Đang hoạt động" : "Không hoạt động"}
-            </span>
-          )}
-        </div>
+        {/* Name */}
+        <p className="mt-3 text-lg font-bold text-gray-900 text-center w-full px-6 break-words">{displayName}</p>
 
-        <div className="flex items-center gap-2">
+        {/* Action buttons */}
+        <div className="flex justify-center gap-6 mt-5 mb-2 w-full px-4">
+          {/* Toggle notifications button */}
           <button
-            className="w-9 h-9 rounded-full border border-[#e1e7fb] text-[#4f5f87] hover:bg-[#f4f6fb] transition cursor-pointer"
             onClick={handleBellClick}
+            className="flex flex-col items-center gap-2 group w-16"
             title={bell?.is_muted ? "Bật thông báo" : "Tắt thông báo"}
           >
-            {bell?.is_muted ? ( 
-              <BellOff className="w-4 h-4 mx-auto" />
-            ) : (
-              <Bell className="w-4 h-4 mx-auto" />
-            )}
+            <div
+              className={`w-9 h-9 flex items-center justify-center rounded-full bg-gray-100 group-hover:bg-gray-200 transition-all`}
+            >
+              {bell?.is_muted ? (
+                <BellOff className="w-5 h-5 text-gray-700" />
+              ) : (
+                <Bell className="w-5 h-5 text-gray-700" />
+              )}
+            </div>
+            <span className="text-[11px] text-gray-700 font-medium text-center">
+              {bell?.is_muted ? "Bật" : "Tắt"} TB
+            </span>
           </button>
 
-          {isGroup && (
-            <button
-              className="w-9 h-9 rounded-full border border-[#e1e7fb] text-[#4f5f87] hover:bg-[#f4f6fb] transition cursor-pointer"
-              onClick={() => setShowAddMemberModal(true)}
-              title="Thêm thành viên"
-            >
-              <UserPlus className="w-4 h-4 mx-auto" />
-            </button>
-          )}
+          {/* Add member (if permitted) or Create group (personal) button */}
+          {isGroup && canAdd && (
+              <button
+                onClick={() => setShowAddMemberModal(true)}
+                className="flex flex-col items-center gap-2 group w-16"
+                title="Thêm thành viên"
+              >
+                <div className="w-9 h-9 flex items-center justify-center rounded-full bg-gray-100 group-hover:bg-gray-200 transition-all">
+                  <UserPlus className="w-5 h-5 text-gray-700" />
+                </div>
+                <span className="text-[11px] text-gray-700 font-medium leading-none">
+                  Thêm TV
+                </span>
+              </button>
+            )}
         </div>
 
-        {bell?.is_muted && (
-          <span className="text-[11px] text-[#7f89a6]">Đã tắt thông báo</span>
-        )}
+
       </div>
 
-      {/* Modal tắt thông báo */}
+      {/* Mute notifications modal - also slightly scaled down */}
       {showMuteModal && (
         <>
           <div
             className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[100]"
             onClick={() => setShowMuteModal(false)}
           />
-          <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-64 bg-gradient-to-br from-blue-900 to-blue-800 rounded-lg shadow-2xl border border-blue-600/30 p-2 z-[101]">
-            <div className="text-sm font-medium text-blue-100 mb-2 px-2">
+          <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-60 bg-white rounded-xl shadow-2xl border border-gray-200 p-4 z-[101]">
+            <p className="text-sm font-medium text-gray-800 mb-3">
               Tắt thông báo trong:
-            </div>
+            </p>
+
+            {["1 tiếng", "24 tiếng", "1 tháng", "Vĩnh viễn"].map(
+              (label, idx) => (
+                <button
+                  key={idx}
+                  className="w-full px-3 py-2.5 text-left rounded-lg hover:bg-gray-100 text-sm transition-colors text-gray-700 flex justify-between items-center"
+                  onClick={() => {
+                    if (label === "1 tiếng") handleMuteOption("1h", 3600000);
+                    if (label === "24 tiếng") handleMuteOption("24h", 86400000);
+                    if (label === "1 tháng")
+                      handleMuteOption("30d", 2592000000);
+                    if (label === "Vĩnh viễn") handleMuteOption("untilOn");
+                  }}
+                >
+                  <span>{label}</span>
+                  {label === "Vĩnh viễn" && (
+                    <span className="text-xs text-gray-400">∞</span>
+                  )}
+                </button>
+              )
+            )}
+
+            <hr className="my-3 border-gray-200" />
 
             <button
-              className="w-full px-3 py-2 text-left rounded hover:bg-blue-700/50 text-sm transition-colors text-white"
-              onClick={() => handleMuteOption("1h", 60 * 60 * 1000)}
-            >
-              <div className="flex justify-between items-center">
-                <span>1 tiếng</span>
-                <span className="text-xs text-blue-300">1h</span>
-              </div>
-            </button>
-
-            <button
-              className="w-full px-3 py-2 text-left rounded hover:bg-blue-700/50 text-sm transition-colors text-white"
-              onClick={() => handleMuteOption("24h", 24 * 60 * 60 * 1000)}
-            >
-              <div className="flex justify-between items-center">
-                <span>24 tiếng</span>
-                <span className="text-xs text-blue-300">24h</span>
-              </div>
-            </button>
-
-            <button
-              className="w-full px-3 py-2 text-left rounded hover:bg-blue-700/50 text-sm transition-colors text-white"
-              onClick={() => handleMuteOption("30d", 30 * 24 * 60 * 60 * 1000)}
-            >
-              <div className="flex justify-between items-center">
-                <span>1 tháng</span>
-                <span className="text-xs text-blue-300">30 ngày</span>
-              </div>
-            </button>
-
-            <button
-              className="w-full px-3 py-2 text-left rounded hover:bg-blue-700/50 text-sm transition-colors text-white"
-              onClick={() => handleMuteOption("untilOn")}
-            >
-              <div className="flex justify-between items-center">
-                <span>Vĩnh viễn</span>
-                <span className="text-xs text-blue-300">∞</span>
-              </div>
-            </button>
-
-            <hr className="my-1 border-blue-600/30" />
-
-            <button
-              className="w-full px-3 py-2 text-left rounded hover:bg-red-700/50 text-sm text-red-300 transition-colors"
+              className="w-full px-3 py-2.5 text-left rounded-lg hover:bg-red-50 text-sm text-red-600 transition-colors"
               onClick={() => setShowMuteModal(false)}
             >
               Hủy
@@ -273,12 +256,11 @@ export default function ChatInfoHeader({
         </>
       )}
 
-      {/* Modal thêm thành viên */}
       <AddMemberModal
         isOpen={showAddMemberModal}
         onClose={() => setShowAddMemberModal(false)}
         groupId={selectedChat?.group_id || ""}
-        onAddMembers={handleAddMembers}
+        onAddMembers={() => console.log("Đã thêm thành viên")}
       />
     </>
   );

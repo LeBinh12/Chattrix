@@ -1,64 +1,33 @@
-import React, { useState, useEffect, useMemo, useRef } from "react";
-import { X, Search, Camera, Check } from "lucide-react";
+import type { Conversation } from "../../types/conversation";
+import { useState, useEffect } from "react";
+import { Camera } from "lucide-react";
 import { conversationApi } from "../../api/conversation";
 import { toast } from "react-toastify";
 import { groupApi } from "../../api/group";
-import { motion, AnimatePresence } from "framer-motion";
-import UserAvatar from "../UserAvatar";
 import { socketManager } from "../../api/socket";
-import { useRecoilValue } from "recoil";
+import { useRecoilValue, useSetRecoilState } from "recoil";
 import { userAtom } from "../../recoil/atoms/userAtom";
-
-// Types
-interface User {
-  id: string;
-  name: string;
-  avatar: string;
-  online?: boolean;
-}
+import UserSelectionModal, { type User } from "./UserSelectionModal";
+import { conversationListAtom } from "../../recoil/atoms/conversationListAtom"; 
+// import { BUTTON_HOVER } from "../../utils/className";
 
 interface CreateGroupModalProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
-const CATEGORIES = [
-  { id: "all", label: "Tất cả" },
-  { id: "customers", label: "Customers" },
-  { id: "family", label: "Family" },
-  { id: "work", label: "Work" },
-  { id: "friends", label: "Friends" },
-  { id: "todo", label: "Todo" },
-];
-
-const getFirstLetter = (name: string): string => {
-  if (!name) return "#";
-  const firstChar = name.trim()[0].toUpperCase();
-  const normalized = firstChar
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toUpperCase();
-  return /[A-Z]/.test(normalized) ? normalized : "#";
-};
-
 export default function CreateGroupModal({
   isOpen,
   onClose,
 }: CreateGroupModalProps) {
-  const userRecoil = useRecoilValue(userAtom)
+  const userRecoil = useRecoilValue(userAtom);
   const [groupName, setGroupName] = useState("");
   const [groupImage, setGroupImage] = useState("");
   const [imagePreview, setImagePreview] = useState("");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [selectedMembers, setSelectedMembers] = useState<Set<string>>(
-    new Set()
-  );
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(false);
-  const [tempQuery, setTempQuery] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-  const [activeCategory, setActiveCategory] = useState("all");
-  const listRef = useRef<HTMLDivElement>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const setConversationList = useSetRecoilState(conversationListAtom);
 
   // Fetch users
   useEffect(() => {
@@ -69,18 +38,18 @@ export default function CreateGroupModal({
         setLoading(true);
         const res = await conversationApi.getConversation(1, 50, searchQuery);
         if (res.status === 200) {
-          const mappedUsers: User[] = res.data.data
+          const mappedUsers: User[] = (res.data.data as Conversation[])
             .filter((item) => !!item.user_id)
             .map((item) => ({
               id: item.user_id!,
-              name: item.display_name,
+              display_name: item.display_name,
               avatar: item.avatar || "https://via.placeholder.com/150",
               online: item.status === "online",
             }));
           setUsers(mappedUsers);
         }
       } catch (error) {
-        console.error("Lỗi tải danh sách user:", error);
+        console.error("Error loading user list:", error);
       } finally {
         setLoading(false);
       }
@@ -96,9 +65,6 @@ export default function CreateGroupModal({
       setGroupImage("");
       setImagePreview("");
       setSearchQuery("");
-      setSelectedMembers(new Set());
-      setTempQuery("");
-      setActiveCategory("all");
     }
   }, [isOpen]);
 
@@ -115,335 +81,176 @@ export default function CreateGroupModal({
     }
   };
 
-  const toggleMember = (userId: string) => {
-    const newSelected = new Set(selectedMembers);
-    if (newSelected.has(userId)) {
-      newSelected.delete(userId);
-    } else {
-      newSelected.add(userId);
+  const handleSubmit = async (selectedIds: string[]) => {
+    if (!groupName.trim()) {
+      toast.error("Tên nhóm không được bỏ trống khi tạo nhóm");
+      throw new Error("Group name is empty");
     }
-    setSelectedMembers(newSelected);
-  };
 
-  const groupedUsers = useMemo(() => {
-    const groups = new Map<string, User[]>();
-    const keys: string[] = [];
+    if (selectedIds.length === 0) {
+      toast.error("Vui lòng chọn ít nhất 1 thành viên!");
+      throw new Error("No members selected");
+    }
 
-    users.forEach((user) => {
-      const letter = getFirstLetter(user.name);
-      if (!groups.has(letter)) {
-        groups.set(letter, []);
-        keys.push(letter);
-      }
-      groups.get(letter)!.push(user);
-    });
+  const formData = new FormData();
+  formData.append("name", groupName);
+  formData.append("status", "active");
 
-    // Sắp xếp A-Z, # để cuối
-    keys.sort((a, b) => {
-      if (a === "#") return 1;
-      if (b === "#") return -1;
-      return a.localeCompare(b);
-    });
+  if (groupImage) {
+    const blob = await fetch(groupImage).then((res) => res.blob());
+    const file = new File([blob], "group.jpg", { type: blob.type });
+    formData.append("image", file);
+  }
 
-    return { groups, keys };
-  }, [users]);
+  try {
+    // Step 1: Create group
+    const res = await groupApi.addGroup(formData);
 
-  const handleSubmit = async () => {
-    if (!groupName.trim() || selectedMembers.size === 0) {
-      toast.error("Vui lòng nhập tên nhóm và chọn ít nhất 1 thành viên!");
+    if (res.status !== 200) {
+      toast.error("Không thể tạo nhóm!");
       return;
     }
 
-    try {
-      setSubmitting(true);
-      const formData = new FormData();
-      formData.append("name", groupName);
-      formData.append("status", "active");
+    const groupId = res.data.id;
+    const groupNameRes = res.data.name;
+    const groupImageRes = res.data.image || "";
+      const newGroupConversation: Conversation = {
+      user_id: "",
+      group_id: groupId,
+      display_name: groupNameRes,
+      avatar: groupImageRes,
+      last_message: "Nhóm vừa được tạo",
+      last_message_type: "system",
+      last_message_id: "",
+      last_date: new Date().toISOString(),
+      unread_count: 0,
+      status: "group",
+      updated_at: new Date().toISOString(),
+      conversation_id: "",
+    };
 
-      if (groupImage) {
-        const blob = await fetch(groupImage).then((res) => res.blob());
-        const file = new File([blob], "group.jpg", { type: blob.type });
-        formData.append("image", file);
-      }
+   
+    setConversationList((prev) => [newGroupConversation, ...prev]);
 
-      const res = await groupApi.addGroup(formData);
-      if (res.status === 200) {        
-        const memberIds = Array.from(selectedMembers);
 
-        const members = memberIds.map(id => ({
+    // Step 2: Add each member via REST API (Exclude self as backend automatically adds creator)
+    const membersToAdd = selectedIds.filter(id => id !== userRecoil?.data.id);
+    const addMemberPromises = membersToAdd.map((userId) =>
+      groupApi.addMember({
+        group_id: groupId,
+        user_id: userId,
+        role: "member",
+      })
+    );
+
+    const addMemberResults = await Promise.allSettled(addMemberPromises);
+
+    // Check if any member failed to be added
+    const failedAdds = addMemberResults.filter(
+      (result) => result.status === "rejected"
+    );
+
+    if (failedAdds.length > 0) {
+      toast.warn("Tạo nhóm thành công nhưng một số thành viên chưa được thêm. Bạn có thể thêm lại sau.");
+      console.error("Failed to add members:", failedAdds);
+      // Continue sending system message as group already exists
+    }
+
+    // Step 3: Send socket notification for group creation (real-time for all members)
+    // Ensure self (creator) is included with owner role for correct UI permissions update
+    const membersPayload = [
+      {
+        user_id: userRecoil?.data.id ?? "",
+        role: "owner",
+        display_name: userRecoil?.data.display_name || "Bạn"
+      },
+      ...selectedIds.map(id => {
+        const u = users.find(user => user.id === id);
+        return {
           user_id: id,
-          role: "member"
-        }));
-        
-        socketManager.sendAddGroupMember(userRecoil?.data.id ?? "", userRecoil?.data.display_name ?? "",
-          res.data.id, res.data.name, res.data.image, members, "create_group")
-        toast.success("Tạo nhóm thành công!");
-        onClose();
-      } else {
-        toast.error("Không thể tạo nhóm!");
-      }
-    } catch (error) {
-      console.error("Lỗi tạo nhóm:", error);
-      toast.error("Đã xảy ra lỗi khi tạo nhóm!");
-    } finally {
-      setSubmitting(false);
-    }
-  };
+          role: "member",
+          display_name: u?.display_name || ""
+        };
+      })
+    ];
 
-  const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter") {
-      setSearchQuery(tempQuery);
-    }
-  };
+    socketManager.sendAddGroupMember(
+      userRecoil?.data.id ?? "",
+      userRecoil?.data.display_name || "Bạn",
+      groupId,
+      groupNameRes,
+      groupImageRes,
+      membersPayload,
+      "create_group"
+    );
+
+    toast.success("Tạo nhóm thành công!");
+    
+    // Reset form or navigate to chat list if needed
+    // onClose?.();
+    // navigate('/chat');
+
+  } catch (error) {
+    console.error("Error creating group:", error);
+    toast.error("Đã xảy ra lỗi khi tạo nhóm!");
+  }
+};
+
+  // Header Section Component
+  const headerSection = (
+    <div className="!px-4 !py-4 flex items-center gap-4 !bg-white !border-b !border-gray-100">
+      <label className="cursor-pointer relative group">
+        <div className={`w-14 h-14 !rounded-full flex items-center justify-center !bg-gray-50 !border !border-[#f1ece7] group-hover:!bg-gray-100 transition-colors`}>
+          {imagePreview ? (
+            <img
+              src={imagePreview}
+              alt="Group"
+              className="w-full h-full object-cover !rounded-full"
+            />
+          ) : (
+            <Camera size={24} className="!text-gray-400 group-hover:text-blue-600 transition-colors" />
+          )}
+        </div>
+        <div className="absolute inset-0 !rounded-full border-2 border-transparent group-hover:border-[#00568c] transition-all pointer-events-none"></div>
+        <input
+          type="file"
+          accept="image/*"
+          onChange={handleImageChange}
+          className="hidden"
+        />
+      </label>
+
+      <div className="flex-1">
+        <input
+          type="text"
+          value={groupName}
+          onChange={(e) => setGroupName(e.target.value)}
+          placeholder="Nhập tên nhóm..."
+          className="w-full !px-0 !py-2 !bg-transparent !border-0 !border-b !border-gray-200 
+                    !text-base !font-medium !text-gray-900 !placeholder-gray-400
+                    focus:!outline-none focus:!border-[#00568c] focus:!ring-0
+                    !transition-all !duration-200"
+          autoFocus
+        />
+      </div>
+    </div>
+  );
 
   return (
-    <AnimatePresence>
-      {isOpen && (
-        <motion.div
-          className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
-          onClick={onClose}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.2 }}
-        >
-          <motion.div
-            className="bg-white w-full max-w-md max-h-[90vh] flex flex-col shadow-2xl rounded-lg overflow-hidden"
-            onClick={(e) => e.stopPropagation()}
-            initial={{ scale: 0.8, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0.8, opacity: 0 }}
-            transition={{ duration: 0.2, ease: "easeOut" }}
-          >
-            {/* Header */}
-            <div className="flex items-center justify-between px-5 py-4 border-b-2 border-gray-200">
-              <h2 className="text-lg font-semibold text-gray-800">Tạo nhóm</h2>
-              <button
-                onClick={onClose}
-                className="p-1 hover:bg-gray-100 rounded-full transition-colors"
-              >
-                <X size={24} className="text-gray-600" />
-              </button>
-            </div>
-
-            {/* Content */}
-            <div className="flex-1 ">
-              {/* Group Info Section */}
-              <div className="px-5 py-3 bg-gray-50 flex items-center gap-4 border-b border-gray-200">
-                <label className="cursor-pointer relative">
-                  <div className="w-10 h-10 rounded-md bg-gray-100 flex items-center justify-center overflow-hidden border border-gray-300 shadow-sm hover:shadow-md transition-all">
-                    {imagePreview ? (
-                      <img
-                        src={imagePreview}
-                        alt="Group"
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <Camera size={18} className="text-gray-600" />
-                    )}
-                  </div>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleImageChange}
-                    className="hidden"
-                  />
-                </label>
-
-                <input
-                  type="text"
-                  value={groupName}
-                  onChange={(e) => setGroupName(e.target.value)}
-                  placeholder="Tên nhóm..."
-                  className="flex-1 px-3 py-2 rounded-lg bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400 text-sm"
-                />
-              </div>
-              {/* Search Bar */}
-              <div className="px-5 py-1">
-                <div className="relative">
-                  <Search
-                    size={20}
-                    className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-                  />
-                  <input
-                    type="text"
-                    value={tempQuery}
-                    onChange={(e) => setTempQuery(e.target.value)}
-                    onKeyDown={handleSearchKeyDown}
-                    placeholder="Nhập tên, số điện thoại, hoặc danh sách số điện thoại"
-                    className="w-full pl-10 pr-4 py-2 bg-gray-100 rounded-full text-sm focus:outline-none focus:bg-gray-200 transition-colors"
-                  />
-                </div>
-              </div>
-              {/* Categories */}
-              <div className="px-5 py-3 overflow-hidden">
-                <div className="border-b border-gray-300 pb-3">
-                  <div className="flex gap-2">
-                    {CATEGORIES.map((category) => (
-                      <button
-                        key={category.id}
-                        onClick={() => setActiveCategory(category.id)}
-                        className={`text-xs px-3 py-0.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
-                          activeCategory === category.id
-                            ? "bg-blue-500 text-white"
-                            : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                        }`}
-                      >
-                        {category.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-              {/* Members List Header */}
-              <div className="px-5">
-                <p className="text-xs font-bold text-gray-800">
-                  Trò chuyện gần đây
-                </p>
-              </div>
-              {/* Loading */}
-              {loading && (
-                <div className="text-center py-8">
-                  <div className="inline-block w-8 h-8 border-3 border-gray-200 border-t-blue-500 rounded-full animate-spin"></div>
-                </div>
-              )}
-              {/* Members List - ĐÃ ĐƯỢC CẢI TIẾN */}
-              {!loading && (
-                <div className="relative">
-                  {/* Danh sách có scroll */}
-                  <div
-                    ref={listRef}
-                    className="px-5 py-3 max-h-[45vh] overflow-y-auto scrollbar-hide"
-                  >
-                    {groupedUsers.keys.length === 0 ? (
-                      <div className="text-center py-8">
-                        <p className="text-gray-500 text-sm">
-                          Không tìm thấy người dùng nào
-                        </p>
-                      </div>
-                    ) : (
-                      groupedUsers.keys.map((letter) => (
-                        <div
-                          key={letter}
-                          id={`section-${letter}`}
-                          className="mb-4"
-                        >
-                          {/* Tiêu đề chữ cái - sticky */}
-                          <div className="py-2 text-xs font-bold text-gray-800 ">
-                            {letter === "#" ? "Khác" : letter}
-                          </div>
-
-                          {/* Danh sách user trong nhóm */}
-                          {groupedUsers.groups.get(letter)!.map((user) => {
-                            const isSelected = selectedMembers.has(user.id);
-
-                            return (
-                              <div
-                                key={user.id}
-                                onClick={() => toggleMember(user.id)}
-                                className="flex items-center gap-3 py-2 cursor-pointer 
-                                  hover:bg-blue-50 rounded-lg px-3 transition-all
-                                  border border-transparent hover:border-blue-300"
-                              >
-                                <UserAvatar
-                                  avatar={user.avatar}
-                                  display_name={user.name}
-                                  isOnline={user.online}
-                                  size={48}
-                                />
-                                <div className="flex-1 min-w-0">
-                                  <p className="font-medium text-gray-800 text-sm truncate">
-                                    {user.name}
-                                  </p>
-                                </div>
-                                <div
-                                  className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all ${
-                                    isSelected
-                                      ? "bg-blue-500 border-blue-500"
-                                      : "border-gray-300"
-                                  }`}
-                                >
-                                  {isSelected && (
-                                    <Check size={14} className="text-white" />
-                                  )}
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      ))
-                    )}
-                  </div>
-
-                  {/* Thanh chữ cái dọc bên phải - ĐẸP CHUẨN APP CHAT
-                  {groupedUsers.keys.length > 6 && (
-                    <div
-                      className="absolute right-1 top-0 bottom-0 w-8 flex flex-col justify-center items-center pointer-events-none"
-                      style={{ height: "100%" }} // Đảm bảo full chiều cao scroll area
-                    >
-                      <div className="flex flex-col justify-between h-full py-6 pointer-events-auto">
-                        {groupedUsers.keys.map((letter) => (
-                          <button
-                            key={letter}
-                            onClick={() => scrollToLetter(letter)}
-                            onMouseEnter={(e) =>
-                              (e.currentTarget.style.color = "#2563eb")
-                            }
-                            onMouseLeave={(e) =>
-                              (e.currentTarget.style.color = "#94a3b8")
-                            }
-                            className="text-[11px] font-bold text-slate-400 hover:text-blue-600 transition-colors duration-200 transform hover:scale-125"
-                            style={{
-                              lineHeight: "1",
-                              minHeight: "18px",
-                            }}
-                          >
-                            {letter === "#" ? "⋯" : letter}
-                          </button>
-                        ))}
-                      </div>
-
-                      Hiệu ứng nổi bật khi hover (tùy chọn thêm)
-                      <div className="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity pointer-events-none">
-                        <div className="bg-blue-500 text-white text-xs font-bold rounded-full w-10 h-10 flex items-center justify-center shadow-lg">
-                          <span
-                            id="active-letter-indicator"
-                            className="text-lg"
-                          >
-                            A
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  )} */}
-                </div>
-              )}
-            </div>
-
-            {/* Footer - giữ nguyên */}
-            <div className="flex items-center justify-end gap-3 px-5 py-3 border-t border-gray-300 bg-white">
-              <button
-                onClick={onClose}
-                className="text-sm px-6 py-2 text-gray-600 hover:bg-gray-100 rounded-md transition-colors font-medium"
-              >
-                Hủy
-              </button>
-              <button
-                onClick={handleSubmit}
-                disabled={
-                  submitting || !groupName.trim() || selectedMembers.size === 0
-                }
-                className="text-sm px-6 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-              >
-                {submitting && (
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                )}
-                <span>Tạo nhóm</span>
-              </button>
-            </div>
-          </motion.div>
-        </motion.div>
-      )}
-    </AnimatePresence>
+    <UserSelectionModal
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Tạo nhóm"
+      submitText="Tạo nhóm"
+      loadingText="Đang tạo..."
+      headerSection={headerSection}
+      users={users}
+      loading={loading}
+      onSubmit={handleSubmit}
+      emptyListMessage="Không tìm thấy người dùng nào"
+      listTitle="Trò chuyện gần đây"
+      showCategories={false}
+      minSelection={1}
+    />
   );
 }

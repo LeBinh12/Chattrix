@@ -1,5 +1,3 @@
-version: "3.8"
-
 services:
   # --------------------
   # MinIO
@@ -55,8 +53,9 @@ services:
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_INTERNAL:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092,PLAINTEXT_INTERNAL://kafka:29092
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT_INTERNAL
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
 
   # --------------------
@@ -77,16 +76,18 @@ services:
       - esdata:/usr/share/elasticsearch/data
 
   # --------------------
-  # Service example using Elasticsearch ENV
+  # LiveKit Server (Video Call)
   # --------------------
-  app-service:
-    image: your-app-image
-    depends_on:
-      - elasticsearch
-    environment:
-      ES_ADDRESSES: "https://elasticsearch:9200"
-      ES_USER: "elastic"
-      ES_PASSWORD: "MyStrongPassword123"
+  livekit:
+    image: livekit/livekit-server:latest
+    container_name: livekit
+    command: --config /etc/livekit.yaml --dev
+    ports:
+      - "7880:7880"
+      - "7881:7881"
+      - "7882:7882/udp"
+    volumes:
+      - ./livekit.yaml:/etc/livekit.yaml
 
 volumes:
   esdata:

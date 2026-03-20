@@ -6,6 +6,6 @@ type JWTIssuer struct{}
 
 func NewJWTIssuer() *JWTIssuer { return &JWTIssuer{} }
 
-func (j *JWTIssuer) Issue(userID string) (string, error) {
-    return utils.GenerateJWT(userID)
+func (j *JWTIssuer) Issue(userID string, roles []string) (string, error) {
+    return utils.GenerateJWT(userID, roles)
 }

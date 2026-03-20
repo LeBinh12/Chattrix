@@ -155,28 +155,25 @@ export default function RegisterScreen() {
       {/* Progress Indicator */}
       <div className="flex items-center justify-center gap-3 mb-6">
         <motion.div
-          className={`flex items-center justify-center w-10 h-10 rounded-full font-semibold transition-all duration-300 ${
-            step >= 1
-              ? "bg-[#334155] text-[#60a5fa] shadow-lg" // nền tối, chữ xanh sáng
-              : "bg-[#1e293b]/50 text-gray-300" // nền tối nhạt, chữ xám nhạt
-          }`}
+          className={`flex items-center justify-center w-10 h-10 rounded-full font-semibold transition-all duration-300 ${step >= 1
+              ? "bg-[#00568c] text-white shadow-lg" 
+              : "bg-gray-200 text-gray-500" 
+            }`}
           whileHover={{ scale: 1.1 }}
         >
           {step > 1 ? <CheckCircle2 className="w-5 h-5" /> : "1"}
         </motion.div>
 
         <div
-          className={`h-1 w-16 rounded-full transition-all duration-300 ${
-            step >= 2 ? "bg-[#60a5fa]" : "bg-[#334155]/50"
-          }`}
+          className={`h-1 w-16 rounded-full transition-all duration-300 ${step >= 2 ? "bg-[#00568c]" : "bg-gray-200"
+            }`}
         ></div>
 
         <motion.div
-          className={`flex items-center justify-center w-10 h-10 rounded-full font-semibold transition-all duration-300 ${
-            step >= 2
-              ? "bg-[#334155] text-[#60a5fa] shadow-lg"
-              : "bg-[#1e293b]/50 text-gray-300"
-          }`}
+          className={`flex items-center justify-center w-10 h-10 rounded-full font-semibold transition-all duration-300 ${step >= 2
+              ? "bg-[#00568c] text-white shadow-lg"
+              : "bg-gray-200 text-gray-500"
+            }`}
           whileHover={{ scale: step >= 2 ? 1.1 : 1 }}
         >
           2
@@ -220,9 +217,12 @@ export default function RegisterScreen() {
                   ) : (
                     <label
                       htmlFor="avatarInput"
-                      className="w-24 h-24 rounded-full bg-black/20 backdrop-blur-sm flex items-center justify-center cursor-pointer hover:bg-white/30 transition-all border-4 border-black shadow-lg"
+                      className="w-28 h-28 rounded-full bg-blue-50 flex items-center justify-center cursor-pointer hover:bg-blue-100 transition-all border-4 border-white shadow-xl group/avatar overflow-hidden"
                     >
-                      <Upload className="w-8 h-8 text-black" />
+                      <div className="flex flex-col items-center gap-1 text-[#00568c] group-hover/avatar:text-[#004a78] transition-colors">
+                        <Upload className="w-8 h-8" />
+                        <span className="text-[10px] font-medium uppercase tracking-wider">Upload</span>
+                      </div>
                     </label>
                   )}
                   <input
@@ -362,9 +362,9 @@ export default function RegisterScreen() {
                         value={option.value}
                         checked={gender === option.value}
                         onChange={() => setGender(option.value)}
-                        className="w-4 h-4 text-[#2665b1] focus:ring-[#2665b1] cursor-pointer"
+                        className="w-4 h-4 text-[#00568c] focus:ring-[#00568c] cursor-pointer"
                       />
-                      <span className="text-gray-700 group-hover:text-[#2665b1] font-medium transition-colors">
+                      <span className="text-gray-700 group-hover:text-[#00568c] font-medium transition-colors">
                         {option.label}
                       </span>
                     </label>
@@ -382,7 +382,7 @@ export default function RegisterScreen() {
                   <button
                     type="button"
                     onClick={() => setStep(1)}
-                    className="w-full bg-white/80 backdrop-blur-sm text-[#2665b1] py-2 px-4 rounded-lg hover:bg-white shadow-md transition font-semibold"
+                    className="w-full bg-white/80 backdrop-blur-sm text-[#00568c] py-2 px-4 rounded-lg hover:bg-white shadow-md transition font-semibold"
                   >
                     <span className="flex items-center justify-center gap-2">
                       <ArrowLeft className="w-5 h-5" />
@@ -413,7 +413,7 @@ export default function RegisterScreen() {
         Đã có tài khoản?{" "}
         <button
           type="button"
-          className="text-blue-600 font-semibold hover:underline underline-offset-2 transition-all cursor-pointer"
+          className="text-[#00568c] font-semibold !no-underline transition-all cursor-pointer hover:underline"
           onClick={() => navigation("/login")}
         >
           Đăng nhập ngay

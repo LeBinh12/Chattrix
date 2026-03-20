@@ -70,4 +70,29 @@ export const statisticalApi = {
             console.error("Error downloading Excel:", err);
         }
     },
+    downloadUserExcelReport: async (): Promise<void> => {
+        try {
+            const response = await axiosClient.get("/statistical/export-users-excel", {
+                responseType: "blob",
+            });
+
+            const url = window.URL.createObjectURL(new Blob([response.data]));
+            const link = document.createElement("a");
+
+            const contentDisposition = response.headers["content-disposition"];
+            let fileName = "users_statistical.xlsx";
+            if (contentDisposition) {
+                const match = contentDisposition.match(/filename="?(.+)"?/);
+                if (match && match[1]) fileName = match[1];
+            }
+
+            link.href = url;
+            link.setAttribute("download", fileName);
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+        } catch (err) {
+            console.error("Error downloading User Excel:", err);
+        }
+    },
 };

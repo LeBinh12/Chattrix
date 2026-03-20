@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"fmt"
 	"my-app/modules/chat/models"
 
 	"go.mongodb.org/mongo-driver/bson"
@@ -40,6 +41,8 @@ func (s *MongoChatStore) UnpinMessage(
 	ctx context.Context,
 	conversationID, messageID primitive.ObjectID,
 ) error {
+	fmt.Println("conversationID", conversationID)
+	fmt.Println("messageID", messageID)
 
 	filter := bson.M{
 		"conversation_id": conversationID,

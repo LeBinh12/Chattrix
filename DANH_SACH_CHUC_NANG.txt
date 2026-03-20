@@ -1,0 +1,42 @@
+DANH SÁCH CHỨC NĂNG HỆ THỐNG CHATTRIX
+
+---
+
+1. HỆ THỐNG & TÀI KHOẢN
+- Đăng ký, Đăng nhập (User/Admin)
+- Quản lý hồ sơ cá nhân (Avatar, thông tin)
+- Trạng thái hoạt động (Online/Offline)
+
+2. LIÊN LẠC & NHẮN TIN
+- Nhắn tin 1-1 và Nhóm thời gian thực
+- Gửi Ảnh, File, Voice Message
+- Lịch sử tin nhắn
+- Tìm kiếm tin nhắn (Elasticsearch)
+
+3. CUỘC GỌI
+- Gọi Video (LiveKit/WebRTC)
+
+4. QUẢN LÝ NHÓM
+- Tạo nhóm, thêm/xóa thành viên
+- Phân quyền quản trị nhóm
+- Giải tán nhóm
+
+5. CÔNG CỤ CỘNG TÁC
+- Giao việc (Task Management) trong chat
+- Bình chọn (Poll) trong chat
+
+7. QUẢN TRỊ VIÊN (ADMIN PANEL)
+- Dashboard thống kê
+- Quản lý người dùng (Khóa, xóa, reset pass, update)
+- Quản lý nhóm toàn hệ thống
+- Gửi thông báo toàn hệ thống
+
+8. PHÂN QUYỀN (RBAC)
+- Quản lý Role & Permission
+- Ma trận quyền hạn người dùng
+- Quản lý Module truy cập
+
+9. KIỂM THỬ & GIÁM SÁT
+- Dashboard Kiểm thử tải (Load Testing)
+- Giả lập người dùng ảo
+- Giám sát hiệu năng hệ thống (Kafka, MongoDB, MinIO)

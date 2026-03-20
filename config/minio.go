@@ -11,10 +11,10 @@ import (
 var MinioClient *minio.Client
 
 func InitMinio() {
-	endpoint := "localhost:9000"
-	accessKey := "dthuadmin"
-	secretKey := "SuperStrongPwd123!"
-	useSSL := false
+	endpoint := getEnv("MINIO_ENDPOINT", "localhost:9000")
+	accessKey := getEnv("MINIO_ROOT_USER", "dthuadmin")
+	secretKey := getEnv("MINIO_ROOT_PASSWORD", "SuperStrongPwd123!")
+	useSSL := getEnv("MINIO_USE_SSL", "false") == "true"
 
 	minioClient, err := minio.New(endpoint, &minio.Options{
 		Creds:  credentials.NewStaticV4(accessKey, secretKey, ""),
@@ -31,7 +31,7 @@ func InitMinio() {
 
 	// Tạo bucket nếu chưa có
 	ctx := context.Background()
-	bucketName := "chat-media"
+	bucketName := "unichat"
 	location := "us-east-1"
 
 	exists, err := MinioClient.BucketExists(ctx, bucketName)

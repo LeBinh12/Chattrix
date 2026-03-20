@@ -21,6 +21,6 @@ func TotalGroupsHandler(db *mongo.Database) gin.HandlerFunc {
 			return
 		}
 
-		ctx.JSON(http.StatusOK, common.NewResponse(http.StatusOK, "Tổng số group", total))
+		ctx.JSON(http.StatusOK, common.NewResponse(http.StatusOK, "Total groups", total))
 	}
 }

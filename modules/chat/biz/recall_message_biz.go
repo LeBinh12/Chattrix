@@ -16,12 +16,17 @@ type RecallMessageStore interface {
 	UpdateMessageRecall(ctx context.Context, id primitive.ObjectID, recalledBy primitive.ObjectID) error
 }
 
-type RecallMessageBiz struct {
-	store RecallMessageStore
+type ESChatRecallStore interface {
+	RecallMessage(ctx context.Context, messageID string) error
 }
 
-func NewRecallMessageBiz(store RecallMessageStore) *RecallMessageBiz {
-	return &RecallMessageBiz{store: store}
+type RecallMessageBiz struct {
+	store   RecallMessageStore
+	esStore ESChatRecallStore
+}
+
+func NewRecallMessageBiz(store RecallMessageStore, esStore ESChatRecallStore) *RecallMessageBiz {
+	return &RecallMessageBiz{store: store, esStore: esStore}
 }
 
 func (biz *RecallMessageBiz) RecallMessage(ctx context.Context, msgID, userID primitive.ObjectID) error {
@@ -48,5 +53,14 @@ func (biz *RecallMessageBiz) RecallMessage(ctx context.Context, msgID, userID pr
 		return nil
 	}
 
-	return biz.store.UpdateMessageRecall(ctx, msgID, userID)
+	err = biz.store.UpdateMessageRecall(ctx, msgID, userID)
+	if err != nil {
+		return err
+	}
+
+	if biz.esStore != nil {
+		_ = biz.esStore.RecallMessage(ctx, msgID.Hex())
+	}
+
+	return nil
 }

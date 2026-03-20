@@ -3,8 +3,10 @@ import type { ListGroupMembersResponse } from "../types/group-member";
 import axiosClient from "../utils/axiosClient";
 
 export const groupApi = {
-    getGroup: async (): Promise<GetAllGroupResponse> => {
-        const response = await axiosClient.get<GetAllGroupResponse>(`/group/get-all`);
+    getGroup: async (page = 1, limit = 10): Promise<GetAllGroupResponse> => {
+        const response = await axiosClient.get<GetAllGroupResponse>(`/group/get-all`, {
+            params: { page, limit }
+        });
         return response.data
     },
 
@@ -37,6 +39,34 @@ export const groupApi = {
         role?: string;
     }) => {
         const response = await axiosClient.post(`/group/add-number`, data);
+        return response.data;
+    },
+
+    removeMember: async (group_id: string, user_id: string) => {
+        const response = await axiosClient.delete(`/group/remove-member`, {
+            params: { group_id, user_id }
+        });
+        return response.data;
+    },
+
+    promoteAdmin: async (group_id: string, user_id: string) => {
+        const response = await axiosClient.post(`/group/promote-admin`, null, {
+            params: { group_id, user_id }
+        });
+        return response.data;
+    },
+
+    transferOwner: async (group_id: string, user_id: string) => {
+        const response = await axiosClient.post(`/group/transfer-owner`, null, {
+            params: { group_id, user_id }
+        });
+        return response.data;
+    },
+
+    dissolveGroup: async (group_id: string) => {
+        const response = await axiosClient.delete(`/group/dissolve`, {
+            params: { group_id }
+        });
         return response.data;
     },
 }

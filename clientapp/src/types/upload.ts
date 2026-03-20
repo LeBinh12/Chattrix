@@ -5,7 +5,7 @@ export interface UploadResponse {
 }
 
 export interface Media {
-    id: string;
+    id?: string;
     type: string;
     filename: string;
     size: number;

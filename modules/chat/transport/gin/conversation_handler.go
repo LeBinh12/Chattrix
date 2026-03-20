@@ -37,7 +37,7 @@ func ConversationsHandler(db *mongo.Database) gin.HandlerFunc {
 		store := storage.NewMongoChatStore(db)
 		business := biz.NewListConversationBiz(store)
 
-		convs, total, err := business.ListConversations(c.Request.Context(), userID, query.Page, query.Limit, query.Keyword)
+		convs, total, err := business.ListConversations(c.Request.Context(), userID, query.Page, query.Limit, query.Keyword, query.Tags, query.Type)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return

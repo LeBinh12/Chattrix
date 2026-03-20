@@ -36,12 +36,14 @@ func SearchMessages(esClient *elasticsearch.Client) gin.HandlerFunc {
 		limitStr := ctx.DefaultQuery("limit", "20")
 		limit, _ := strconv.Atoi(limitStr)
 
-		cursorTime := ctx.Query("cursor_time") // <<< thêm
+		cursorTime := ctx.Query("cursor_time")
+		startTime := ctx.Query("start_time")
+		endTime := ctx.Query("end_time")
 
 		store := storage.NewESChatStore(esClient)
 		business := biz.NewChatSearchBiz(store)
 
-		messages, nextCursor, err := business.Search(ctx.Request.Context(), content, senderIDStr, receiverID, groupID, limit, cursorTime)
+		messages, nextCursor, err := business.Search(ctx.Request.Context(), content, senderIDStr, receiverID, groupID, limit, cursorTime, startTime, endTime)
 		if err != nil {
 			ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return

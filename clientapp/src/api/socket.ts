@@ -1,5 +1,8 @@
 import type { ReplyMessage } from "../types/Message";
 import type { Media } from "../types/upload";
+import type { Task } from "./taskApi";
+import { API_BASE_URL } from "../config/api";
+import type { TaskComment } from "../types/task-comment";
 
 type MessagePayload = Record<string, unknown>;
 type MessageCallback = (data: MessagePayload) => void;
@@ -13,7 +16,9 @@ class SocketManager {
     if (this.socket && this.socket.readyState !== WebSocket.CLOSED) return;
     console.log("người dùng trước socket:", userId)
     // this.userId = userId;
-    this.socket = new WebSocket(`ws://localhost:3000/v1/chat/ws?id=${userId}`);
+    // Convert API_BASE_URL (http/https) to WebSocket URL (ws/wss)
+    const wsUrl = API_BASE_URL.replace(/^http/, 'ws');
+    this.socket = new WebSocket(`${wsUrl}/chat/ws?id=${userId}`);
 
     this.socket.onopen = () => {
       console.log("Socket connected");
@@ -33,6 +38,16 @@ class SocketManager {
         if (data.type === "pong") return;
         if (data.type === "ping" && this.socket?.readyState === WebSocket.OPEN) {
           this.socket.send(JSON.stringify({ type: "pong" }));
+          return;
+        }
+
+        if (data.type === "account_deleted") {
+          localStorage.removeItem("token");
+          localStorage.removeItem("user");
+          // Dispatch a custom event so other parts of the app can react if needed
+          window.dispatchEvent(new Event('account_deleted'));
+          alert(data.message || "Tài khoản của bạn đã bị xóa khỏi hệ thống.");
+          window.location.href = "/login";
           return;
         }
 
@@ -67,21 +82,94 @@ class SocketManager {
   }
 
   sendMessage(senderId: string, receiverId: string, groupID: string, content: string,
-    mediaIDs: Media[], display_name?: string, avatar?: string, sender_avatar?: string, reply?: ReplyMessage) {
+    mediaIDs: Media[], display_name?: string, avatar?: string, sender_avatar?: string, reply?: ReplyMessage, type?: string, parent_id?: string) {
+    if (!this.socket || this.socket.readyState !== WebSocket.OPEN) return;
+
+    const messageType = type
+      ? type
+      : mediaIDs.length > 0
+        ? "file"
+        : "text";
+
+    const msg: MessagePayload = {
+      type: "chat",
+      message: {
+        sender_id: senderId,
+        receiver_id: receiverId || undefined,
+        group_id: groupID || undefined,
+        content,
+        media_ids: mediaIDs,
+        type: messageType,
+        display_name: display_name,
+        avatar: avatar,
+        sender_avatar: sender_avatar,
+        reply: reply,
+        parent_id: parent_id
+      },
+    };
+
+
+    this.socket.send(JSON.stringify(msg));
+  }
+
+  sendNotification(senderId: string, receiverId: string[], groupID: string[], content: string,
+    mediaIDs: Media[], display_name?: string, sender_avatar?: string, type?: string) {
+    if (!this.socket || this.socket.readyState !== WebSocket.OPEN) return;
+
+    const messageType = type
+      ? type
+      : mediaIDs.length > 0
+        ? "file"
+        : "text";
+
+    const msg: MessagePayload = {
+      type: "notification",
+      notification: {
+        sender_id: senderId,
+        receiver_id: receiverId,
+        group_id: groupID,
+        content,
+        media_ids: mediaIDs,
+        type: messageType,
+        sender_name: display_name,
+        sender_avatar: sender_avatar,
+        notification_type: "system"
+      },
+    };
+
+    console.log("msg_notification", msg)
+
+    this.socket.send(JSON.stringify(msg));
+  }
+
+  sendTask(senderId: string, receiverId: string, groupID: string, task: Task, display_name?: string, avatar?: string, sender_avatar?: string) {
     if (!this.socket || this.socket.readyState !== WebSocket.OPEN) return;
     const msg: MessagePayload = {
       type: "chat",
       message: {
         sender_id: senderId,
         receiver_id: receiverId || undefined,
-        group_id: groupID,
-        content,
-        media_ids: mediaIDs,
-        type: mediaIDs.length > 0 ? "file" : "text",
+        group_id: groupID || undefined,
+        content: `Đã tạo công việc: ${task.title}`,
+        type: "task",
+        task: task,
         display_name: display_name,
         avatar: avatar,
-        sender_avatar: sender_avatar,
-        reply: reply
+        sender_avatar: sender_avatar
+      },
+    };
+    this.socket.send(JSON.stringify(msg));
+  }
+
+  sendRepTask(senderId: string, receiverId: string, groupID: string, task: Task) {
+    if (!this.socket || this.socket.readyState !== WebSocket.OPEN) return;
+    const msg: MessagePayload = {
+      type: "rep-task",
+      message: {
+        sender_id: senderId,
+        receiver_id: receiverId || undefined,
+        group_id: groupID || undefined,
+        task: task,
       },
     };
     this.socket.send(JSON.stringify(msg));
@@ -105,6 +193,27 @@ class SocketManager {
     this.socket.send(JSON.stringify(msg));
   }
 
+  sendTaskComment(taskComment: TaskComment) {
+    if (!this.socket || this.socket.readyState !== WebSocket.OPEN) return;
+    const msg: MessagePayload = {
+      type: "task_comment",
+      task_comment: taskComment
+    };
+    this.socket.send(JSON.stringify(msg));
+  }
+
+  sendPromoteAdmin(groupID: string, targetUserID: string) {
+    if (!this.socket || this.socket.readyState !== WebSocket.OPEN) return;
+    const msg: MessagePayload = {
+      type: "group_member_promoted",
+      payload: {
+        group_id: groupID,
+        user_id: targetUserID,
+        role: "admin",
+      },
+    };
+    this.socket.send(JSON.stringify(msg));
+  }
 
   sendMemberLeft(senderId?: string, groupID?: string, displayName?: string) {
     if (!this.socket || this.socket.readyState !== WebSocket.OPEN) return;
@@ -116,7 +225,7 @@ class SocketManager {
         group_id: groupID,
         content: `Người dùng ${displayName} đã thoát nhóm`,
         type: "system",
-      }, 
+      },
     };
 
     this.socket.send(JSON.stringify(msg));
@@ -156,7 +265,7 @@ class SocketManager {
       message: {
         sender_id: sender_id,
         receiver_id: receiver_id || undefined,
-        group_id: group_id,
+        group_id: group_id || undefined,
         recalled_by: sender_id,
         id: message_id,
       },
@@ -164,27 +273,44 @@ class SocketManager {
     this.socket.send(JSON.stringify(msg));
   };
 
-  sendPinnedMessage(message_id: string, sender_id: string, receiver_id?: string, group_id?: string, content?: string,
-    sender_name?: string, pinned_by_name?: string, message_type?: string, created_at?: string
+  sendEditMessage(messageId: string, senderId: string, content: string, receiverId?: string, groupId?: string) {
+    if (!this.socket || this.socket.readyState !== WebSocket.OPEN) return;
+    const msg = {
+      type: "edit-message",
+      edit_message: {
+        id: messageId,
+        sender_id: senderId,
+        receiver_id: receiverId || "",
+        group_id: groupId || "",
+        content: content,
+      },
+    };
+    this.socket.send(JSON.stringify(msg));
+  };
+
+  sendPinnedMessage(message_id: string, pinner_id: string, message_sender_id: string, receiver_id?: string, group_id?: string, content?: string,
+    message_sender_name?: string, pinner_name?: string, message_type?: string, created_at?: string
   ) {
     if (!this.socket || this.socket.readyState !== WebSocket.OPEN) return;
     const msg = {
       type: "pinned-message",
       message: {
-        sender_id: sender_id,
+        sender_id: pinner_id, // Who performed the action
         receiver_id: receiver_id || undefined,
-        group_id: group_id,
+        group_id: group_id || undefined,
         id: message_id,
       },
       message_res: {
         message_id: message_id,
+        pin_id: message_id, // Initial pin_id fallback for immediate unpin
         content: content,
-        sender_id: sender_id,
-        sender_name: sender_name,
-        pinned_by_id: sender_id,
-        pinned_by_name: pinned_by_name,
+        sender_id: message_sender_id,
+        sender_name: message_sender_name,
+        pinned_by_id: pinner_id,
+        pinned_by_name: pinner_name,
         message_type: message_type,
-        created_at: created_at
+        created_at: created_at,
+        pinned_at: new Date().toISOString()
       }
     };
     this.socket.send(JSON.stringify(msg));
@@ -199,7 +325,7 @@ class SocketManager {
       message: {
         sender_id: sender_id,
         receiver_id: receiver_id || undefined,
-        group_id: group_id,
+        group_id: group_id || undefined,
         id: message_id,
       },
       message_res: {
@@ -207,8 +333,40 @@ class SocketManager {
         conversation_id: conversation_id
       }
     };
+
     this.socket.send(JSON.stringify(msg));
   };
+
+  sendReaction(messageId: string, userId: string, emoji: string, action: "add" | "remove" | "remove_all" = "add", sender_name: string) {
+    if (!this.socket || this.socket.readyState !== WebSocket.OPEN) return;
+    const msg = {
+      type: "send-reaction",
+      reaction: {
+        sender_name: sender_name,
+        message_id: messageId,
+        user_id: userId,
+        type: emoji,
+        action: action
+      }
+    };
+    this.socket.send(JSON.stringify(msg));
+  }
+
+  sendForwardMessage(senderId: string, content: string, type: string, mediaIds: any[], receiverIds: string[], groupIds: string[]) {
+    if (!this.socket || this.socket.readyState !== WebSocket.OPEN) return;
+    const msg = {
+      type: "forward_message",
+      forward: {
+        sender_id: senderId,
+        content: content,
+        type: type,
+        media_ids: mediaIds,
+        receiver_ids: receiverIds,
+        group_ids: groupIds,
+      }
+    };
+    this.socket.send(JSON.stringify(msg));
+  }
 
 
 

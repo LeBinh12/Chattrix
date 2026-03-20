@@ -1,0 +1,217 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - generic [ref=e5]:
+      - generic [ref=e8] [cursor=pointer]: Q
+      - generic [ref=e9]:
+        - button [ref=e11] [cursor=pointer]:
+          - img [ref=e12]
+        - button [ref=e15] [cursor=pointer]:
+          - img [ref=e16]
+        - button [ref=e20] [cursor=pointer]:
+          - img [ref=e21]
+      - generic [ref=e25]:
+        - button [ref=e27] [cursor=pointer]:
+          - img [ref=e28]
+        - button "Ẩn sidebar" [ref=e31] [cursor=pointer]:
+          - img [ref=e32]
+    - generic [ref=e36]:
+      - generic [ref=e40]:
+        - generic [ref=e41]:
+          - generic [ref=e42]:
+            - img [ref=e44]
+            - textbox "Tìm kiếm" [ref=e47]
+          - button "Tạo nhóm" [ref=e48] [cursor=pointer]:
+            - img [ref=e49]
+        - generic [ref=e52]:
+          - button "Tất cả" [ref=e53] [cursor=pointer]: Tất cả
+          - button "Nhóm" [ref=e55] [cursor=pointer]
+          - button "Chưa đọc" [ref=e56] [cursor=pointer]
+          - button "Phân loại" [ref=e58] [cursor=pointer]:
+            - text: Phân loại
+            - img [ref=e59]
+        - generic [ref=e62]:
+          - 'button "S Ngoại tuyến Stress User 633 3 phút trước Bạn: Chào bạn, đây là tin nhắn tự động từ aut..." [ref=e63] [cursor=pointer]':
+            - generic [ref=e65]:
+              - generic [ref=e67]: S
+              - generic "Ngoại tuyến" [ref=e68]
+            - generic [ref=e69]:
+              - generic [ref=e70]:
+                - paragraph [ref=e72]: Stress User 633
+                - generic [ref=e73]: 3 phút trước
+              - paragraph [ref=e76]: "Bạn: Chào bạn, đây là tin nhắn tự động từ aut..."
+          - button "S Ngoại tuyến Stress User 377 Chưa có tin nhắn" [ref=e77] [cursor=pointer]:
+            - generic [ref=e79]:
+              - generic [ref=e81]: S
+              - generic "Ngoại tuyến" [ref=e82]
+            - generic [ref=e83]:
+              - paragraph [ref=e86]: Stress User 377
+              - paragraph [ref=e89]: Chưa có tin nhắn
+          - button "S Ngoại tuyến Stress User 632 Chưa có tin nhắn" [ref=e90] [cursor=pointer]:
+            - generic [ref=e92]:
+              - generic [ref=e94]: S
+              - generic "Ngoại tuyến" [ref=e95]
+            - generic [ref=e96]:
+              - paragraph [ref=e99]: Stress User 632
+              - paragraph [ref=e102]: Chưa có tin nhắn
+          - button "S Ngoại tuyến Stress User 761 Chưa có tin nhắn" [ref=e103] [cursor=pointer]:
+            - generic [ref=e105]:
+              - generic [ref=e107]: S
+              - generic "Ngoại tuyến" [ref=e108]
+            - generic [ref=e109]:
+              - paragraph [ref=e112]: Stress User 761
+              - paragraph [ref=e115]: Chưa có tin nhắn
+          - button "S Ngoại tuyến Stress User 569 Chưa có tin nhắn" [ref=e116] [cursor=pointer]:
+            - generic [ref=e118]:
+              - generic [ref=e120]: S
+              - generic "Ngoại tuyến" [ref=e121]
+            - generic [ref=e122]:
+              - paragraph [ref=e125]: Stress User 569
+              - paragraph [ref=e128]: Chưa có tin nhắn
+          - button "S Ngoại tuyến Stress User 313 Chưa có tin nhắn" [ref=e129] [cursor=pointer]:
+            - generic [ref=e131]:
+              - generic [ref=e133]: S
+              - generic "Ngoại tuyến" [ref=e134]
+            - generic [ref=e135]:
+              - paragraph [ref=e138]: Stress User 313
+              - paragraph [ref=e141]: Chưa có tin nhắn
+          - button "S Ngoại tuyến Stress User 697 Chưa có tin nhắn" [ref=e142] [cursor=pointer]:
+            - generic [ref=e144]:
+              - generic [ref=e146]: S
+              - generic "Ngoại tuyến" [ref=e147]
+            - generic [ref=e148]:
+              - paragraph [ref=e151]: Stress User 697
+              - paragraph [ref=e154]: Chưa có tin nhắn
+          - button "S Ngoại tuyến Stress User 185 Chưa có tin nhắn" [ref=e155] [cursor=pointer]:
+            - generic [ref=e157]:
+              - generic [ref=e159]: S
+              - generic "Ngoại tuyến" [ref=e160]
+            - generic [ref=e161]:
+              - paragraph [ref=e164]: Stress User 185
+              - paragraph [ref=e167]: Chưa có tin nhắn
+          - button "S Ngoại tuyến Stress User 441 Chưa có tin nhắn" [ref=e168] [cursor=pointer]:
+            - generic [ref=e170]:
+              - generic [ref=e172]: S
+              - generic "Ngoại tuyến" [ref=e173]
+            - generic [ref=e174]:
+              - paragraph [ref=e177]: Stress User 441
+              - paragraph [ref=e180]: Chưa có tin nhắn
+          - button "S Ngoại tuyến Stress User 825 Chưa có tin nhắn" [ref=e181] [cursor=pointer]:
+            - generic [ref=e183]:
+              - generic [ref=e185]: S
+              - generic "Ngoại tuyến" [ref=e186]
+            - generic [ref=e187]:
+              - paragraph [ref=e190]: Stress User 825
+              - paragraph [ref=e193]: Chưa có tin nhắn
+          - button "S Ngoại tuyến Stress User 889 Chưa có tin nhắn" [ref=e194] [cursor=pointer]:
+            - generic [ref=e196]:
+              - generic [ref=e198]: S
+              - generic "Ngoại tuyến" [ref=e199]
+            - generic [ref=e200]:
+              - paragraph [ref=e203]: Stress User 889
+              - paragraph [ref=e206]: Chưa có tin nhắn
+          - button "S Ngoại tuyến Stress User 537 Chưa có tin nhắn" [ref=e207] [cursor=pointer]:
+            - generic [ref=e209]:
+              - generic [ref=e211]: S
+              - generic "Ngoại tuyến" [ref=e212]
+            - generic [ref=e213]:
+              - paragraph [ref=e216]: Stress User 537
+              - paragraph [ref=e219]: Chưa có tin nhắn
+          - button "S Ngoại tuyến Stress User 281 Chưa có tin nhắn" [ref=e220] [cursor=pointer]:
+            - generic [ref=e222]:
+              - generic [ref=e224]: S
+              - generic "Ngoại tuyến" [ref=e225]
+            - generic [ref=e226]:
+              - paragraph [ref=e229]: Stress User 281
+              - paragraph [ref=e232]: Chưa có tin nhắn
+          - button "S Ngoại tuyến Stress User 601 Chưa có tin nhắn" [ref=e233] [cursor=pointer]:
+            - generic [ref=e235]:
+              - generic [ref=e237]: S
+              - generic "Ngoại tuyến" [ref=e238]
+            - generic [ref=e239]:
+              - paragraph [ref=e242]: Stress User 601
+              - paragraph [ref=e245]: Chưa có tin nhắn
+          - button "S Ngoại tuyến Stress User 153 Chưa có tin nhắn" [ref=e246] [cursor=pointer]:
+            - generic [ref=e248]:
+              - generic [ref=e250]: S
+              - generic "Ngoại tuyến" [ref=e251]
+            - generic [ref=e252]:
+              - paragraph [ref=e255]: Stress User 153
+              - paragraph [ref=e258]: Chưa có tin nhắn
+          - button "S Ngoại tuyến Stress User 665 Chưa có tin nhắn" [ref=e259] [cursor=pointer]:
+            - generic [ref=e261]:
+              - generic [ref=e263]: S
+              - generic "Ngoại tuyến" [ref=e264]
+            - generic [ref=e265]:
+              - paragraph [ref=e268]: Stress User 665
+              - paragraph [ref=e271]: Chưa có tin nhắn
+          - button "S Ngoại tuyến Stress User 345 Chưa có tin nhắn" [ref=e272] [cursor=pointer]:
+            - generic [ref=e274]:
+              - generic [ref=e276]: S
+              - generic "Ngoại tuyến" [ref=e277]
+            - generic [ref=e278]:
+              - paragraph [ref=e281]: Stress User 345
+              - paragraph [ref=e284]: Chưa có tin nhắn
+          - button "S Ngoại tuyến Stress User 729 Chưa có tin nhắn" [ref=e285] [cursor=pointer]:
+            - generic [ref=e287]:
+              - generic [ref=e289]: S
+              - generic "Ngoại tuyến" [ref=e290]
+            - generic [ref=e291]:
+              - paragraph [ref=e294]: Stress User 729
+              - paragraph [ref=e297]: Chưa có tin nhắn
+          - button "S Ngoại tuyến Stress User 89 Chưa có tin nhắn" [ref=e298] [cursor=pointer]:
+            - generic [ref=e300]:
+              - generic [ref=e302]: S
+              - generic "Ngoại tuyến" [ref=e303]
+            - generic [ref=e304]:
+              - paragraph [ref=e307]: Stress User 89
+              - paragraph [ref=e310]: Chưa có tin nhắn
+          - button "S Ngoại tuyến Stress User 793 Chưa có tin nhắn" [ref=e311] [cursor=pointer]:
+            - generic [ref=e313]:
+              - generic [ref=e315]: S
+              - generic "Ngoại tuyến" [ref=e316]
+            - generic [ref=e317]:
+              - paragraph [ref=e320]: Stress User 793
+              - paragraph [ref=e323]: Chưa có tin nhắn
+      - generic [ref=e327]:
+        - generic [ref=e328]:
+          - generic [ref=e329]:
+            - generic [ref=e332]: S
+            - generic [ref=e333]:
+              - paragraph [ref=e334]: Stress User 633
+              - generic [ref=e336]: Chưa truy cập
+          - generic [ref=e337]:
+            - button "Gọi video" [ref=e338] [cursor=pointer]:
+              - img [ref=e339]
+            - button "Thêm" [ref=e343] [cursor=pointer]:
+              - img [ref=e344]
+        - generic [ref=e348]:
+          - generic [ref=e351]:
+            - generic [ref=e352]:
+              - generic [ref=e354]: 17:12
+              - paragraph [ref=e359]: "123"
+            - paragraph [ref=e365]: Chào bạn, đây là tin nhắn tự động từ automation test!
+            - paragraph [ref=e371]: Chào bạn, đây là tin nhắn tự động từ automation test!
+            - paragraph [ref=e377]: Chào bạn, đây là tin nhắn tự động từ automation test!
+            - paragraph [ref=e383]: Chào bạn, đây là tin nhắn tự động từ automation test!
+            - paragraph [ref=e389]: Chào bạn, đây là tin nhắn tự động từ automation test!
+            - generic [ref=e392]:
+              - paragraph [ref=e395]: Chào bạn, đây là tin nhắn tự động từ automation test!
+              - generic [ref=e396]:
+                - generic [ref=e397]: 17:34
+                - generic [ref=e398]:
+                  - img [ref=e399]
+                  - generic [ref=e401]: Đã gửi
+          - generic [ref=e403]:
+            - button [ref=e404] [cursor=pointer]:
+              - img [ref=e405]
+            - paragraph [ref=e413]: Nhập @, tin nhắn tới Stress User 633
+            - generic [ref=e414]:
+              - button [ref=e415] [cursor=pointer]:
+                - img [ref=e416]
+              - button [ref=e419] [cursor=pointer]:
+                - img [ref=e420]
+  - region "Notifications Alt+T"
+```

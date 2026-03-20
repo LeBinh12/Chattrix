@@ -4,25 +4,27 @@ import type { PinnedMessageResponse } from "../types/pinned_message";
 import axiosClient from "../utils/axiosClient";
 
 export const messageAPI = {
-    getMessage: async (renderId: string, groupID: string, limit: number, beforeTime?: string): Promise<MessageResponse> => {
+    getMessage: async (renderId: string, groupID: string, limit: number, beforeTime?: string, parent_id?: string): Promise<MessageResponse> => {
         const response = await axiosClient.get<MessageResponse>(`/message/get-message`, {
             params: {
                 receiver_id: renderId,
                 group_id: groupID,
                 limit: limit,
-                beforeTime: beforeTime
+                beforeTime: beforeTime,
+                parent_id: parent_id
             }
         });
 
         return response.data;
     },
-    getMessageBelow: async (renderId: string, groupID: string, limit: number, afterTime?: string): Promise<MessageResponse> => {
+    getMessageBelow: async (renderId: string, groupID: string, limit: number, afterTime?: string, parent_id?: string): Promise<MessageResponse> => {
         const response = await axiosClient.get<MessageResponse>(`/message/get-message-below`, {
             params: {
                 receiver_id: renderId,
                 group_id: groupID,
                 limit: limit,
-                afterTime: afterTime
+                afterTime: afterTime,
+                parent_id: parent_id
             }
         });
 

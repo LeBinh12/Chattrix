@@ -1,4 +1,4 @@
-import { Check, CheckCheck, Eye, MoreVertical } from "lucide-react";
+import { Check, CheckCheck, Eye, MoreVertical, MessageSquare } from "lucide-react";
 import { motion } from "framer-motion";
 import type { Messages } from "../../../types/Message";
 import AvatarPreview from "./AvatarPreview";
@@ -7,10 +7,13 @@ import { API_ENDPOINTS } from "../../../config/api";
 import { LOGO } from "../../../assets/paths";
 import { useSetRecoilState } from "recoil";
 import { messageIDAtom } from "../../../recoil/atoms/messageAtom";
+import { activePanelAtom, threadTargetAtom, threadTargetTypeAtom } from "../../../recoil/atoms/uiAtom";
 import MessageContent from "./MessageContent";
 import MessageMenu from "./MessageMenu";
 import ReplyPreview from "./ReplyPreview";
 import React from "react";
+import { forceDownload } from "../../../utils/downloadUtil";
+import { toast } from "react-toastify";
 
 type StatusConfig = {
   icon: typeof Check;
@@ -48,6 +51,16 @@ function MessageItemComponent({
   const [showMenu, setShowMenu] = useState(false);
   const messageRef = useRef<HTMLDivElement>(null);
   const setMessageID = useSetRecoilState(messageIDAtom);
+  const setActivePanel = useSetRecoilState(activePanelAtom);
+  const setThreadTarget = useSetRecoilState(threadTargetAtom);
+  const setThreadTargetType = useSetRecoilState(threadTargetTypeAtom);
+
+  const handleThread = useCallback(() => {
+    setActivePanel("thread");
+    setThreadTarget(msg);
+    setThreadTargetType("message");
+    setShowMenu(false);
+  }, [msg, setActivePanel, setThreadTarget, setThreadTargetType]);
 
   // Strip HTML để hiển thị text thuần
   const getTextContent = useCallback((html: string) => {
@@ -76,6 +89,36 @@ function MessageItemComponent({
     },
     [currentUserId]
   );
+  
+  const hasMedia = (msg.media_ids || []).length > 0;
+
+  const handleDownloadAll = async () => {
+    if (!hasMedia) return;
+    
+    const mediaList = msg.media_ids || [];
+    toast.info("Đang bắt đầu tải xuống...");
+
+    try {
+        for (let i = 0; i < mediaList.length; i++) {
+            const m = mediaList[i];
+            const url =
+              m.type === "video"
+                ? `${API_ENDPOINTS.STREAM_MEDIA}/${m.id}`
+                : `${API_ENDPOINTS.UPLOAD_MEDIA}/${m.url}`;
+            
+            await forceDownload(url, m.filename);
+            
+            if (i < mediaList.length - 1) {
+                await new Promise(resolve => setTimeout(resolve, 300));
+            }
+        }
+        toast.success("Đã tải xong tất cả media!");
+    } catch (error) {
+        console.error("Batch download error:", error);
+        toast.error("Có lỗi xảy ra khi tải file!");
+    }
+    setShowMenu(false);
+  };
 
   useEffect(() => {
     if (isHighlighted && messageRef.current) {
@@ -149,18 +192,24 @@ function MessageItemComponent({
             initial={{ opacity: 0, scale: 0.9, y: -5 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.9, y: -5 }}
-            className={`absolute flex items-center gap-2 px-2 py-1 
-              bg-white shadow border border-gray-200 rounded-full
-              ${
-                isMine ? "left-0 -translate-x-full" : "right-0 translate-x-full"
-              }
-            `}
+             className={`absolute flex items-center gap-1.5 z-20
+               ${
+                 isMine ? "left-0 -translate-x-full -ml-2" : "right-0 translate-x-full ml-2"
+               }
+             `}
           >
-            <button
-              onClick={() => setShowMenu(true)}
-              className="p-1.5 rounded-full hover:bg-gray-100 text-gray-600"
-            >
+             <button
+               onClick={() => setShowMenu(true)}
+               className="w-7 h-7 flex items-center justify-center rounded-full bg-white border border-gray-200 shadow-sm hover:translate-y-[-2px] hover:shadow-md transition-all duration-200 text-gray-600"
+             >
               <MoreVertical className="w-4 h-4" />
+            </button>
+             <button
+               onClick={handleThread}
+               className="w-7 h-7 flex items-center justify-center rounded-full bg-white border border-gray-200 shadow-sm hover:translate-y-[-2px] hover:shadow-md transition-all duration-200 text-gray-600"
+               title="Bình luận (Thread)"
+             >
+              <MessageSquare className="w-4 h-4" />
             </button>
           </motion.div>
         )}
@@ -184,6 +233,17 @@ function MessageItemComponent({
             onPreviewMedia={onPreviewMedia}
             getTextContent={getTextContent}
           />
+
+          {/* Comment Count Link */}
+          {Number(msg.comment_count) > 0 && (
+            <button 
+              onClick={handleThread}
+              className="mt-2 flex items-center gap-1.5 text-[11px] font-bold text-blue-600 hover:underline !bg-transparent !p-0 !border-none"
+            >
+              <MessageSquare size={13} />
+              <span>{msg.comment_count} bình luận</span>
+            </button>
+          )}
 
           {/* Status icon for sent messages */}
           {isMine && (
@@ -210,10 +270,23 @@ function MessageItemComponent({
         msg={msg}
         showMenu={showMenu}
         setShowMenu={setShowMenu}
-        currentUserId={currentUserId}
-        display_name={display_name}
         isMine={isMine}
-        onDeleteMessage={onDeleteMessage}
+        isMobile={window.innerWidth < 768}
+        senderName={display_name}
+        senderAvatar={msg.sender_avatar}
+        onReaction={() => {}}
+        onReply={() => {}}
+        onCopy={() => {}}
+        onDownloadAll={handleDownloadAll}
+        onPin={() => {}}
+        onStar={() => {}}
+        onSelectMultiple={() => {}}
+        onViewDetail={() => {}}
+        onRecall={() => {}}
+        onReport={() => {}}
+        onDeleteForMe={() => onDeleteMessage(msg.id)}
+        onForward={() => {}}
+        onThread={handleThread}
       />
     </motion.div>
   );

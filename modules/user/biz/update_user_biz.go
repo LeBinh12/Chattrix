@@ -14,6 +14,7 @@ import (
 type UpdateUserStore interface {
 	Update(ctx context.Context, id primitive.ObjectID, data *models.UpdateRequest) error
 	FindByID(ctx context.Context, id string) (*models.User, error)
+	GetUserRoles(ctx context.Context, userID string) ([]string, error)
 }
 
 // Biz struct
@@ -66,4 +67,8 @@ func (biz *UpdateUserBiz) CompleteProfile(ctx context.Context, id primitive.Obje
 
 func (biz *UpdateUserBiz) GetUserByID(ctx context.Context, id string) (*models.User, error) {
 	return biz.store.FindByID(ctx, id)
+}
+
+func (biz *UpdateUserBiz) GetUserRoles(ctx context.Context, id string) ([]string, error) {
+	return biz.store.GetUserRoles(ctx, id)
 }

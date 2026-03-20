@@ -21,7 +21,7 @@ func buildRouter(cfg config.AppConfig, db *mongo.Database, hub *websocket.Hub) *
 		middleware.CORSMiddleware(),
 	)
 
-	routes.InitRouter(router, db, hub, cfg.NewESClient())
+	routes.InitRouter(router, db, hub, cfg.NewESClient(), cfg)
 
 	if cfg.Static.AssetsDir != "" {
 		router.Static("/assets", cfg.Static.AssetsDir)

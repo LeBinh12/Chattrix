@@ -8,14 +8,14 @@ export default function SuggestionLayout() {
       <Header />
 
       <main className="h-screen w-full relative overflow-hidden bg-gradient-to-br from-brand-700 to-brand-500">
-        {/* Nội dung */}
+        {/* Content */}
         <div className="relative flex flex-col items-center justify-center h-full px-4">
-          {/* Tiêu đề Chattrix */}
-          <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold text-white mb-6 sm:mb-4 tracking-wide drop-shadow-lg text-center">
+          {/* Chattrix Title */}
+          <p className="text-3xl sm:text-4xl md:text-5xl font-extrabold text-white mb-6 sm:mb-4 tracking-wide drop-shadow-lg text-center">
             Chattrix
-          </h1>
+          </p>
 
-          {/* 🔔 Thông báo nhắc người dùng */}
+          {/* 🔔 User notification reminder */}
           <motion.div
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
@@ -29,7 +29,7 @@ export default function SuggestionLayout() {
             </p>
           </motion.div>
 
-          {/* Form / nội dung */}
+          {/* Form / content */}
           <div className="w-full max-w-sm sm:max-w-md md:max-w-lg bg-white/10 backdrop-blur-lg rounded-2xl p-4 sm:p-6 md:p-8 shadow-xl">
             <Outlet />
           </div>

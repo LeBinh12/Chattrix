@@ -81,12 +81,13 @@ func (s *MongoChatStore) CheckGroupExists(ctx context.Context, groupID string) (
 
 func (s *MongoChatStore) IsUserInGroup(ctx context.Context, userID, groupID primitive.ObjectID) (bool, error) {
 	filter := bson.M{
-		"group_id": groupID,
-		"user_id":  userID,
-		"status":   "active",
+		"group_id":   groupID.Hex(),
+		"user_id":    userID.Hex(),
+		"is_deleted": bson.M{"$ne": true},
+		"role_id":    bson.M{"$ne": ""},
 	}
 
-	err := s.db.Collection("group_members").FindOne(ctx, filter).Err()
+	err := s.db.Collection("group_user_roles").FindOne(ctx, filter).Err()
 	if err == mongo.ErrNoDocuments {
 		return false, nil
 	}

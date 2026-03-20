@@ -16,7 +16,7 @@ Lần đầu cần chạy chương trình sẽ chạy
 
 ```
 MONGO_URI=mongodb://root:19006292@localhost:27018/?authSource=admin
-MONGO_DB=chattrix
+MONGO_DB=unichat
 CORS_ALLOWED_ORIGINS=http://localhost:5173
 ```
 

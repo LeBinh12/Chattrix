@@ -140,5 +140,46 @@ func ErrEntityDeleted(entity string, err error) *AppError {
 	)
 }
 
-var RecordNotFound = errors.New("Không tìm thấy dữ liệu")
+func ErrEntityNotFound(entity string, err error) *AppError {
+	if err == nil {
+		err = RecordNotFound
+	}
 
+	return NewFullErrorResponse(
+		http.StatusNotFound,
+		err,
+		fmt.Sprintf("Không tìm thấy %s", strings.ToLower(entity)),
+		err.Error(),
+		fmt.Sprintf("Err%sNotFound", entity),
+	)
+}
+
+func ErrNoPermission(err error) *AppError {
+	if err == nil {
+		err = errors.New("permission denied")
+	}
+
+	return NewFullErrorResponse(
+		http.StatusForbidden,
+		err,
+		"Bạn không có quyền thực hiện thao tác này",
+		err.Error(),
+		"ErrNoPermission",
+	)
+}
+
+func ErrEntityExisted(entity string, err error) *AppError {
+	if err == nil {
+		err = errors.New("entity already exists")
+	}
+
+	return NewFullErrorResponse(
+		http.StatusConflict,
+		err,
+		fmt.Sprintf("%s đã tồn tại", strings.Title(entity)),
+		err.Error(),
+		fmt.Sprintf("Err%sExisted", entity),
+	)
+}
+
+var RecordNotFound = errors.New("Không tìm thấy dữ liệu")

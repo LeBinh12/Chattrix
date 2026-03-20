@@ -2,6 +2,7 @@ package ginUser
 
 import (
 	"my-app/common"
+	"my-app/modules/user/models"
 	"my-app/modules/user/storage"
 	"net/http"
 
@@ -27,6 +28,23 @@ func ProfileHandler(db *mongo.Database) gin.HandlerFunc {
 			return
 		}
 
-		ctx.JSON(http.StatusOK, common.NewResponse(http.StatusOK, "Lấy thông tin người dùng thành công", user))
+		roles, err := store.GetUserRoles(ctx.Request.Context(), userID.(string))
+		if err != nil {
+			roles = []string{}
+		}
+
+		permissions, err := store.GetUserPermissions(ctx.Request.Context(), userID.(string))
+		if err != nil {
+			permissions = []string{}
+		}
+
+		// Tạo response với roles và permissions
+		response := models.UserProfileResponse{
+			User:        *user,
+			Roles:       roles,
+			Permissions: permissions,
+		}
+
+		ctx.JSON(http.StatusOK, common.NewResponse(http.StatusOK, "Lấy thông tin người dùng thành công", response))
 	}
 }

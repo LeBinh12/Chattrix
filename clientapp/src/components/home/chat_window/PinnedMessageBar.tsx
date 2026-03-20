@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Pin, ChevronDown, ChevronUp } from "lucide-react";
 import type { PinnedMessageDetail } from "../../../types/pinned_message";
 import { socketManager } from "../../../api/socket";
+import { BUTTON_HOVER } from "../../../utils/className";
 
 type Props = {
   pinned: PinnedMessageDetail[];
@@ -79,7 +80,7 @@ export default function PinnedMessageBar({
       initial={{ height: 0, opacity: 0 }}
       animate={{ height: "auto", opacity: 1 }}
       exit={{ height: 0, opacity: 0 }}
-      className="bg-white border-b border-[#e4e8f1]"
+      className="bg-white border-b border-t border-[#e4e8f1]"
     >
       <div className="px-4 py-1">
         {/* Header với Latest Message */}
@@ -95,14 +96,14 @@ export default function PinnedMessageBar({
               transition={{ duration: 2, repeat: Infinity, repeatDelay: 4 }}
               className="flex-shrink-0"
             >
-              <div className="w-9 h-9 rounded-full bg-[#f0f3f8] flex items-center justify-center group-hover:bg-[#e4e9f2] transition-colors">
-                <Pin className="w-4 h-4 text-gray-800" fill="currentColor" />
+              <div className={`w-9 h-9 rounded-full bg-white hover:bg-blue-50 text-gray-800 hover:text-[#00568c] flex items-center justify-center transition-colors`}>
+                <Pin className="w-4 h-4" fill="currentColor" />
               </div>
             </motion.div>
 
             {/* Message Content */}
             <div className="flex-1 min-w-0">
-              <div className="text-[10px] font-bold text-[#6b7a8f] mb-0.5">
+              <div className="text-[10px] font-bold text-gray-900 mb-0.5">
                 Tin nhắn
               </div>
               <div className="text-[12px] text-[#1c2333] break-words line-clamp-1">
@@ -115,7 +116,9 @@ export default function PinnedMessageBar({
                   {latest.sender_name}:{" "}
                 </span>
                 {stripHtmlAndTruncate(latest.content, 80) ||
-                  "Tin nhắn đã bị xóa"}{" "}
+                  (latest.message_type !== "text"
+                    ? getMessageTypeDisplay(latest.message_type)
+                    : "Tin nhắn đã bị xóa")}{" "}
               </div>
             </div>
           </div>
@@ -126,7 +129,7 @@ export default function PinnedMessageBar({
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                className="px-3 py-1.5 bg-[#f0f3f8] hover:bg-[#e4e9f2] rounded-full text-[13px] font-medium text-[#2754d7] transition-colors cursor-pointer"
+                className={`px-3 py-1.5 rounded-full text-[13px] font-medium text-gray-900 transition-colors cursor-pointer bg-white hover:bg-blue-50 hover:text-[#00568c]`}
                 onClick={(e) => {
                   e.stopPropagation();
                   setOpenDropdown((v) => !v);
@@ -146,7 +149,7 @@ export default function PinnedMessageBar({
                 e.stopPropagation();
                 handleUnpin(latest.message_id, latest.conversation_id);
               }}
-              className="text-red-500 text-xs no-underline underline-offset-2 hover:underline hover:text-red-600 cursor-pointer"
+              className="text-red-500 text-xs !no-underline hover:text-red-600 cursor-pointer"
             >
               Bỏ ghim
             </button>
@@ -165,7 +168,7 @@ export default function PinnedMessageBar({
             >
               {pinned.slice(1).map((msg, index) => (
                 <motion.div
-                  key={msg.pin_id}
+                  key={msg.pin_id || msg.message_id}
                   initial={{ x: -10, opacity: 0 }}
                   animate={{ x: 0, opacity: 1 }}
                   transition={{ delay: index * 0.04 }}
@@ -173,37 +176,53 @@ export default function PinnedMessageBar({
                     onSelectPinned(msg.message_id);
                     setOpenDropdown(false);
                   }}
-                  className="flex items-start gap-3 px-3 py-2 rounded-lg bg-[#f8f9fc] hover:bg-[#f0f3f8] cursor-pointer transition-colors group"
+                  className="flex items-start gap-3 px-3 py-2 rounded-lg bg-gray-50 hover:bg-blue-50 cursor-pointer transition-colors group"
                 >
                   {/* Avatar placeholder */}
-                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#5a7de1] to-[#7b94eb] flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <span className="text-xs text-white font-semibold">
+                  <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <span className="text-xs text-blue-700 font-semibold">
                       {msg.sender_name.charAt(0).toUpperCase()}
                     </span>
                   </div>
 
                   {/* Message info */}
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-baseline gap-2 mb-0.5">
-                      <span className="text-[13px] font-medium text-[#1c2333]">
-                        {msg.sender_name}
-                      </span>
-                      <span className="text-[11px] text-[#8b96a5]">
-                        {new Date(msg.created_at).toLocaleTimeString("vi-VN", {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
-                      </span>
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-0.5">
+                          <span className="text-[13px] font-medium text-[#1c2333] truncate">
+                            {msg.sender_name}
+                          </span>
+                          <span className="text-[11px] text-[#8b96a5] flex-shrink-0">
+                            {new Date(msg.created_at).toLocaleTimeString("vi-VN", {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
+                          </span>
+                        </div>
+                        <p className="text-[13px] text-[#5a6677] line-clamp-2 break-words">
+                          {msg.message_type !== "text" && (
+                            <span className="mr-1.5 opacity-70">
+                              {getMessageTypeDisplay(msg.message_type)}
+                            </span>
+                          )}
+                          {stripHtmlAndTruncate(msg.content, 80) ||
+                            (msg.message_type !== "text"
+                              ? getMessageTypeDisplay(msg.message_type)
+                              : "Tin nhắn đã bị xóa")}
+                        </p>
+                      </div>
+
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleUnpin(msg.message_id, msg.conversation_id);
+                        }}
+                        className="text-red-500 text-[11px] hover:text-red-600 font-medium whitespace-nowrap"
+                      >
+                        Bỏ ghim
+                      </button>
                     </div>
-                    <p className="text-[13px] text-[#5a6677] line-clamp-2 break-words">
-                      {msg.message_type !== "text" && (
-                        <span className="mr-1.5 opacity-70">
-                          {getMessageTypeDisplay(msg.message_type)}
-                        </span>
-                      )}
-                      {stripHtmlAndTruncate(msg.content, 80) ||
-                        "Tin nhắn đã bị xóa"}
-                    </p>
                   </div>
                 </motion.div>
               ))}

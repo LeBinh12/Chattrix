@@ -11,7 +11,7 @@ import { selectedChatState } from "../../recoil/atoms/chatAtom";
 import { messageAPI } from "../../api/messageApi";
 import type { MediaItemDTO } from "../../types/media";
 import MediaStorageViewer from "./MediaStorageViwer";
-import { activePanelAtom } from "../../recoil/atoms/uiAtom";
+import { activePanelAtom, storageTabAtom } from "../../recoil/atoms/uiAtom";
 import { API_ENDPOINTS } from "../../config/api";
 
 type MediaType = "image" | "video" | "file";
@@ -19,7 +19,9 @@ type TabType = "media" | "files" | "links";
 
 export default function StorageArchivePanel() {
   const selectedChat = useRecoilValue(selectedChatState);
-  const [activeTab, setActiveTab] = useState<TabType>("media");
+  const initialTab = useRecoilValue(storageTabAtom);
+  const setStorageTab = useSetRecoilState(storageTabAtom);
+  const [activeTab, setActiveTab] = useState<TabType>(initialTab);
   const setActivePanel = useSetRecoilState(activePanelAtom);
 
   // Separate states for different media types
@@ -174,7 +176,7 @@ export default function StorageArchivePanel() {
         <div
           key={`${item.id}-${index}`}
           onClick={() => handleMediaItemClick(item)}
-          className="relative aspect-square rounded-lg overflow-hidden bg-[#f0f3fb] cursor-pointer hover:ring-2 hover:ring-[#4f6eda] transition group border border-[#e3e8f2]"
+          className="relative aspect-square rounded-lg overflow-hidden bg-[#f0f3fb] cursor-pointer hover:ring-2 hover:ring-[#00568c] transition group border border-[#e3e8f2]"
         >
           <img
             src={getMediaUrl(item.id)}
@@ -205,7 +207,7 @@ export default function StorageArchivePanel() {
         <div
           key={`${item.id}-${index}`}
           onClick={() => handleMediaItemClick(item)}
-          className="relative aspect-square rounded-lg overflow-hidden bg-[#f0f3fb] cursor-pointer hover:ring-2 hover:ring-[#4f6eda] transition group border border-[#e3e8f2]"
+          className="relative aspect-square rounded-lg overflow-hidden bg-[#f0f3fb] cursor-pointer hover:ring-2 hover:ring-[#00568c] transition group border border-[#e3e8f2]"
         >
           <video
             src={getMediaUrl(item.id)}
@@ -225,8 +227,8 @@ export default function StorageArchivePanel() {
           onClick={() => handleMediaItemClick(item)}
           className="flex items-center gap-3 px-4 py-3 hover:bg-[#f0f3fb] cursor-pointer transition border-b border-[#e3e8f2]"
         >
-          <div className="w-10 h-10 bg-gradient-to-br from-orange-50 to-red-50 rounded-lg flex items-center justify-center flex-shrink-0">
-            <FileText size={20} className="text-orange-500" />
+          <div className="w-10 h-10 bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
+            <FileText size={20} className="text-[#00568c]" />
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium text-[#2e3a59] truncate">
@@ -265,43 +267,52 @@ export default function StorageArchivePanel() {
             >
               <ChevronLeft size={20} />
             </button>
-            <h2 className="text-base font-semibold">Kho lưu trữ</h2>
+            <p className="text-base font-semibold">Kho lưu trữ</p>
           </div>
         </div>
 
         {/* Tabs */}
         <div className="flex border-b border-[#e3e8f2]">
           <button
-            onClick={() => setActiveTab("media")}
+            onClick={() => {
+              setActiveTab("media");
+              setStorageTab("media");
+            }}
             className={`flex-1 py-3 text-sm font-medium relative ${
-              activeTab === "media" ? "text-[#4f6eda]" : "text-[#7d89a8]"
+              activeTab === "media" ? "text-[#00568c]" : "text-[#7d89a8]"
             }`}
           >
             Ảnh/Video
             {activeTab === "media" && (
-              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#4f6eda]"></div>
+              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#00568c]"></div>
             )}
           </button>
           <button
-            onClick={() => setActiveTab("files")}
+            onClick={() => {
+              setActiveTab("files");
+              setStorageTab("files");
+            }}
             className={`flex-1 py-3 text-sm font-medium relative ${
-              activeTab === "files" ? "text-[#4f6eda]" : "text-[#7d89a8]"
+              activeTab === "files" ? "text-[#00568c]" : "text-[#7d89a8]"
             }`}
           >
             Files
             {activeTab === "files" && (
-              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#4f6eda]"></div>
+              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#00568c]"></div>
             )}
           </button>
           <button
-            onClick={() => setActiveTab("links")}
+            onClick={() => {
+              setActiveTab("links");
+              setStorageTab("links");
+            }}
             className={`flex-1 py-3 text-sm font-medium relative ${
-              activeTab === "links" ? "text-[#4f6eda]" : "text-[#7d89a8]"
+              activeTab === "links" ? "text-[#00568c]" : "text-[#7d89a8]"
             }`}
           >
             Links
             {activeTab === "links" && (
-              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#4f6eda]"></div>
+              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#00568c]"></div>
             )}
           </button>
         </div>
@@ -310,7 +321,7 @@ export default function StorageArchivePanel() {
         <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-[#d4dbef] scrollbar-track-transparent">
           {loading && currentItems.length === 0 ? (
             <div className="flex items-center justify-center py-8">
-              <Loader2 size={24} className="text-[#4f6eda] animate-spin" />
+              <Loader2 size={24} className="text-[#00568c] animate-spin" />
             </div>
           ) : Object.keys(groupedItems).length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 px-4">
@@ -333,9 +344,9 @@ export default function StorageArchivePanel() {
                 <>
                   {Object.entries(groupedItems).map(([dateGroup, items]) => (
                     <div key={dateGroup} className="mb-6">
-                      <h3 className="text-xs font-semibold px-4 py-2 text-[#7d89a8] bg-[#f8f9fc] sticky top-0 z-10">
+                      <p className="text-xs font-semibold px-4 py-2 text-[#7d89a8] bg-[#f8f9fc] sticky top-0 z-10">
                         {dateGroup}
-                      </h3>
+                      </p>
                       <div className="grid grid-cols-3 gap-1.5 px-4 pt-2">
                         {items.map((item, index) =>
                           renderMediaItem(item, index)
@@ -350,9 +361,9 @@ export default function StorageArchivePanel() {
                 <>
                   {Object.entries(groupedItems).map(([dateGroup, items]) => (
                     <div key={dateGroup} className="mb-4">
-                      <h3 className="text-xs font-semibold px-4 py-2 text-[#7d89a8] bg-[#f8f9fc] sticky top-0 z-10">
+                      <p className="text-xs font-semibold px-4 py-2 text-[#7d89a8] bg-[#f8f9fc] sticky top-0 z-10">
                         {dateGroup}
-                      </h3>
+                      </p>
                       <div>
                         {items.map((item, index) =>
                           renderMediaItem(item, index)
@@ -367,7 +378,7 @@ export default function StorageArchivePanel() {
                 <div className="flex justify-center py-4">
                   <button
                     onClick={() => fetchMediaList(false)}
-                    className="px-4 py-2 text-sm text-[#4f6eda] hover:bg-[#f0f3fb] rounded-lg transition"
+                    className="px-4 py-2 text-sm text-[#00568c] hover:bg-[#f0f3fb] rounded-lg transition"
                   >
                     Tải thêm
                   </button>
@@ -376,7 +387,7 @@ export default function StorageArchivePanel() {
 
               {loading && currentItems.length > 0 && (
                 <div className="flex justify-center py-4">
-                  <Loader2 size={20} className="text-[#4f6eda] animate-spin" />
+                  <Loader2 size={20} className="text-[#00568c] animate-spin" />
                 </div>
               )}
             </>

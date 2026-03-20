@@ -17,10 +17,22 @@ export default function ReplyPreview() {
 
   const getMediaUrl = (url: string) => {
     if (!url) return "";
-    // nếu media_url đã là URL đầy đủ hoặc bắt đầu bằng "/" thì trả về trực tiếp
     if (url.startsWith("http") || url.startsWith("/")) return url;
     return `${API_ENDPOINTS.UPLOAD_MEDIA}/${url}`;
   };
+
+  const getFileNameFromUrl = (url: string) => {
+    if (!url) return "";
+    const parts = url.split("/");
+    const fileName = parts[parts.length - 1];
+    // If filename has a UUID prefix like 'xxxxx_actualName.ext', try to clean it
+    if (fileName.includes("_")) {
+      const subParts = fileName.split("_");
+      if (subParts.length > 1) return subParts.slice(1).join("_");
+    }
+    return fileName;
+  };
+
 
   return (
     <AnimatePresence>
@@ -32,19 +44,26 @@ export default function ReplyPreview() {
           transition={{ duration: 0.2 }}
           className="px-2 sm:px-4 pt-3 overflow-hidden"
         >
-          <div className="flex items-start gap-2 p-3 rounded-xl bg-[#f0f4ff] border border-[#d5e0ff] relative">
-            <div className="absolute left-0 top-0 bottom-0 w-1 bg-blue-500 rounded-l-xl" />
+          <div className="flex items-start gap-2 p-3 rounded-xl bg-gray-50 border border-gray-200 relative">
+            <div className="absolute left-0 top-0 bottom-0 w-1 bg-gray-400 rounded-l-xl" />
 
             <div className="flex-1 min-w-0 pl-2">
               <div className="flex items-center gap-2 mb-1">
-                <Reply className="w-3.5 h-3.5 text-blue-600 flex-shrink-0" />
-                <span className="text-xs font-semibold text-blue-600 truncate">
+                <Reply className="w-3.5 h-3.5 text-gray-700 flex-shrink-0" />
+                <span className="text-xs font-semibold text-gray-700 truncate">
                   Trả lời {replyTo.sender}
-                </span>
+                </span>0
               </div>
 
-              <div className="text-xs text-gray-600 line-clamp-2 break-words">
-                {getTextContent(replyTo.content)}
+              <div className="text-xs text-gray-800 line-clamp-2 break-words">
+                {(() => {
+                  const text = getTextContent(replyTo.content);
+                  if (text) return text;
+                  if (replyTo.type === "image") return "[Hình ảnh]";
+                  if (replyTo.type === "video") return "[Video]";
+                  if (replyTo.type === "file") return "[Tệp tin]";
+                  return "";
+                })()}
               </div>
 
               {/* Media preview */}
@@ -71,9 +90,11 @@ export default function ReplyPreview() {
                     </div>
                   )}
                   {replyTo.type === "file" && (
-                    <div className="flex items-center justify-center w-10 h-10 bg-gray-300 text-gray-600 text-[10px] p-1 text-center rounded">
-                      <FileText className="w-3 h-3 mr-1 inline-block" />
-                      {replyTo.content || "File"}
+                    <div className="flex items-center justify-center w-10 h-10 bg-gray-300 text-gray-800 text-[10px] p-1 text-center rounded overflow-hidden">
+                      <FileText className="w-3 h-3 mr-1 flex-shrink-0" />
+                      <span className="truncate leading-tight">
+                        {getFileNameFromUrl(replyTo.media_url) || "Tệp"}
+                      </span>
                     </div>
                   )}
                 </div>

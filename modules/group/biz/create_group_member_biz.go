@@ -22,9 +22,9 @@ func NewCreateGroupMemberBiz(store CreateGroupMemberStorage) *createGroupMemberB
 }
 
 func (biz *createGroupMemberBiz) CreateGroupNumber(ctx context.Context, data *models.GroupMember) error {
-	// logic kiểm tra hợp lệ
+	// validation logic
 	if data.GroupID.IsZero() || data.UserID.IsZero() {
-		return fmt.Errorf("Lỗi dữ liệu không hợp lệ")
+		return fmt.Errorf("invalid data error")
 	}
 
 	data.ID = primitive.NewObjectID()

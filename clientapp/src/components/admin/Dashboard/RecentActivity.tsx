@@ -77,10 +77,10 @@ const getActivityBgColor = (type: string) => {
 
 export default function RecentActivity() {
   return (
-    <div className="bg-white rounded-lg shadow-sm p-3 sm:p-4 md:p-6 border border-gray-100 overflow-hidden">
-      <h3 className="text-sm sm:text-base md:text-lg font-bold text-gray-900 mb-3 sm:mb-4 line-clamp-1">
+    <div className="bg-white rounded-sm shadow-sm p-3 sm:p-4 md:p-6 border border-gray-100 overflow-hidden">
+      <p className="text-sm sm:text-base md:text-lg font-bold text-gray-900 mb-3 sm:mb-4 line-clamp-1">
         Hoạt động gần đây
-      </h3>
+      </p>
       <div className="space-y-2 sm:space-y-3 md:space-y-4">
         {activities.map((activity) => (
           <div
@@ -90,16 +90,16 @@ export default function RecentActivity() {
             <div
               className={`${getActivityBgColor(
                 activity.type
-              )} rounded-lg p-2 sm:p-2.5 md:p-3 flex-shrink-0 flex items-center justify-center`}
+              )} rounded-sm p-2 sm:p-2.5 md:p-3 flex-shrink-0 flex items-center justify-center`}
             >
               <div className="w-4 h-4 sm:w-5 sm:h-5">
                 {getActivityIcon(activity.type)}
               </div>
             </div>
             <div className="flex-1 min-w-0">
-              <h4 className="font-semibold text-gray-900 text-xs sm:text-sm line-clamp-1">
+              <p className="font-semibold text-gray-900 text-xs sm:text-sm line-clamp-1">
                 {activity.title}
-              </h4>
+              </p>
               <p className="text-gray-600 text-xs sm:text-sm mt-1 line-clamp-2">
                 {activity.description}
               </p>

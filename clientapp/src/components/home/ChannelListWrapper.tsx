@@ -7,12 +7,12 @@ interface ChannelListWrapperProps {
 export default function ChannelListWrapper({
   children,
 }: ChannelListWrapperProps) {
-  const [width, setWidth] = useState(300); // độ rộng mặc định
+  const [width, setWidth] = useState(330); // default width
   const [isResizing, setIsResizing] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const minWidth = 60; // nhỏ nhất: chỉ hiện avatar
-  const maxWidth = 400; // rộng nhất
+  const minWidth = 75; // minimum: avatar only
+  const maxWidth = 400; // maximum
 
   const handleMouseMove = useCallback(
     (e: MouseEvent) => {

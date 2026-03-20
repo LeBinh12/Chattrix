@@ -1,6 +1,6 @@
-import { Image, Play } from "lucide-react";
+import { Play, ChevronRight } from "lucide-react";
 import { useSetRecoilState } from "recoil";
-import { activePanelAtom } from "../../../recoil/atoms/uiAtom";
+import { activePanelAtom, storageTabAtom } from "../../../recoil/atoms/uiAtom";
 import { API_ENDPOINTS } from "../../../config/api";
 
 interface MediaItem {
@@ -21,37 +21,42 @@ export default function RecentMediaSection({
   onMediaClick,
 }: RecentMediaSectionProps) {
   const setActivePanel = useSetRecoilState(activePanelAtom);
+  const setStorageTab = useSetRecoilState(storageTabAtom);
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-2">
-        <h4 className="text-[13px] font-semibold text-[#1f2a44] flex items-center gap-2">
-          <Image size={18} />
-          Ảnh/Video ({mediaItems.length})
-        </h4>
-        {mediaItems.length > 8 && (
-          <button
-            onClick={() => setActivePanel("storage")}
-            className="text-[11px] text-[#4f6eda] no-underline hover:underline hover:text-[#1f2a44] transition cursor-pointer"
-          >
-            Xem tất cả
-          </button>
-        )}
+      <div
+        className="flex items-center justify-between mb-3 cursor-pointer group"
+        onClick={() => {
+          if (mediaItems.length > 0) {
+            setStorageTab("media");
+            setActivePanel("storage");
+          }
+        }}
+      >
+        <p className="text-sm font-bold text-gray-900 flex items-center gap-2">
+          Ảnh/Video
+        </p>
+        {/* Only show 'See all' logic if items exist, or just show arrow like Zalo */}
+        <div className="flex items-center text-gray-500 font-bold group-hover:text-gray-800 transition-colors mr-3">
+          <span className="text-xs mr-1">{mediaItems.length > 0 ? "Xem tất cả" : ""}</span>
+          <ChevronRight size={16} />
+        </div>
       </div>
 
       {mediaItems.length > 0 ? (
-        <div className="grid grid-cols-4 gap-1.5">
+        <div className="grid grid-cols-4 gap-1">
           {mediaItems.slice(0, 8).map((media) => (
             <div
               key={media.id}
               onClick={() => onMediaClick(media.id)}
-              className="relative aspect-square rounded-2xl overflow-hidden bg-[#f0f3fb] cursor-pointer hover:ring-2 hover:ring-[#94b5ff] transition group flex items-center justify-center border border-transparent"
+              className="relative aspect-square rounded-md overflow-hidden bg-gray-100 cursor-pointer hover:opacity-90 transition border border-gray-100"
             >
               {media.type === "video" ? (
                 <>
                   <div className="absolute inset-0 bg-black/30"></div>
-                  <div className="relative z-10 flex items-center justify-center text-white">
-                    <Play size={24} />
+                  <div className="absolute inset-0 z-10 flex items-center justify-center text-white">
+                    <Play size={20} />
                   </div>
                 </>
               ) : (
@@ -65,9 +70,9 @@ export default function RecentMediaSection({
           ))}
         </div>
       ) : (
-        <p className="text-xs text-[#9ba6c4] text-center py-4">
-          Chưa có ảnh/video nào
-        </p>
+        <div className="text-xs text-gray-500 py-2 italic bg-gray-50 rounded text-center">
+          Chưa có ảnh/video được chia sẻ
+        </div>
       )}
     </div>
   );

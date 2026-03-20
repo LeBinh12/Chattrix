@@ -10,6 +10,7 @@ import (
 type UserStore interface {
 	FindByEmail(ctx context.Context, email string) (*models.User, error)
 	Create(ctx context.Context, user *models.User) error
+	GetUserRoles(ctx context.Context, userID string) ([]string, error)
 }
 
 type googleLoginBiz struct {
@@ -38,7 +39,13 @@ func (biz *googleLoginBiz) LoginOrRegisterByGoogle(ctx context.Context, req *mod
 		user = newUser
 	}
 
-	token, err := utils.GenerateJWT(user.ID.Hex())
+	// Lấy danh sách role của user
+	roles, err := biz.store.GetUserRoles(ctx, user.ID.Hex())
+	if err != nil {
+		roles = []string{}
+	}
+
+	token, err := utils.GenerateJWT(user.ID.Hex(), roles)
 	if err != nil {
 		return "", err
 	}

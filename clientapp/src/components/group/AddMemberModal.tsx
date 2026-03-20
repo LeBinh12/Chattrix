@@ -1,19 +1,11 @@
 import { useState, useEffect, useCallback } from "react";
-import { X, UserPlus, Check } from "lucide-react";
 import { toast } from "react-toastify";
 import { groupApi } from "../../api/group";
-import { API_ENDPOINTS } from "../../config/api";
-import { LOGO } from "../../assets/paths";
 import { useRecoilValue } from "recoil";
 import { selectedChatState } from "../../recoil/atoms/chatAtom";
 import { socketManager } from "../../api/socket";
 import { userAtom } from "../../recoil/atoms/userAtom";
-
-interface User {
-  id: string;
-  display_name: string;
-  avatar: string;
-}
+import UserSelectionModal, { type User } from "./UserSelectionModal";
 
 interface AddMemberModalProps {
   isOpen: boolean;
@@ -29,17 +21,9 @@ export default function AddMemberModal({
   onAddMembers,
 }: AddMemberModalProps) {
   const [users, setUsers] = useState<User[]>([]);
-  const [selectedMembers, setSelectedMembers] = useState<Set<string>>(
-    new Set()
-  );
   const [loading, setLoading] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-    const selectedChat = useRecoilValue(selectedChatState);
-  const userRecoil = useRecoilValue(userAtom)
-  // const [page, setPage] = useState(1);
-  // const [hasMore, setHasMore] = useState(true);
-
-  // Fetch users chưa trong nhóm
+  const selectedChat = useRecoilValue(selectedChatState);
+  const userRecoil = useRecoilValue(userAtom);
 
   const fetchUsers = useCallback(
     async (pageToFetch = 1) => {
@@ -49,15 +33,27 @@ export default function AddMemberModal({
 
         if (res.status === 200) {
           const data = res.data || [];
+          interface ApiUser {
+            id: string;
+            display_name: string;
+            avatar: string;
+            status: string;
+          }
+          const mappedUsers: User[] = (data as unknown as ApiUser[]).map((user) => ({
+            id: user.id,
+            display_name: user.display_name,
+            avatar: user.avatar || "",
+            online: user.status === "online",
+          }));
 
           if (pageToFetch === 1) {
-            setUsers(data);
+            setUsers(mappedUsers);
           } else {
-            setUsers((prev) => [...prev, ...data]);
+            setUsers((prev) => [...prev, ...mappedUsers]);
           }
         }
       } catch (error) {
-        console.error("Lỗi tải danh sách user:", error);
+        console.error("Error loading user list:", error);
       } finally {
         setLoading(false);
       }
@@ -70,162 +66,69 @@ export default function AddMemberModal({
     fetchUsers(1);
   }, [isOpen, fetchUsers]);
 
-  // Reset khi đóng modal
-  useEffect(() => {
-    if (!isOpen) {
-      setSelectedMembers(new Set());
-    }
-  }, [isOpen]);
-
-  const toggleMember = (userId: string) => {
-    const newSelected = new Set(selectedMembers);
-    if (newSelected.has(userId)) {
-      newSelected.delete(userId);
-    } else {
-      newSelected.add(userId);
-    }
-    setSelectedMembers(newSelected);
-  };
-
-  const handleSubmit = async () => {
-    if (selectedMembers.size === 0) {
+  const handleSubmit = async (selectedIds: string[]) => {
+    if (selectedIds.length === 0) {
       toast.warning("Vui lòng chọn ít nhất một thành viên");
-      return;
+      throw new Error("No members selected");
     }
+
+    const members = selectedIds.map((userId) => {
+      const user = users.find((u) => u.id === userId);
+      return {
+        user_id: userId,
+        user_name: user?.display_name || "",
+        display_name: user?.display_name || "",
+        role: "number",
+      };
+    });
 
     try {
-      setSubmitting(true);
-      const members = Array.from(selectedMembers).map((userId) => {
-        const user = users.find((u) => u.id === userId);
-
-        return {
+      // Step 1: Add each member via REST API to ensure they are saved to DB/reactivated first
+      const addMemberPromises = selectedIds.map((userId) =>
+        groupApi.addMember({
+          group_id: selectedChat?.group_id ?? "",
           user_id: userId,
-          user_name: user?.display_name || "",
-          role: "number", // role mặc định
-        };
-      });
+          role: "number",
+        })
+      );
 
-      socketManager.sendAddGroupMember(userRecoil?.data.id ?? "", userRecoil?.data.display_name ?? "",
-        selectedChat?.group_id ?? "", selectedChat?.display_name ?? "",
-        selectedChat?.avatar ?? "", members, "add_member")
+      await Promise.all(addMemberPromises);
 
+      // Step 2: After DB is successfully updated, send socket event for real-time updates to other clients
+      socketManager.sendAddGroupMember(
+        userRecoil?.data.id ?? "",
+        userRecoil?.data.display_name ?? "",
+        selectedChat?.group_id ?? "",
+        selectedChat?.display_name ?? "",
+        selectedChat?.avatar ?? "",
+        members,
+        "add_member"
+      );
 
-      // Lọc bỏ những user vừa thêm khỏi list hiện tại
-      setUsers((prev) => prev.filter((u) => !selectedMembers.has(u.id)));
-      const addedCount = selectedMembers.size;
-      setSelectedMembers(new Set());
-
-      toast.success(`Đã thêm ${addedCount} thành viên vào nhóm!`);
+      setUsers((prev) => prev.filter((u) => !selectedIds.includes(u.id)));
+      toast.success(`Đã thêm ${selectedIds.length} thành viên vào nhóm!`);
       onAddMembers?.();
-
-      // Nếu không còn user nào -> thông báo / đóng modal (tuỳ bạn)
-      setTimeout(() => {
-        if (users.length - addedCount <= 0) {
-          toast.info("Đã thêm hết tất cả người dùng trong danh sách.");
-          // onClose(); // nếu muốn tự đóng modal, bỏ comment
-        }
-      }, 200);
     } catch (error) {
-      console.error(error);
-      toast.error("Thêm thành viên thất bại!");
-    } finally {
-      setSubmitting(false);
+      console.error("Error adding members:", error);
+      toast.error("Đã xảy ra lỗi khi thêm thành viên!");
     }
   };
 
-  if (!isOpen) return null;
-
   return (
-    <div
-      className="inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
-      onClick={onClose}
-    >
-      <div
-        className="bg-white w-full max-w-2xl max-h-[90vh] flex flex-col rounded-2xl overflow-hidden"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div className="p-6 border-b bg-gradient-to-r from-blue-500 via-indigo-500 to-indigo-600 text-white flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-md">
-              <UserPlus size={20} className="text-white" />
-            </div>
-            <div>
-              <h2 className="text-lg font-bold">Thêm thành viên</h2>
-              <p className="text-xs text-white/90 mt-0.5">
-                Chọn người chưa tham gia nhóm
-              </p>
-            </div>
-          </div>
-          <button onClick={onClose} className="p-2 bg-white/10 rounded-full cursor-pointer">
-            <X size={20} className="text-white" />
-          </button>
-        </div>
-
-        {/* Content */}
-        <div className="flex-1 overflow-y-auto p-6">
-          {loading ? (
-            <div className="text-center py-12">
-              <div className="inline-block w-10 h-10 border-4 border-gray-200 border-t-blue-500 rounded-full animate-spin"></div>
-              <p className="mt-3 text-gray-500">Đang tải...</p>
-            </div>
-          ) : users.length === 0 ? (
-            <p className="text-center text-gray-500 py-12">
-              Không tìm thấy người dùng nào
-            </p>
-          ) : (
-            <div className="space-y-2">
-              {users.map((user) => {
-                const isSelected = selectedMembers.has(user.id);
-                return (
-                  <div
-                    key={user.id}
-                    onClick={() => toggleMember(user.id)}
-                    className={`flex items-center gap-3 p-4 rounded-2xl cursor-pointer transition-all border-2 ${
-                      isSelected
-                        ? "border-blue-500 bg-blue-50"
-                        : "border-transparent hover:bg-gray-50"
-                    }`}
-                  >
-                    <img
-                      src={
-                        user.avatar && user.avatar !== "null"
-                          ? `${API_ENDPOINTS.UPLOAD_MEDIA}/${user.avatar}`
-                          : LOGO
-                      }
-                      alt={user.display_name}
-                      className="w-12 h-12 rounded-full object-cover"
-                    />
-                    <p className="font-medium">{user.display_name}</p>
-                    {isSelected && (
-                      <Check className="ml-auto text-blue-500" size={16} />
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
-        {/* Footer */}
-        <div className="flex gap-3 p-5 border-t">
-          <button
-            onClick={onClose}
-            className="px-6 py-3 border rounded-2xl font-semibold text-gray-700 cursor-pointer"
-          >
-            Hủy
-          </button>
-          <button
-            onClick={handleSubmit}
-            disabled={
-              selectedMembers.size === 0 || submitting || users.length === 0
-            }
-            className="flex-1 px-6 py-3 bg-blue-500 text-white rounded-2xl font-semibold disabled:opacity-50 cursor-pointer"
-          >
-            {submitting ? "Đang thêm..." : `Thêm (${selectedMembers.size})`}
-          </button>
-        </div>
-      </div>
-    </div>
+    <UserSelectionModal
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Thêm thành viên"
+      submitText="Thêm"
+      loadingText="Đang thêm..."
+      users={users}
+      loading={loading}
+      onSubmit={handleSubmit}
+      emptySearchMessage="Không tìm thấy kết quả phù hợp"
+      emptyListMessage="Không có người dùng nào chưa trong nhóm"
+      listTitle="Người chưa tham gia nhóm"
+      showCategories={true}
+      minSelection={1}
+    />
   );
 }

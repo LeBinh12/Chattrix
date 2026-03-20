@@ -1,116 +1,223 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
+import { useRecoilValue } from "recoil";
+import { userAtom } from "../../recoil/atoms/userAtom";
 import {
   Box,
   Typography,
   Button,
   Input,
+  Chip,
   Select,
   Option,
-  Breadcrumbs,
-  Link,
-  Table,
-  Checkbox,
-  Chip,
-  Avatar,
-  Sheet,
   IconButton,
   Stack,
-  CircularProgress,
+  Dropdown,
+  Menu,
+  MenuButton,
+  MenuItem,
+  ListItemDecorator,
 } from "@mui/joy";
+import { Drawer, SelectPicker, DatePicker, DateRangePicker } from "rsuite";
+import "rsuite/dist/rsuite.min.css";
 import {
-  Download,
-  Search,
-  ChevronLeft,
-  ChevronRight,
   Trash2,
-  Upload,
-  RefreshCw,
+  UserPlus,
+  Edit,
+  KeyRound,
+  MoreVertical,
+  MoreHorizontal,
 } from "lucide-react";
 import { userAdminApi } from "../../api/admin/userAdminApi";
 import type { UserStatus } from "../../types/admin/user";
 import { toast } from "react-toastify";
-import { API_ENDPOINTS } from "../../config/api";
+import RegisterForm from "../../components/admin/RegisterForm";
+import UpdateUserModal from "../../components/admin/User/UpdateUserModal";
+import UserRoleCell from "../../components/admin/User/UserRoleCell";
+import { authApi } from "../../api/authApi";
+import ConfirmModal from "../../components/notification/ConfirmModal";
+import { PERMISSIONS } from "../../constants/menuPermissions";
+import { usePermissions } from "../../hooks/usePermissions";
+
+import { ChevronRight } from "lucide-react";
+import DataManagementLayout from "../../components/admin/DataManagementLayout";
+import DataTable from "../../components/admin/DataTable";
+import type { DataTableColumn } from "../../components/admin/DataTable";
+import {
+  UserCell,
+  DateTimeCell,
+} from "../../components/admin/ModernDataTable";
 
 export default function UserManagerScreen() {
-  const [users, setUsers] = useState<UserStatus[]>([]);
+  const currentUserResponse = useRecoilValue(userAtom);
+  const currentUserId = currentUserResponse?.data?.id || null;
+  const { hasPermission } = usePermissions();
+  const [users, setUsers] = useState<(UserStatus & { id: string })[]>([]);
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [genderFilter, setGenderFilter] = useState("all");
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
   const [totalUsers, setTotalUsers] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const pageSize = 10;
+  const [isOpen, setIsOpen] = useState(false);
+  const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false);
+  const [pageSize, setPageSize] = useState(15);
 
-  // ========== FETCH DATA FROM API ==========
-  const fetchUsers = useCallback(async (page: number) => {
+  const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
+  const [selectedUserForUpdate, setSelectedUserForUpdate] = useState<
+    UserStatus["user"] | null
+  >(null);
+  const [confirmModal, setConfirmModal] = useState({
+    isOpen: false,
+    title: "",
+    description: "",
+    onConfirm: () => {},
+  });
+
+  // ========== FETCH DATA ==========
+  const fetchUsers = async () => {
+    setIsLoading(true);
     try {
-      setIsLoading(true);
-      const response = await userAdminApi.getPagination(page, pageSize);
-      console.log("res", response);
-      if (response.status === 200 && response.data) {
-        setUsers(response.data.users);
-        setTotalPages(Math.ceil(response.data.total / pageSize));
+      const response = await userAdminApi.getPagination(
+        currentPage,
+        pageSize,
+        searchQuery,
+        genderFilter,
+        statusFilter,
+        fromDate,
+        toDate
+      );
+
+      if (response && response.data.users) {
+        const usersWithId = response.data.users.map(u => ({
+          ...u,
+          id: String(u.user.id)
+        }));
+        setUsers(usersWithId);
         setTotalUsers(response.data.total);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching users:", error);
-      toast.error("Không thể tải danh sách người dùng!");
+      if (error.response?.status !== 403) {
+        toast.error("Không thể tải danh sách người dùng!");
+      }
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  };
 
-  // ========== INITIAL LOAD ==========
+  // ========== DATE HELPER FUNCTIONS ==========
+  /**
+   * Parse ISO date string (yyyy-MM-dd) to Date object without timezone offset
+   */
+  const parseIsoDate = (dateString: string): Date | null => {
+    if (!dateString) return null;
+    const [year, month, day] = dateString.split('-').map(Number);
+    // Create date in local timezone to avoid UTC offset issues
+    return new Date(year, month - 1, day);
+  };
+
+  /**
+   * Convert Date object to ISO date string (yyyy-MM-dd)
+   */
+  const dateToIsoString = (date: Date): string => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  /**
+   * Handle fromDate change with validation
+   */
+  const handleFromDateChange = (date: Date | null) => {
+    if (!date) {
+      setFromDate("");
+      return;
+    }
+
+    const newFromDate = dateToIsoString(date);
+    setFromDate(newFromDate);
+
+    // If toDate is set and less than fromDate, reset toDate
+    if (toDate) {
+      const fromDateObj = parseIsoDate(newFromDate);
+      const toDateObj = parseIsoDate(toDate);
+      if (fromDateObj && toDateObj && fromDateObj > toDateObj) {
+        setToDate("");
+      }
+    }
+  };
+
+  /**
+   * Handle toDate change with validation
+   */
+  const handleToDateChange = (date: Date | null) => {
+    if (!date) {
+      setToDate("");
+      return;
+    }
+
+    const newToDate = dateToIsoString(date);
+
+    // If fromDate is set and greater than toDate, don't allow
+    if (fromDate) {
+      const fromDateObj = parseIsoDate(fromDate);
+      const toDateObj = parseIsoDate(newToDate);
+      if (fromDateObj && toDateObj && fromDateObj > toDateObj) {
+        toast.warning("Ngày kết thúc phải lớn hơn ngày bắt đầu!");
+        return;
+      }
+    }
+
+    setToDate(newToDate);
+  };
+
+  /**
+   * Check if date is disabled for fromDate picker
+   */
+  const isFromDateDisabled = (date: Date): boolean => {
+    if (!toDate) return false;
+    const toDateObj = parseIsoDate(toDate);
+    return toDateObj ? date > toDateObj : false;
+  };
+
+  /**
+   * Check if date is disabled for toDate picker
+   */
+  const isToDateDisabled = (date: Date): boolean => {
+    if (!fromDate) return false;
+    const fromDateObj = parseIsoDate(fromDate);
+    return fromDateObj ? date < fromDateObj : false;
+  };
+
+  /**
+   * Handle date range change
+   */
+  const handleDateRangeChange = (value: [Date, Date] | null) => {
+    if (!value) {
+      setFromDate("");
+      setToDate("");
+      return;
+    }
+    setFromDate(dateToIsoString(value[0]));
+    setToDate(dateToIsoString(value[1]));
+  };
+
   useEffect(() => {
-    fetchUsers(currentPage);
-  }, [currentPage, fetchUsers]);
+    fetchUsers();
+  }, [currentPage, pageSize, searchQuery, statusFilter, genderFilter, fromDate, toDate]);
 
-  // ========== REFRESH DATA ==========
-  const handleRefresh = async () => {
-    setIsRefreshing(true);
-    await fetchUsers(currentPage);
-    setIsRefreshing(false);
-    toast.success("Đã làm mới dữ liệu!");
-  };
-
-  // ========== CLIENT-SIDE FILTERING ==========
-  const filteredData = users.filter((userStatus) => {
-    const { user, status } = userStatus;
-
-    const matchesSearch =
-      user.display_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      user.username?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      user.email?.toLowerCase().includes(searchQuery.toLowerCase());
-
-    const matchesStatus =
-      statusFilter === "all" ||
-      status.toLowerCase() === statusFilter.toLowerCase();
-
-    return matchesSearch && matchesStatus;
-  });
-
-  // ========== SELECTION HANDLERS ==========
-  const handleSelectAll = (checked: boolean) => {
-    setSelectedUsers(checked ? filteredData.map((u) => u.user.id) : []);
-  };
-
-  const handleSelectUser = (userId: string, checked: boolean) => {
-    setSelectedUsers((prev) =>
-      checked ? [...prev, userId] : prev.filter((id) => id !== userId)
-    );
-  };
-
-  const isAllSelected =
-    filteredData.length > 0 &&
-    filteredData.every((userStatus) =>
-      selectedUsers.includes(userStatus.user.id)
-    );
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, statusFilter, genderFilter, fromDate, toDate]);
 
   // ========== STATUS STYLING ==========
   const getStatusColor = (status: string) => {
-    switch (status.toLowerCase()) {
+    switch (status?.toLowerCase()) {
       case "active":
       case "online":
         return "success";
@@ -125,437 +232,568 @@ export default function UserManagerScreen() {
     }
   };
 
-  // ========== GET USER INITIAL ==========
-  const getUserInitial = (user: UserStatus["user"]) => {
-    if (user.display_name) {
-      return user.display_name.charAt(0).toUpperCase();
-    }
-    if (user.username) {
-      return user.username.charAt(0).toUpperCase();
-    }
-    return "U";
+  // ========== EDIT HANDLER ==========
+  const handleEdit = (rowData: UserStatus) => {
+    // Gộp roles vào object user để UpdateUserModal có thể nhận và tick sẵn checkbox
+    const userWithRoles = { 
+      ...rowData.user, 
+      roles: rowData.roles 
+    };
+    setSelectedUserForUpdate(userWithRoles);
+    setIsUpdateModalOpen(true);
   };
 
-  // ========== FORMAT DATE ==========
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString("vi-VN", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
+  // ========== DELETE SINGLE USER ==========
+  const handleDeleteSingle = async (userId: string) => {
+    setConfirmModal({
+      isOpen: true,
+      title: "Xác nhận xóa",
+      description: "Bạn có chắc muốn xóa người dùng này? Hành động này không thể hoàn tác.",
+      onConfirm: async () => {
+        try {
+          await userAdminApi.deleteUser(userId);
+          toast.success(`Đã xóa người dùng thành công!`);
+          fetchUsers();
+        } catch (error: any) {
+          if (error.response?.status !== 403) {
+            toast.error("Không thể xóa người dùng!");
+          }
+        }
+      },
     });
   };
 
-  // ========== EXPORT HANDLER ==========
-  const handleExport = () => {
-    const selectedData = users.filter((u) => selectedUsers.includes(u.user.id));
-    console.log("Exporting users:", selectedData);
-    toast.success(`Đang xuất ${selectedUsers.length} người dùng...`);
-    // TODO: Implement actual export logic
+  // ========== RESET PASSWORD HANDLER ==========
+  const handleResetPassword = async (userId: string) => {
+    setConfirmModal({
+      isOpen: true,
+      title: "Xác nhận đặt lại mật khẩu",
+      description: "Bạn có chắc chắn muốn đặt lại mật khẩu không? Mật khẩu mới sẽ là: 123456",
+      onConfirm: async () => {
+        try {
+          const response = await userAdminApi.resetPassword(userId);
+          toast.success(response.data?.message || "Đã đặt lại mật khẩu thành công!");
+        } catch (error: any) {
+          if (error.response?.status !== 403) {
+            toast.error("Không thể đặt lại mật khẩu!");
+          }
+        }
+      },
+    });
+  };
+  // ========== COLUMN DEFINITIONS ==========
+  const columns: DataTableColumn<UserStatus & { id: string }>[] = [
+    {
+      key: "user",
+      header: "NGƯỜI DÙNG",
+      sortable: true,
+      width: 250,
+      flexGrow: 1,
+      render: (rowData: UserStatus) => {
+        const user = rowData.user;
+        const genderLabel =
+          user.gender === "male"
+            ? "Nam"
+            : user.gender === "female"
+            ? "Nữ"
+            : "Khác";
+
+        return (
+          <UserCell
+            avatar={user.avatar}
+            name={user.display_name || user.username}
+            username={`${user.username} • ${genderLabel}`}
+          />
+        );
+      },
+    },
+    {
+      key: "email",
+      header: "EMAIL & SỐ ĐIỆN THOẠI",
+      sortable: false,
+      width: 220,
+      flexGrow: 1,
+      render: (rowData: UserStatus) => {
+        const user = rowData.user;
+        return (
+          <div>
+            <div style={{ fontWeight: 500, fontSize: "13px", color: "#374151" }}>
+              {user.email}
+            </div>
+            {user.phone && (
+              <div style={{ fontSize: "12px", color: "#6b7280" }}>
+                {user.phone}
+              </div>
+            )}
+          </div>
+        );
+      },
+    },
+    {
+      key: "last_login",
+      header: "ĐĂNG NHẬP CUỐI",
+      sortable: true,
+      width: 180,
+      render: (rowData: UserStatus) => (
+        <DateTimeCell date={rowData.last_login || ""} />
+      ),
+    },
+    {
+      key: "roles",
+      header: "VAI TRÒ",
+      sortable: true,
+      width: 200,
+      render: (rowData: UserStatus) => {
+        return <UserRoleCell roles={rowData.roles} />;
+      },
+    },
+    {
+      key: "status",
+      header: "TRẠNG THÁI",
+      sortable: true,
+      width: 140,
+      render: (rowData: UserStatus) => (
+        <Chip
+          variant="soft"
+          size="sm"
+          color={getStatusColor(rowData.status)}
+          sx={{ fontSize: "12px" }}
+        >
+          {rowData.status === "online" ? "Trực tuyến" : "Ngoại tuyến"}
+        </Chip>
+      ),
+    },
+    {
+      key: "actions",
+      header: "THAO TÁC",
+      width: 100,
+      align: "center",
+      sortable: false,
+      fixed: "right",
+      render: (rowData: UserStatus) => {
+        const isCurrentUser = currentUserId != null && String(rowData.user.id) === currentUserId;
+        const canUpdate = hasPermission(PERMISSIONS.USER_UPDATE_GLOBAL);
+        const canDelete = hasPermission(PERMISSIONS.USER_DELETE);
+        const canResetPassword = hasPermission(PERMISSIONS.USER_RESET_PASSWORD);
+        
+        // If no actions available, render nothing
+        if (!canUpdate && !canDelete && (!canResetPassword || isCurrentUser)) {
+          return null;
+        }
+
+        return (
+          <Box 
+            sx={{ display: "flex", justifyContent: "center", width: "100%" }}
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <Dropdown>
+              <MenuButton
+                slots={{ root: IconButton }}
+                slotProps={{ root: { variant: "plain", color: "neutral", size: "sm" } }}
+                sx={{ transform: 'none' }} // Fix positioning if needed
+              >
+                <MoreHorizontal size={20} />
+              </MenuButton>
+            <Menu placement="bottom-end" size="sm" sx={{ minWidth: 140, zIndex: 99999 }}>
+              {canUpdate && (
+                <MenuItem onClick={() => handleEdit(rowData)}>
+                  <ListItemDecorator>
+                    <Edit size={16} />
+                  </ListItemDecorator>
+                  Chỉnh sửa
+                </MenuItem>
+              )}
+              
+              { canResetPassword && (
+                <MenuItem onClick={() => handleResetPassword(String(rowData.user.id))}>
+                  <ListItemDecorator>
+                    <KeyRound size={16} />
+                  </ListItemDecorator>
+                  Đổi mật khẩu
+                </MenuItem>
+              )}
+
+              {canDelete && (
+                <MenuItem 
+                  onClick={() => handleDeleteSingle(String(rowData.user.id))}
+                  color="danger"
+                  sx={{ color: "danger.plainColor" }}
+                >
+                  <ListItemDecorator sx={{ color: "danger.plainColor" }}>
+                    <Trash2 size={16} />
+                  </ListItemDecorator>
+                  Xóa
+                </MenuItem>
+              )}
+            </Menu>
+          </Dropdown>
+        </Box>
+        );
+      },
+    },
+  ];
+
+
+  // ========== UPDATE USER HANDLER ==========
+  const handleUpdateUser = async (userId: string, formData: FormData) => {
+    try {
+      const response = await userAdminApi.updateUser(userId, formData);
+      toast.success(response.message || "Cập nhật người dùng thành công!");
+
+      fetchUsers();
+
+      setIsUpdateModalOpen(false);
+      setSelectedUserForUpdate(null);
+    } catch (error: any) {
+      if (error.response?.status !== 403) {
+        const errorMessage =
+          error.response?.data?.message || "Cập nhật thất bại!";
+        toast.error(errorMessage);
+      }
+      throw error;
+    }
   };
 
   // ========== DELETE HANDLER ==========
   const handleDelete = async () => {
-    if (!confirm(`Bạn có chắc muốn xóa ${selectedUsers.length} người dùng?`)) {
-      return;
-    }
+    setConfirmModal({
+      isOpen: true,
+      title: "Xác nhận xóa danh sách",
+      description: `Bạn có chắc muốn xóa ${selectedUsers.length} người dùng đã chọn? Hành động này không thể hoàn tác.`,
+      onConfirm: async () => {
+        try {
+          toast.info(`Đang xử lý xóa ${selectedUsers.length} người dùng...`);
+          for (const id of selectedUsers) {
+            await userAdminApi.deleteUser(id);
+          }
+          toast.success(`Đã xóa ${selectedUsers.length} người dùng thành công!`);
+          setSelectedUsers([]);
+          fetchUsers();
+        } catch (error: any) {
+          if (error.response?.status !== 403) {
+            toast.error("Có lỗi xảy ra khi xóa danh sách người dùng!");
+          }
+        }
+      },
+    });
+  };
 
+  const handleSubmit = async (formData: FormData) => {
     try {
-      // TODO: Call delete API
-      console.log("Deleting users:", selectedUsers);
-      toast.success(`Đã xóa ${selectedUsers.length} người dùng!`);
-      setSelectedUsers([]);
-      await fetchUsers(currentPage);
-    } catch {
-      toast.error("Không thể xóa người dùng!");
+      const res: any = await authApi.register(formData);
+      
+      // Check response status and success flag
+      if (res.success === false || res.error) {
+        // Handle error from API
+        const errorMessage = res.message || res.error || "Tạo người dùng thất bại";
+        toast.error(errorMessage);
+        throw new Error(errorMessage); // Throw to prevent modal from closing
+      }
+      
+      // Success case
+      toast.success(res.message || "Tạo người dùng thành công!");
+      fetchUsers();
+      setIsOpen(false);
+    } catch (err: any) {
+      // Handle axios error or thrown error
+      if (err.response) {
+        const status = err.response.status;
+        const data = err.response.data;
+        
+        // Don't show toast for 403 (permission denied - already handled by interceptor)
+        if (status === 403) {
+          throw err;
+        }
+        
+        // Handle specific error cases
+        if (status === 409) {
+          // Conflict - username or email already exists
+          const message = data.message || "Thông tin đã tồn tại";
+          toast.error(`Tạo thất bại: ${message}`);
+        } else if (status === 400) {
+          // Bad request - validation error
+          const message = data.message || "Dữ liệu không hợp lệ";
+          toast.error(`Tạo thất bại: ${message}`);
+        } else {
+          // Other errors
+          const message = data.message || err.message || "Đăng ký thất bại";
+          toast.error(message);
+        }
+      } else {
+        // Network error or other
+        toast.error(err.message || "Đăng ký thất bại");
+      }
+      
+      // Re-throw to keep modal open
+      throw err;
     }
   };
 
-  // ========== DOWNLOAD PDF ==========
-  const handleDownloadPDF = () => {
-    toast.info("Đang tạo file PDF...");
-    // TODO: Implement PDF download
-  };
+  const advancedSearchContent = (
+    <Stack spacing={2.5} sx={{ p: 2 }}>
+      {/* Status Filter */}
+      <Box>
+        <Typography level="body-xs" sx={{ mb: 1, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+          Trạng thái
+        </Typography>
+        <SelectPicker
+          data={[
+            { label: "Tất cả", value: "all" },
+            { label: "Trực tuyến", value: "online" },
+            { label: "Ngoại tuyến", value: "offline" },
+          ]}
+          value={statusFilter}
+          onChange={(value) => setStatusFilter(value || "all")}
+          searchable={false}
+          cleanable={false}
+          block
+          placeholder="Chọn trạng thái"
+        />
+      </Box>
+
+      {/* Gender Filter */}
+      <Box>
+        <Typography level="body-xs" sx={{ mb: 1, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+          Giới tính
+        </Typography>
+        <SelectPicker
+          data={[
+            { label: "Tất cả", value: "all" },
+            { label: "Nam", value: "male" },
+            { label: "Nữ", value: "female" },
+            { label: "Khác", value: "other" },
+          ]}
+          value={genderFilter}
+          onChange={(value) => setGenderFilter(value || "all")}
+          searchable={false}
+          cleanable={false}
+          block
+          placeholder="Chọn giới tính"
+        />
+      </Box>
+
+      {/* Date Range Selector */}
+      <Box>
+        <Typography level="body-xs" sx={{ mb: 1, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+          Thời gian đăng nhập
+        </Typography>
+        <DateRangePicker
+          format="dd/MM/yyyy"
+          showOneCalendar
+          value={fromDate && toDate ? [parseIsoDate(fromDate) as Date, parseIsoDate(toDate) as Date] : null}
+          onChange={handleDateRangeChange}
+          placeholder="Chọn khoảng thời gian"
+          block
+          character=" - "
+        />
+      </Box>
+    </Stack>
+  );
+
+  const filterControls = (
+    <Box sx={{ display: { xs: 'none', md: 'flex' }, gap: 1, alignItems: 'center' }}>
+      <SelectPicker
+        data={[
+          { label: "Trạng thái: Tất cả", value: "all" },
+          { label: "Trực tuyến", value: "online" },
+          { label: "Ngoại tuyến", value: "offline" },
+        ]}
+        value={statusFilter}
+        onChange={(value) => setStatusFilter(value || "all")}
+        searchable={false}
+        cleanable={false}
+        size="sm"
+        className="header-filter-picker"
+        style={{ width: 160, height: 36 }}
+      />
+      <SelectPicker
+        data={[
+          { label: "Giới tính: Tất cả", value: "all" },
+          { label: "Nam", value: "male" },
+          { label: "Nữ", value: "female" },
+          { label: "Khác", value: "other" },
+        ]}
+        value={genderFilter}
+        onChange={(value) => setGenderFilter(value || "all")}
+        searchable={false}
+        cleanable={false}
+        size="sm"
+        className="header-filter-picker"
+        style={{ width: 150, height: 36 }}
+      />
+      <DateRangePicker
+        format="dd/MM/yyyy"
+        showOneCalendar
+        value={fromDate && toDate ? [parseIsoDate(fromDate) as Date, parseIsoDate(toDate) as Date] : null}
+        onChange={handleDateRangeChange}
+        placeholder="Thời gian đăng nhập"
+        size="sm"
+        character=" - "
+        className="header-filter-picker"
+        style={{ width: 220, height: 36 }}
+      />
+      <style>{`
+        .header-filter-picker .rs-picker-toggle,
+        .header-filter-picker.rs-picker .rs-picker-toggle,
+        .header-filter-picker .rs-picker-daterange-calendar-group {
+          height: 36px !important;
+          display: flex !important;
+          align-items: center !important;
+          padding-top: 0 !important;
+          padding-bottom: 0 !important;
+          border-color: #e5e5ea !important;
+          box-shadow: none !important;
+        }
+        .header-filter-picker .rs-picker-toggle:hover {
+          border-color: #0665D0 !important;
+        }
+        /* Fix for DateRangePicker specifically */
+        .header-filter-picker .rs-stack,
+        .header-filter-picker .rs-picker-toggle-textbox {
+          height: 36px !important;
+          display: flex !important;
+          align-items: center !important;
+        }
+        .header-filter-picker .rs-picker-toggle-value,
+        .header-filter-picker .rs-picker-toggle-placeholder,
+        .header-filter-picker .rs-picker-toggle-input {
+          font-size: 14px !important;
+          color: #111827 !important;
+          line-height: 36px !important;
+        }
+        .header-filter-picker .rs-picker-input-group,
+        .header-filter-picker .rs-picker-input-group.rs-input-group {
+          height: 100% !important;
+        }
+      `}</style>
+    </Box>
+  );
 
   return (
-    <Box
-      sx={{ flex: 1, p: 4, bgcolor: "background.level1", minHeight: "100vh" }}
-    >
-      {/* Breadcrumb */}
-      <Breadcrumbs sx={{ mb: 2 }}>
-        <Link color="neutral" href="/admin">
-          Dashboard
-        </Link>
-        <Typography>Quản lý người dùng</Typography>
-      </Breadcrumbs>
-
-      {/* Header */}
-      <Box
-        sx={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          mb: 3,
-          flexWrap: "wrap",
-          gap: 2,
-        }}
-      >
-        <Box>
-          <Typography level="h2" fontWeight="bold">
-            Quản lý người dùng
-          </Typography>
-          <Typography level="body-sm" textColor="text.tertiary">
-            Tổng số: {totalUsers} người dùng
-          </Typography>
-        </Box>
-
-        <Stack direction="row" spacing={1}>
-          <IconButton
-            variant="outlined"
-            color="neutral"
-            onClick={handleRefresh}
-            disabled={isRefreshing}
-          >
-            <RefreshCw
-              size={18}
-              className={isRefreshing ? "animate-spin" : ""}
-            />
-          </IconButton>
-          <Button
-            startDecorator={<Download size={18} />}
-            color="primary"
-            onClick={handleDownloadPDF}
-          >
-            Download PDF
-          </Button>
-        </Stack>
+    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100dvh', bgcolor: '#F3F4F6', overflow: 'hidden' }}>
+      {/* Breadcrumb Header */}
+      <Box sx={{ px: 2, py: 1.5, display: 'flex', alignItems: 'center', gap: 1, bgcolor: 'white', borderBottom: '1px solid #e5e7eb', flexShrink: 0 }}>
+        <Typography level="body-sm" sx={{ color: 'text.secondary' }}>Quản lý</Typography>
+        <ChevronRight size={14} className="text-gray-400" />
+        <Typography level="body-sm" sx={{ fontWeight: 600, color: 'text.primary' }}>Người dùng</Typography>
       </Box>
 
-      {/* Filters */}
-      <Box sx={{ display: "flex", gap: 2, mb: 3, flexWrap: "wrap" }}>
-        <Input
-          placeholder="Tìm kiếm theo tên, email, username..."
-          startDecorator={<Search size={18} />}
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          sx={{ flex: 1, minWidth: "250px" }}
-        />
-
-        <Select
-          value={statusFilter}
-          onChange={(_, value) => setStatusFilter(value as string)}
-          sx={{ minWidth: "180px" }}
-        >
-          <Option value="all">Tất cả trạng thái</Option>
-          <Option value="active">Đang hoạt động</Option>
-          <Option value="inactive">Không hoạt động</Option>
-          <Option value="banned">Đã khóa</Option>
-        </Select>
-      </Box>
-
-      {/* Action Buttons */}
-      {selectedUsers.length > 0 && (
-        <Sheet
-          variant="soft"
-          color="primary"
-          sx={{
-            p: 2,
-            mb: 2,
-            borderRadius: "sm",
-            display: "flex",
-            alignItems: "center",
-            gap: 2,
-            flexWrap: "wrap",
-          }}
-        >
-          <Typography level="body-sm" fontWeight="md">
-            Đã chọn {selectedUsers.length} người dùng
-          </Typography>
-          <Button
-            size="sm"
-            variant="outlined"
-            color="primary"
-            startDecorator={<Upload size={16} />}
-            onClick={handleExport}
-          >
-            Export
-          </Button>
-          <Button
-            size="sm"
-            variant="outlined"
-            color="danger"
-            startDecorator={<Trash2 size={16} />}
-            onClick={handleDelete}
-          >
-            Xóa
-          </Button>
-        </Sheet>
-      )}
-
-      {/* Table */}
-      <Sheet
-        variant="outlined"
-        sx={{
-          borderRadius: "sm",
-          overflow: "hidden",
-          bgcolor: "background.surface",
-        }}
-      >
-        {isLoading ? (
-          <Box
-            sx={{
-              display: "flex",
-              justifyContent: "center",
-              alignItems: "center",
-              py: 8,
-            }}
-          >
-            <CircularProgress />
-          </Box>
-        ) : (
-          <Table
-            hoverRow
-            sx={{
-              "& thead th": {
-                bgcolor: "background.level1",
-                fontWeight: "600",
-                fontSize: "xs",
-                textTransform: "uppercase",
-                letterSpacing: "0.05em",
-              },
-              "& tbody td": {
-                py: 2,
-              },
-            }}
-          >
-            <thead>
-              <tr>
-                <th style={{ width: 48, textAlign: "center" }}>
-                  <Checkbox
-                    checked={isAllSelected}
-                    indeterminate={selectedUsers.length > 0 && !isAllSelected}
-                    onChange={(e) => handleSelectAll(e.target.checked)}
-                  />
-                </th>
-                <th>Người dùng</th>
-                <th>Email / Phone</th>
-                <th>Ngày tạo</th>
-                <th>Trạng thái</th>
-                <th>Tin nhắn</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredData.map((userStatus) => {
-                const { user, status, messages_count } = userStatus;
-
-                return (
-                  <tr key={user.id}>
-                    <td style={{ textAlign: "center" }}>
-                      <Checkbox
-                        checked={selectedUsers.includes(user.id)}
-                        onChange={(e) =>
-                          handleSelectUser(user.id, e.target.checked)
-                        }
-                      />
-                    </td>
-                    <td>
-                      <Box
-                        sx={{ display: "flex", alignItems: "center", gap: 2 }}
-                      >
-                        <Avatar
-                          size="sm"
-                          src={`${API_ENDPOINTS.UPLOAD_MEDIA}/${user.avatar}`}
-                          sx={{ bgcolor: "primary.500" }}
-                        >
-                          {getUserInitial(user)}
-                        </Avatar>
-                        <Box>
-                          <Typography level="body-sm" fontWeight="md">
-                            {user.display_name || user.username}
-                          </Typography>
-                          <Typography level="body-xs" textColor="text.tertiary">
-                            @{user.username}
-                          </Typography>
-                        </Box>
-                      </Box>
-                    </td>
-                    <td>
-                      <Typography level="body-sm" textColor="text.secondary">
-                        {user.email}
-                      </Typography>
-                      {user.phone && (
-                        <Typography level="body-xs" textColor="text.tertiary">
-                          {user.phone}
-                        </Typography>
-                      )}
-                    </td>
-                    <td>
-                      <Typography level="body-sm" textColor="text.secondary">
-                        {formatDate(user.created_at)}
-                      </Typography>
-                    </td>
-                    <td>
-                      <Chip
-                        variant="soft"
-                        size="sm"
-                        color={getStatusColor(status)}
-                      >
-                        {status}
-                      </Chip>
-                    </td>
-                    <td>
-                      <Typography level="body-sm" fontWeight="md">
-                        {messages_count.toLocaleString()}
-                      </Typography>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </Table>
-        )}
-
-        {/* Empty State */}
-        {!isLoading && filteredData.length === 0 && (
-          <Box
-            sx={{
-              textAlign: "center",
-              py: 8,
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              gap: 1,
-            }}
-          >
-            <Search
-              size={48}
-              style={{ color: "var(--joy-palette-neutral-400)" }}
-            />
-            <Typography level="body-md" fontWeight="md" textColor="neutral.500">
-              Không tìm thấy người dùng
-            </Typography>
-            <Typography level="body-sm" textColor="neutral.400">
-              {searchQuery || statusFilter !== "all"
-                ? "Thử thay đổi bộ lọc hoặc từ khóa tìm kiếm"
-                : "Chưa có người dùng nào trong hệ thống"}
-            </Typography>
-          </Box>
-        )}
-      </Sheet>
-
-      {/* Pagination */}
-      {totalPages > 1 && !isLoading && (
-        <Box
-          sx={{
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-            gap: 1,
-            mt: 3,
-          }}
-        >
-          <Button
-            variant="outlined"
-            color="neutral"
-            size="sm"
-            startDecorator={<ChevronLeft size={16} />}
-            disabled={currentPage === 1}
-            onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
-          >
-            Previous
-          </Button>
-
-          <Stack direction="row" spacing={0.5}>
-            {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-              let pageNum;
-              if (totalPages <= 5) {
-                pageNum = i + 1;
-              } else if (currentPage <= 3) {
-                pageNum = i + 1;
-              } else if (currentPage >= totalPages - 2) {
-                pageNum = totalPages - 4 + i;
-              } else {
-                pageNum = currentPage - 2 + i;
-              }
-
-              return (
-                <Button
-                  key={i}
-                  variant={currentPage === pageNum ? "solid" : "outlined"}
-                  color={currentPage === pageNum ? "primary" : "neutral"}
-                  size="sm"
-                  onClick={() => setCurrentPage(pageNum)}
-                  sx={{ minWidth: 40 }}
-                >
-                  {pageNum}
-                </Button>
-              );
-            })}
-          </Stack>
-
-          {totalPages > 5 && currentPage < totalPages - 2 && (
-            <>
-              <Typography level="body-sm" textColor="neutral.400">
-                ...
-              </Typography>
+      <DataManagementLayout
+        searchTerm={searchQuery}
+        onSearchTermChange={setSearchQuery}
+        onSearch={fetchUsers}
+        searchPlaceholder="Tìm kiếm tên, email, username..."
+        advancedOpen={isFilterDrawerOpen}
+        onToggleAdvanced={() => setIsFilterDrawerOpen(!isFilterDrawerOpen)}
+        advancedContent={advancedSearchContent}
+        filterControls={filterControls}
+        searchBarExtras={
+          <Stack direction="row" spacing={1} alignItems="center">
+            {selectedUsers.length > 0 && (
               <Button
-                variant="outlined"
-                color="neutral"
+                color="danger"
+                variant="soft"
                 size="sm"
-                onClick={() => setCurrentPage(totalPages)}
-                sx={{ minWidth: 40 }}
+                startDecorator={<Trash2 size={16} />}
+                onClick={handleDelete}
+                sx={{ fontWeight: 600 }}
               >
-                {totalPages}
+                <span className="hidden sm:inline">Xóa {selectedUsers.length} mục</span>
               </Button>
-            </>
-          )}
+            )}
 
+            {hasPermission(PERMISSIONS.USER_CREATE) && (
+              <Button
+                startDecorator={<UserPlus size={18} />}
+                onClick={() => setIsOpen(true)}
+                sx={{
+                  bgcolor: "#00568c",
+                  color: "white",
+                  "&:hover": { bgcolor: "#004470" },
+                  borderRadius: "6px",
+                  height: 36,
+                  fontWeight: 600,
+                  fontSize: "13px"
+                }}
+              >
+                <span className="hidden sm:inline">Tạo người dùng</span>
+              </Button>
+            )}
+          </Stack>
+        }
+        advancedActions={
           <Button
-            variant="outlined"
-            color="neutral"
-            size="sm"
-            endDecorator={<ChevronRight size={16} />}
-            disabled={currentPage === totalPages}
-            onClick={() =>
-              setCurrentPage((prev) => Math.min(totalPages, prev + 1))
-            }
+            fullWidth
+            onClick={() => {
+              fetchUsers();
+              setIsFilterDrawerOpen(false);
+            }}
+            sx={{
+              bgcolor: "#00568c",
+              color: "white",
+              "&:hover": { bgcolor: "#004470" },
+              borderRadius: "6px",
+              height: 40,
+              fontWeight: 600
+            }}
           >
-            Next
+            Áp dụng bộ lọc
           </Button>
-        </Box>
+        }
+      >
+        <DataTable
+          data={users}
+          columns={columns}
+          total={totalUsers}
+          rowSelection={{ mode: "multiRow", enableClickSelection: false }}
+          onSelectionChange={(rows) => setSelectedUsers(rows.map(r => String(r.user.id)))}
+          rowKey="id"
+          serverSidePagination={true}
+          enableNativePagination={false}
+          limitOptions={[15, 30, 50, 100]}
+          limit={pageSize}
+          currentPage={currentPage}
+          onChangePage={setCurrentPage}
+          onChangeLimit={setPageSize}
+          autoFitHeight
+          autoFitBottomGap={0}
+        />
+      </DataManagementLayout>
+
+      {/* Register Modal */}
+      <RegisterForm 
+        isOpen={isOpen}
+        onClose={() => setIsOpen(false)}
+        onSubmit={handleSubmit} 
+      />
+
+      {/* Update User Modal */}
+      {selectedUserForUpdate && (
+        <UpdateUserModal
+          isOpen={isUpdateModalOpen}
+          onClose={() => {
+            setIsUpdateModalOpen(false);
+            setSelectedUserForUpdate(null);
+          }}
+          user={selectedUserForUpdate}
+          onSubmit={handleUpdateUser}
+        />
       )}
 
-      {/* Footer Info */}
-      <Box sx={{ mt: 2, textAlign: "center" }}>
-        <Typography level="body-sm" textColor="text.tertiary">
-          Trang {currentPage} / {totalPages} - Hiển thị {filteredData.length}{" "}
-          trong tổng số {totalUsers} người dùng
-        </Typography>
-      </Box>
-
-      {/* Floating Add Button
-      <IconButton
-        color="primary"
-        size="lg"
-        variant="solid"
-        onClick={() => alert("Thêm người dùng mới")}
-        sx={{
-          position: "fixed",
-          bottom: 32,
-          right: 32,
-          borderRadius: "50%",
-          width: 56,
-          height: 56,
-          boxShadow: "lg",
-          "&:hover": {
-            transform: "scale(1.05)",
-            boxShadow: "xl",
-          },
-          transition: "all 0.2s",
+      {/* Confirmation Modal */}
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        title={confirmModal.title}
+        description={confirmModal.description}
+        onConfirm={() => {
+          confirmModal.onConfirm();
+          setConfirmModal((prev) => ({ ...prev, isOpen: false }));
         }}
-      >
-        <Plus size={24} />
-      </IconButton> */}
+        onCancel={() => setConfirmModal((prev) => ({ ...prev, isOpen: false }))}
+        confirmText="Xác nhận"
+        cancelText="Hủy"
+      />
     </Box>
   );
 }

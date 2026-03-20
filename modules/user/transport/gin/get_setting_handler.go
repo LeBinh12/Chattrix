@@ -62,7 +62,7 @@ func GetSettingHandler(db *mongo.Database) gin.HandlerFunc {
 		setting, err := business.GetSetting(ctx.Request.Context(), &model)
 
 		if err != nil {
-			panic(err)
+			ctx.JSON(400, common.NewResponse(400, "Lỗi không lấy được cài đặt", err))
 		}
 
 		ctx.JSON(200, common.NewResponse(200, "Lấy cài đặt thành công", setting))

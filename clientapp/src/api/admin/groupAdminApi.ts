@@ -4,11 +4,14 @@ import axiosClient from "../../utils/axiosClient";
 
 
 export const groupAdminApi = {
-    getPagination: async (page: number, limit: number): Promise<ListGroupsResponse> => {
+    getPagination: async (page: number, limit: number, name?: string, min_member?: number, max_member?: number): Promise<ListGroupsResponse> => {
         const response = await axiosClient.get<ListGroupsResponse>(`/admin/get-group`, {
             params: {
                 page: page,
-                limit: limit
+                limit: limit,
+                name: name,
+                min_member: min_member,
+                max_member: max_member
             }
         });
         return response.data

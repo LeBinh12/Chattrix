@@ -8,6 +8,8 @@ export type SelectedChat = {
     display_name: string;
     status: string;
     update_at: string;
+    conversation_id?: string;
+    is_deleted?: boolean;
 };
 
 export const selectedChatState = atom<SelectedChat | null>({

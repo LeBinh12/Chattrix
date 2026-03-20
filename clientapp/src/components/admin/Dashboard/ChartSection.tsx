@@ -84,10 +84,10 @@ export default function ChartSection() {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4 md:gap-6">
       {/* Line Chart */}
-      <div className="bg-white rounded-lg shadow-sm p-3 sm:p-4 md:p-6 border border-gray-100 overflow-hidden">
-        <h3 className="text-sm sm:text-base md:text-lg font-bold text-gray-900 mb-3 sm:mb-4 md:mb-6 line-clamp-2">
+      <div className="bg-white rounded-sm shadow-sm p-3 sm:p-4 md:p-6 border border-gray-100 overflow-hidden">
+        <p className="text-sm sm:text-base md:text-lg font-bold text-gray-900 mb-3 sm:mb-4 md:mb-6 line-clamp-2">
           Tần suất người dùng mới trong tháng
-        </h3>
+        </p>
         <div className="w-full h-48 sm:h-64 md:h-80">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={monthlyData}>
@@ -109,10 +109,10 @@ export default function ChartSection() {
         </div>
       </div>
       {/* Bar Chart */}
-      <div className="bg-white rounded-lg shadow-sm p-3 sm:p-4 md:p-6 border border-gray-100 overflow-hidden">
-        <h3 className="text-sm sm:text-base md:text-lg font-bold text-gray-900 mb-3 sm:mb-4 md:mb-6 line-clamp-2">
+      <div className="bg-white rounded-sm shadow-sm p-3 sm:p-4 md:p-6 border border-gray-100 overflow-hidden">
+        <p className="text-sm sm:text-base md:text-lg font-bold text-gray-900 mb-3 sm:mb-4 md:mb-6 line-clamp-2">
           Tần suất tin nhắn trong tuần
-        </h3>
+        </p>
         <div className="w-full h-48 sm:h-64 md:h-80">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={chartData}>

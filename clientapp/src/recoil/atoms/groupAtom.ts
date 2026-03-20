@@ -18,7 +18,16 @@ export type GroupMembersState = {
   [groupId: string]: GroupMember[];
 };
 
-export const groupMembersAtom = atom<GroupMembersState>({
-  key: "groupMembersAtom",
+  export const groupMembersAtom = atom<GroupMembersState>({
+    key: "groupMembersAtom",
+    default: {},
+  });
+
+export type GroupTotalMembersState = {
+  [groupId: string]: number;
+};
+
+export const groupTotalMembersAtom = atom<GroupTotalMembersState>({
+  key: "groupTotalMembersAtom",
   default: {},
 });

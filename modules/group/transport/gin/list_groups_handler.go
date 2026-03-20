@@ -16,19 +16,19 @@ func ListGroupsByUserHandler(db *mongo.Database) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		createBy, exists := c.Get("userID")
 		if !exists {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Không tìm thấy userID trong context"})
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "userID not found in context"})
 			return
 		}
 
 		createByStr, ok := createBy.(string)
 		if !ok {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "userID không hợp lệ"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid userID"})
 			return
 		}
 
 		userID, err := primitive.ObjectIDFromHex(createByStr)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "userID không phải ObjectID hợp lệ"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "userID is not a valid ObjectID"})
 			return
 		}
 
@@ -45,6 +45,6 @@ func ListGroupsByUserHandler(db *mongo.Database) gin.HandlerFunc {
 			return
 		}
 
-		c.JSON(http.StatusOK, common.NewResponse(http.StatusOK, "Lấy danh sách nhóm thành công", groups))
+		c.JSON(http.StatusOK, common.NewResponse(http.StatusOK, "Groups retrieved successfully", groups))
 	}
 }

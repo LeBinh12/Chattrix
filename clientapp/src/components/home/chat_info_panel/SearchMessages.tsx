@@ -11,9 +11,9 @@ export default function SearchMessages({
 }: SearchMessagesProps) {
   return (
     <div>
-      <h4 className="text-[13px] font-semibold text-[#1f2a44] mb-2">
+      <p className="text-[13px] font-semibold text-[#1f2a44] mb-2">
         Tìm kiếm tin nhắn
-      </h4>
+      </p>
       <div className="relative">
         <Search
           className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#8893b2]"

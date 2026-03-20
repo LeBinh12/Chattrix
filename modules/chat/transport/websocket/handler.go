@@ -6,6 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 	"go.mongodb.org/mongo-driver/mongo"
+	"strings"
 )
 
 var upgrader = websocket.Upgrader{
@@ -27,7 +28,13 @@ func WebSocketHandler(db *mongo.Database, hub *Hub) gin.HandlerFunc {
 		}
 
 		// để mặc kịch thước channel là 256 thì khi nhiều tin nhắn quá sẽ bị tràn làm mất dữ liệu
-		client := &Client{Hub: hub, Conn: conn, Send: make(chan []byte, 256), UserID: userID}
+		client := &Client{
+			Hub:          hub,
+			Conn:         conn,
+			Send:         make(chan []byte, 1024),
+			UserID:       userID,
+			IsStressUser: strings.HasPrefix(userID, "stress_user"),
+		}
 		hub.Register <- client
 
 		// goroutine xử lý đọc / ghi

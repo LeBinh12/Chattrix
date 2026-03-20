@@ -3,66 +3,53 @@ import { Outlet } from "react-router-dom";
 export default function AuthLayout() {
   return (
     <main className="h-screen w-full flex overflow-hidden bg-gray-50">
-      {/* Left Side - Banner Image */}
-      <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
-        <img 
-          src="src/assets/banner-1.jpg" 
-          alt="Chattrix Banner"
+      {/* LEFT SIDE - BLUE THEME */}
+      <div className="hidden lg:flex lg:w-[60%] relative overflow-hidden items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-50">
+        {/* Logo */}
+        <div className="absolute top-8 left-8 z-10">
+          <img
+            src="/src/assets/Logo-Dai-hoc-Dong-Thap.png"
+            alt="Logo"
+            className="h-12 w-auto object-contain"
+          />
+        </div>
+        
+        {/* Background Image */}
+        <img
+          src="/src/assets/banner-login.png"
+          alt="Banner Login"
           className="w-full h-full object-cover"
         />
-        
-        {/* Optional: Overlay để tạo hiệu ứng đẹp hơn */}
-        <div className="absolute inset-0 bg-gradient-to-br from-indigo-600/10 via-purple-600/10 to-transparent" />
-        
-        {/* Logo trên ảnh */}
-        <div className="absolute top-8 left-8 z-10">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-white/90 backdrop-blur-sm rounded-xl flex items-center justify-center shadow-xl">
-              <span className="text-2xl font-bold bg-gradient-to-br from-indigo-600 to-purple-600 bg-clip-text text-transparent">
-                C
-              </span>
-            </div>
-            <span className="text-3xl font-bold text-white drop-shadow-2xl">
-              Chattrix
-            </span>
-          </div>
-        </div>
-
-        {/* Optional: Thêm text mô tả */}
-        <div className="absolute bottom-12 left-8 right-8 z-10">
-          <h2 className="text-4xl font-bold text-white mb-4 drop-shadow-lg">
-            Kết nối mọi lúc, mọi nơi
-          </h2>
-          <p className="text-white/90 text-lg drop-shadow-md">
-            Trò chuyện với bạn bè, gia đình và cộng đồng của bạn
-          </p>
-        </div>
       </div>
 
-      {/* Right Side - Form Area */}
-      <div className="w-full lg:w-1/2 flex flex-col relative bg-white">
-        {/* Mobile Logo - Chỉ hiện trên màn hình nhỏ */}
-        <div className="lg:hidden absolute top-6 left-6 z-10">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-lg flex items-center justify-center shadow-lg">
-              <span className="text-xl font-bold text-white">C</span>
-            </div>
-            <span className="text-2xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
-              Chattrix
-            </span>
-          </div>
+      {/* RIGHT SIDE - BLUE THEME (FORM) */}
+      <div
+        className="w-full lg:w-[40%] flex flex-col relative overflow-hidden
+        bg-gradient-to-br from-[#00568c]/10 via-white to-[#00568c]/5"
+      >
+        {/* Blob nền */}
+        <div className="absolute top-[-20%] right-[-10%] w-[500px] h-[500px] bg-[#00568c]/10 rounded-full blur-[120px]"></div>
+        <div className="absolute bottom-[-20%] left-[-10%] w-[500px] h-[500px] bg-[#00568c]/10 rounded-full blur-[120px]"></div>
+
+        {/* Mobile Logo */}
+        <div className="lg:hidden absolute top-20 sm:top-28 left-1/2 -translate-x-1/2 z-10">
+          <img
+            src="/src/assets/Logo-Dai-hoc-Dong-Thap.png"
+            alt="Logo"
+            className="h-24 sm:h-32 w-auto object-contain"
+          />
         </div>
 
-        {/* Form Content - Căn giữa */}
-        <div className="flex-1 flex items-center justify-center px-6 sm:px-12 lg:px-16 xl:px-24">
+        {/* Form */}
+        <div className="flex-1 flex items-center justify-center px-4 sm:px-6 lg:px-12 xl:px-20 pt-24 sm:pt-32 relative z-10">
           <div className="w-full max-w-md">
             <Outlet />
           </div>
         </div>
 
         {/* Footer */}
-        <div className="py-6 text-center text-sm text-gray-500">
-          © 2024 Chattrix. All rights reserved.
+        <div className="py-10 text-center text-lg font-semibold text-[#00568c] relative z-10">
+          © {new Date().getFullYear()}, Đại Học Đông Tháp
         </div>
       </div>
     </main>

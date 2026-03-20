@@ -16,10 +16,10 @@ export default function UserStats() {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4 md:gap-6">
       {/* Pie Chart */}
-      <div className="bg-white rounded-lg shadow-sm p-3 sm:p-4 md:p-6 border border-gray-100 overflow-hidden">
-        <h3 className="text-sm sm:text-base md:text-lg font-bold text-gray-900 mb-3 sm:mb-4 md:mb-6 line-clamp-2">
+      <div className="bg-white rounded-sm shadow-sm p-3 sm:p-4 md:p-6 border border-gray-100 overflow-hidden">
+        <p className="text-sm sm:text-base md:text-lg font-bold text-gray-900 mb-3 sm:mb-4 md:mb-6 line-clamp-2">
           Trạng thái người dùng
-        </h3>
+        </p>
         <div className="w-full h-48 sm:h-56 md:h-64">
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
@@ -44,10 +44,10 @@ export default function UserStats() {
       </div>
 
       {/* User Status Table */}
-      <div className="bg-white rounded-lg shadow-sm p-3 sm:p-4 md:p-6 border border-gray-100 overflow-hidden">
-        <h3 className="text-sm sm:text-base md:text-lg font-bold text-gray-900 mb-3 sm:mb-4 md:mb-6 line-clamp-2">
+      <div className="bg-white rounded-sm shadow-sm p-3 sm:p-4 md:p-6 border border-gray-100 overflow-hidden">
+        <p className="text-sm sm:text-base md:text-lg font-bold text-gray-900 mb-3 sm:mb-4 md:mb-6 line-clamp-2">
           Thống kê trạng thái
-        </h3>
+        </p>
         <div className="space-y-2 sm:space-y-3 md:space-y-4">
           {userStatusData.map((item) => (
             <div

@@ -1,59 +1,89 @@
 import type { ReactNode } from "react";
-import { TrendingUp, TrendingDown } from "lucide-react";
 
 interface StatsCardProps {
-  title: string;
+  label: string;
   value: string | number;
+  sub?: string;
   icon: ReactNode;
-  trend?: number;
-  iconBgColor?: string;
+  accentColor: string;
+  iconBg: string;
 }
 
 export default function StatsCard({
-  title,
+  label,
   value,
+  sub,
   icon,
-  trend,
-  iconBgColor = "bg-blue-100",
+  accentColor,
+  iconBg,
 }: StatsCardProps) {
-  const isPositive = trend && trend >= 0;
-
   return (
-    <div className="bg-white rounded-lg shadow-sm p-3 sm:p-4 md:p-6 border border-gray-100 hover:shadow-md transition-shadow">
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex-1 min-w-0">
-          <p className="text-xs sm:text-sm font-medium text-gray-600 mb-2 truncate">
-            {title}
-          </p>
-          <p className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900 break-words">
-            {value}
-          </p>
-          {trend !== undefined && (
-            <div className="flex items-center mt-2 flex-wrap gap-1">
-              {isPositive ? (
-                <TrendingUp className="w-3 h-3 sm:w-4 sm:h-4 text-green-500 flex-shrink-0" />
-              ) : (
-                <TrendingDown className="w-3 h-3 sm:w-4 sm:h-4 text-red-500 flex-shrink-0" />
-              )}
-              <span
-                className={`text-xs sm:text-sm font-medium ${
-                  isPositive ? "text-green-600" : "text-red-600"
-                }`}
-              >
-                {isPositive ? "+" : ""}
-                {trend}%
-              </span>
-              <span className="text-xs text-gray-500 hidden sm:inline">
-                vs tuần trước
-              </span>
-            </div>
-          )}
+    <div
+      style={{
+        background: "#ffffff",
+        borderRadius: 12,
+        padding: "14px 16px",
+        borderLeft: `4px solid ${accentColor}`,
+        boxShadow: "0 1px 4px rgba(0,0,0,0.07)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        gap: 12,
+        transition: "transform 0.2s ease, box-shadow 0.2s ease",
+        cursor: "default",
+      }}
+      onMouseEnter={(e) => {
+        (e.currentTarget as HTMLDivElement).style.transform = "translateY(-2px)";
+        (e.currentTarget as HTMLDivElement).style.boxShadow =
+          "0 4px 16px rgba(0,0,0,0.12)";
+      }}
+      onMouseLeave={(e) => {
+        (e.currentTarget as HTMLDivElement).style.transform = "translateY(0)";
+        (e.currentTarget as HTMLDivElement).style.boxShadow =
+          "0 1px 4px rgba(0,0,0,0.07)";
+      }}
+    >
+      <div>
+        <div
+          style={{
+            fontSize: 12,
+            color: "#64748b",
+            fontWeight: 500,
+            marginBottom: 6,
+          }}
+        >
+          {label}
         </div>
         <div
-          className={`${iconBgColor} rounded-lg p-2 sm:p-3 flex items-center justify-center flex-shrink-0`}
+          style={{
+            fontSize: 26,
+            fontWeight: 800,
+            color: "#1e293b",
+            lineHeight: 1,
+          }}
         >
-          <div className="w-5 h-5 sm:w-6 sm:h-6">{icon}</div>
+          {value}
         </div>
+        {sub && (
+          <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 4 }}>
+            {sub}
+          </div>
+        )}
+      </div>
+      <div
+        style={{
+          width: 46,
+          height: 46,
+          borderRadius: "50%",
+          background: iconBg,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          color: accentColor,
+          flexShrink: 0,
+        }}
+      >
+        {icon}
       </div>
     </div>
   );

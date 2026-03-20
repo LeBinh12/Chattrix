@@ -7,7 +7,7 @@ export default function NewsTab() {
 
   return (
     <div className="p-4 space-y-3">
-      <h1 className="text-4xl font-bold text-center text-white">Tin Tức</h1>
+      <p className="text-4xl font-bold text-center text-white">Tin Tức</p>
       <p className="text-2xl font-extrabold text-[#ecf1fe] text-center">
         Tin tức và cập nhật mới nhất{" "}
       </p>
@@ -18,7 +18,7 @@ export default function NewsTab() {
             key={item.id}
             className="p-3 bg-purple-50 rounded-lg shadow-sm hover:bg-purple-100 transition"
           >
-            <h2 className="font-semibold">{item.title}</h2>
+            <p className="font-semibold">{item.title}</p>
             <p className="text-xs text-gray-500">{item.date}</p>
           </div>
         ))}

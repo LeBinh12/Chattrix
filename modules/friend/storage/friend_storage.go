@@ -23,7 +23,10 @@ func (s *mongoStoreFriend) CheckUserExists(ctx context.Context, userID string) (
 	if err != nil {
 		return false, err
 	}
-	filter := bson.M{"_id": oid}
+	filter := bson.M{
+		"_id":        oid,
+		"is_deleted": bson.M{"$ne": true},
+	}
 	err = s.db.Collection("users").FindOne(ctx, filter).Err()
 
 	if err == mongo.ErrNoDocuments {

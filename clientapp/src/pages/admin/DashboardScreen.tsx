@@ -48,65 +48,69 @@ export default function DashboardScreen() {
 
   const stats = [
     {
-      title: "Tổng người dùng",
+      label: "Tổng người dùng",
       value: allUser,
-      icon: <Users className="w-6 h-6 text-blue-600" />,
-      trend: allUser,
-      iconBgColor: "bg-blue-100",
+      icon: <Users size={24} />,
+      sub: "Tổng số thành viên",
+      accentColor: "#2563eb",
+      iconBg: "#eff6ff",
     },
     {
-      title: "Tin nhắn hôm nay",
+      label: "Tin nhắn hôm nay",
       value: messageToday,
-      icon: <MessageSquare className="w-6 h-6 text-green-600" />,
-      trend: messageToday,
-      iconBgColor: "bg-green-100",
+      icon: <MessageSquare size={24} />,
+      sub: "Lượt tương tác mới",
+      accentColor: "#16a34a",
+      iconBg: "#f0fdf4",
     },
     {
-      title: "Người dùng hoạt động",
+      label: "Người dùng hoạt động",
       value: userOnline,
-      icon: <UserCheck className="w-6 h-6 text-purple-600" />,
-      trend: userOnline,
-      iconBgColor: "bg-purple-100",
+      icon: <UserCheck size={24} />,
+      sub: "Đang truy cập hệ thống",
+      accentColor: "#9333ea",
+      iconBg: "#faf5ff",
     },
     {
-      title: "Nhóm đang hoạt đông",
+      label: "Nhóm đang hoạt động",
       value: allGroup,
-      icon: <TrendingUp className="w-6 h-6 text-orange-600" />,
-      trend: -2.1,
-      iconBgColor: "bg-orange-100",
+      icon: <TrendingUp size={24} />,
+      sub: "Cộng đồng sôi nổi",
+      accentColor: "#ea580c",
+      iconBg: "#fff7ed",
     },
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-scree">
       {/* Padding thông minh: tăng dần theo màn hình */}
-      <div className="px-4 sm:px-6 lg:px-8 xl:px-12 2xl:px-20 py-6 lg:py-8">
+      <div className="px-1 sm:px-2 lg:px-4 py-1 lg:py-2">
         {/* Container tối ưu: full width đến 1920px, sau đó giữ max 1920px + padding lớn */}
         <div className="mx-auto w-full max-w-screen-2xl">
           {/* Header */}
           <DashboardHeader userName="Quản trị viên" />
 
           {/* Stats Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-3">
             {stats.map((stat, index) => (
               <StatsCard key={index} {...stat} />
             ))}
           </div>
 
           {/* Charts */}
-          <div className="mb-8">
+          <div className="mb-3">
             <ChartSection />
           </div>
 
           {/* Bottom Section */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          {/* <div className="grid grid-cols-1 lg:grid-cols-12 gap-3">
             <div className="lg:col-span-8">
               <UserStats />
             </div>
             <div className="lg:col-span-4">
               <RecentActivity />
             </div>
-          </div>
+          </div> */}
         </div>
       </div>
     </div>

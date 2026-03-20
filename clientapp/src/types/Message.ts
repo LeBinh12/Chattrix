@@ -1,4 +1,5 @@
 import type { Media } from "./upload";
+import type { Task } from "../api/taskApi";
 
 export type Message = {
   id: number;
@@ -52,7 +53,22 @@ export type Messages = {
   reply_to_id: string,
   reply?: ReplyMessage,
   recalled_at: string,
-  recalled_by: string
+  recalled_by: string,
+  task?: Task,
+  reactions?: Reaction[],
+  system_action?: string,
+  old_owner_id?: string,
+  new_owner_id?: string,
+  parent_id?: string;
+  comment_count?: number;
+  edited_at?: string;
+}
+
+export type Reaction = {
+  user_id: string;
+  user_name: string;
+  emoji: string;
+  created_at?: string;
 }
 
 

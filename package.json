@@ -1,9 +1,0 @@
-{
-  "dependencies": {
-    "@mui/joy": "^5.0.0-beta.52",
-    "@react-oauth/google": "^0.12.2"
-  },
-  "devDependencies": {
-    "@types/howler": "^2.2.12"
-  }
-}

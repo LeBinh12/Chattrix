@@ -231,47 +231,47 @@ export default function MediaStorageViewer({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/95 flex flex-col">
+    <div className="!fixed !inset-0 !z-50 !bg-black/95 !flex !flex-col">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 bg-black/50 backdrop-blur-sm">
-        <div className="flex items-center gap-4 flex-1 min-w-0">
+      <div className="!flex !items-center !justify-between !px-4 !py-3 !bg-black/50 !backdrop-blur-sm">
+        <div className="!flex !items-center !gap-4 !flex-1 !min-w-0">
           <button
             onClick={onClose}
-            className="p-2 hover:bg-white/10 rounded-lg transition text-white"
+            className="!p-2 !hover:bg-white/10 !rounded-lg !transition !text-white"
           >
             <X size={20} />
           </button>
-          <div className="flex-1 min-w-0">
-            <h3 className="text-white font-medium truncate">
+          <div className="!flex-1 !min-w-0">
+            <p className="!text-white !font-medium !truncate">
               {currentMedia.filename}
-            </h3>
-            <p className="text-gray-400 text-xs">
+            </p>
+            <p className="!text-gray-400 !text-xs">
               {formatFileSize(currentMedia.size)} • {currentIndex + 1} /{" "}
               {allMediaIds.length}
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="!flex !items-center !gap-2">
           {currentMedia.type === "image" && (
             <>
               <button
                 onClick={handleZoomOut}
-                className="p-2 hover:bg-white/10 rounded-lg transition text-white"
+                className="!p-2 !hover:bg-white/10 !rounded-lg !transition !text-white"
                 title="Zoom out"
               >
                 <ZoomOut size={20} />
               </button>
               <button
                 onClick={handleZoomIn}
-                className="p-2 hover:bg-white/10 rounded-lg transition text-white"
+                className="!p-2 !hover:bg-white/10 !rounded-lg !transition !text-white"
                 title="Zoom in"
               >
                 <ZoomIn size={20} />
               </button>
               <button
                 onClick={handleRotate}
-                className="p-2 hover:bg-white/10 rounded-lg transition text-white"
+                className="!p-2 !hover:bg-white/10 !rounded-lg !transition !text-white"
                 title="Rotate"
               >
                 <RotateCw size={20} />
@@ -280,7 +280,7 @@ export default function MediaStorageViewer({
           )}
           <button
             onClick={handleDownload}
-            className="p-2 hover:bg-white/10 rounded-lg transition text-white"
+            className="!p-2 !hover:bg-white/10 !rounded-lg !transition !text-white"
             title="Download"
           >
             <Download size={20} />
@@ -297,7 +297,7 @@ export default function MediaStorageViewer({
       {/* Main Content */}
       <div
         ref={containerRef}
-        className="flex-1 flex items-center justify-center relative overflow-hidden"
+        className="!flex-1 !flex !items-center !justify-center !relative !overflow-hidden"
       >
         {/* Navigation Buttons */}
         {allMediaIds.length > 1 && (
@@ -305,8 +305,8 @@ export default function MediaStorageViewer({
             <button
               onClick={handlePrevious}
               disabled={currentIndex === 0}
-              className={`absolute left-4 z-10 p-3 bg-black/50 hover:bg-black/70 rounded-full transition text-white ${
-                currentIndex === 0 ? "opacity-50 cursor-not-allowed" : ""
+              className={`!absolute !left-4 !z-10 !p-3 !bg-black/50 !hover:bg-black/70 !rounded-full !transition !text-white ${
+                currentIndex === 0 ? "!opacity-50 !cursor-not-allowed" : ""
               }`}
             >
               <ChevronLeft size={24} />
@@ -314,9 +314,9 @@ export default function MediaStorageViewer({
             <button
               onClick={handleNext}
               disabled={currentIndex === allMediaIds.length - 1}
-              className={`absolute right-4 z-10 p-3 bg-black/50 hover:bg-black/70 rounded-full transition text-white ${
+              className={`!absolute !right-4 !z-10 !p-3 !bg-black/50 !hover:bg-black/70 !rounded-full !transition !text-white ${
                 currentIndex === allMediaIds.length - 1
-                  ? "opacity-50 cursor-not-allowed"
+                  ? "!opacity-50 !cursor-not-allowed"
                   : ""
               }`}
             >
@@ -326,12 +326,12 @@ export default function MediaStorageViewer({
         )}
 
         {/* Media Display */}
-        <div className="w-full h-full flex items-center justify-center p-4">
+        <div className="!w-full !h-full !flex !items-center !justify-center !p-4">
           {currentMedia.type === "image" && (
             <img
               src={getMediaUrl(currentMedia.id)}
               alt={currentMedia.filename}
-              className="max-w-full max-h-full object-contain transition-transform duration-200"
+              className="!max-w-full !max-h-full !object-contain !transition-transform !duration-200"
               style={{
                 transform: `scale(${zoom}) rotate(${rotation}deg)`,
               }}
@@ -339,28 +339,28 @@ export default function MediaStorageViewer({
           )}
 
           {currentMedia.type === "video" && (
-            <div className="relative w-full h-full flex items-center justify-center">
+            <div className="!relative !w-full !h-full !flex !items-center !justify-center">
               <video
                 ref={videoRef}
                 src={getMediaUrl(currentMedia.id)}
-                className="max-w-full max-h-full"
+                className="!max-w-full !max-h-full"
                 onClick={togglePlayPause}
               />
 
               {/* Video Controls Overlay */}
-              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              <div className="!absolute !inset-0 !flex !items-center !justify-center !pointer-events-none">
                 {!isPlaying && (
                   <button
                     onClick={togglePlayPause}
-                    className="p-4 bg-black/50 rounded-full hover:bg-black/70 transition pointer-events-auto"
+                    className="!p-4 !bg-black/50 !rounded-full !hover:bg-black/70 !transition !pointer-events-auto"
                   >
-                    <Play size={48} className="text-white" fill="white" />
+                    <Play size={48} className="!text-white" fill="white" />
                   </button>
                 )}
               </div>
 
               {/* Video Controls Bar */}
-              <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-4">
+              <div className="!absolute !bottom-0 !left-0 !right-0 !bg-gradient-to-t !from-black/80 !to-transparent !p-4">
                 {/* Progress Bar */}
                 <input
                   type="range"
@@ -368,9 +368,9 @@ export default function MediaStorageViewer({
                   max={duration || 0}
                   value={currentTime}
                   onChange={handleSeek}
-                  className="w-full h-1 bg-gray-600 rounded-lg appearance-none cursor-pointer mb-3"
+                  className="!w-full !h-1 !bg-gray-600 !rounded-lg !appearance-none !cursor-pointer !mb-3"
                   style={{
-                    background: `linear-gradient(to right, #4f6eda 0%, #4f6eda ${
+                    background: `linear-gradient(to right, #00568c 0%, #00568c ${
                       (currentTime / duration) * 100
                     }%, #4b5563 ${
                       (currentTime / duration) * 100
@@ -378,21 +378,21 @@ export default function MediaStorageViewer({
                   }}
                 />
 
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
+                <div className="!flex !items-center !justify-between">
+                  <div className="!flex !items-center !gap-3">
                     {/* Play/Pause */}
                     <button
                       onClick={togglePlayPause}
-                      className="p-2 hover:bg-white/10 rounded-lg transition text-white"
+                      className="!p-2 !hover:bg-white/10 !rounded-lg !transition !text-white"
                     >
                       {isPlaying ? <Pause size={20} /> : <Play size={20} />}
                     </button>
 
                     {/* Volume */}
-                    <div className="flex items-center gap-2 group">
+                    <div className="!flex !items-center !gap-2 !group">
                       <button
                         onClick={toggleMute}
-                        className="p-2 hover:bg-white/10 rounded-lg transition text-white"
+                        className="!p-2 !hover:bg-white/10 !rounded-lg !transition !text-white"
                       >
                         {isMuted || volume === 0 ? (
                           <VolumeX size={20} />
@@ -407,12 +407,12 @@ export default function MediaStorageViewer({
                         step="0.1"
                         value={volume}
                         onChange={handleVolumeChange}
-                        className="w-20 h-1 bg-gray-600 rounded-lg appearance-none cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity"
+                        className="!w-20 !h-1 !bg-gray-600 !rounded-lg !appearance-none !cursor-pointer !opacity-0 !group-hover:opacity-100 !transition-opacity"
                       />
                     </div>
 
                     {/* Time */}
-                    <span className="text-white text-sm">
+                    <span className="!text-white !text-sm">
                       {formatTime(currentTime)} / {formatTime(duration)}
                     </span>
                   </div>
@@ -420,7 +420,7 @@ export default function MediaStorageViewer({
                   {/* Fullscreen */}
                   <button
                     onClick={toggleFullscreen}
-                    className="p-2 hover:bg-white/10 rounded-lg transition text-white"
+                    className="!p-2 !hover:bg-white/10 !rounded-lg !transition !text-white"
                   >
                     <Maximize2 size={20} />
                   </button>
@@ -430,11 +430,11 @@ export default function MediaStorageViewer({
           )}
 
           {currentMedia.type === "file" && (
-            <div className="bg-white rounded-lg p-8 max-w-md w-full">
-              <div className="flex flex-col items-center gap-4">
-                <div className="w-24 h-24 bg-gradient-to-br from-orange-100 to-red-100 rounded-2xl flex items-center justify-center">
+            <div className="!bg-white !rounded-lg !p-8 !max-w-md !w-full">
+              <div className="!flex !flex-col !items-center !gap-4">
+                <div className="!w-24 !h-24 !bg-gradient-to-br !from-blue-50 !to-blue-100 !rounded-2xl !flex !items-center !justify-center">
                   <svg
-                    className="w-12 h-12 text-orange-500"
+                    className="!w-12 !h-12 !text-[#00568c]"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -447,17 +447,17 @@ export default function MediaStorageViewer({
                     />
                   </svg>
                 </div>
-                <div className="text-center">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-1">
+                <div className="!text-center">
+                  <p className="!text-lg !font-semibold !text-gray-900 !mb-1">
                     {currentMedia.filename}
-                  </h3>
-                  <p className="text-sm text-gray-500">
+                  </p>
+                  <p className="!text-sm !text-gray-500">
                     {formatFileSize(currentMedia.size)}
                   </p>
                 </div>
                 <button
                   onClick={handleDownload}
-                  className="flex items-center gap-2 px-6 py-3 bg-[#4f6eda] text-white rounded-lg hover:bg-[#3f5ed0] transition font-medium"
+                  className="!flex !items-center !gap-2 !px-6 !py-3 !bg-[#00568c] !text-white !rounded-lg !hover:bg-[#004775] !transition !font-medium"
                 >
                   <Download size={20} />
                   Tải xuống
@@ -470,8 +470,8 @@ export default function MediaStorageViewer({
 
       {/* Thumbnail Navigation (Optional) */}
       {allMediaIds.length > 1 && (
-        <div className="bg-black/50 backdrop-blur-sm px-4 py-3 overflow-x-auto">
-          <div className="flex gap-2 justify-center">
+        <div className="!bg-black/50 !backdrop-blur-sm !px-4 !py-3 !overflow-x-auto">
+          <div className="!flex !gap-2 !justify-center">
             {allMediaIds.slice(0, 10).map((id, idx) => {
               const item = mediaItems.find((m) => m.id === id);
               if (!item) return null;
@@ -480,28 +480,28 @@ export default function MediaStorageViewer({
                 <button
                   key={id}
                   onClick={() => setCurrentIndex(idx)}
-                  className={`relative w-16 h-16 rounded-lg overflow-hidden flex-shrink-0 border-2 transition ${
+                  className={`!relative !w-16 !h-16 !rounded-lg !overflow-hidden !flex-shrink-0 !border-2 !transition ${
                     idx === currentIndex
-                      ? "border-[#4f6eda]"
-                      : "border-transparent hover:border-white/50"
+                      ? "!border-[#00568c]"
+                      : "!border-transparent !hover:border-white/50"
                   }`}
                 >
                   {item.type === "image" && (
                     <img
                       src={getMediaUrl(item.id)}
                       alt=""
-                      className="w-full h-full object-cover"
+                      className="!w-full !h-full !object-cover"
                     />
                   )}
                   {item.type === "video" && (
-                    <div className="w-full h-full bg-gray-800 flex items-center justify-center">
-                      <Play size={16} className="text-white" />
+                    <div className="!w-full !h-full !bg-gray-800 !flex !items-center !justify-center">
+                      <Play size={16} className="!text-white" />
                     </div>
                   )}
                   {item.type === "file" && (
-                    <div className="w-full h-full bg-gradient-to-br from-orange-100 to-red-100 flex items-center justify-center">
+                    <div className="!w-full !h-full !bg-gradient-to-br !from-blue-50 !to-blue-100 !flex !items-center !justify-center">
                       <svg
-                        className="w-6 h-6 text-orange-500"
+                        className="!w-6 !h-6 !text-[#00568c]"
                         fill="none"
                         stroke="currentColor"
                         viewBox="0 0 24 24"
@@ -519,7 +519,7 @@ export default function MediaStorageViewer({
               );
             })}
             {allMediaIds.length > 10 && (
-              <div className="flex items-center justify-center px-3 text-white text-sm">
+              <div className="!flex !items-center !justify-center !px-3 !text-white !text-sm">
                 +{allMediaIds.length - 10}
               </div>
             )}

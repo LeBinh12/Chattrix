@@ -1,0 +1,55 @@
+# LiveKit Production Configuration
+# IMPORTANT: Before deploying, update the following:
+# 1. Change API keys to secure production values
+# 2. Set node_ip to your server's PUBLIC IP or leave empty for auto-detection
+# 3. Configure TURN server if clients are behind strict NAT/firewalls
+
+port: 7880
+bind_addresses:
+  - ""
+
+rtc:
+  udp_port: 7882
+  tcp_port: 7881
+  # Disabled because node_ip is set manually
+  use_external_ip: false
+  # Set to your server's public IP (required for Docker/cloud environments)
+  node_ip: "14.225.222.10"
+
+  # Port range for WebRTC (must be open in firewall)
+  port_range_start: 50000
+  port_range_end: 60000
+
+  # Congestion control - important for weak networks
+  congestion_control:
+    enabled: true
+
+# IMPORTANT: Change these keys for production!
+keys:
+  APIdFXUBmdyEmiV: l3CpDYhqlDWM8VJq6mrQYhysRJmVtBbLtwsrbZ32PoK
+
+# Optional: TURN server configuration for better NAT traversal
+# Uncomment and configure if clients have connection issues behind firewalls
+# turn:
+#   enabled: true
+#   domain: your-domain.com
+#   tls_port: 5349
+#   udp_port: 3478
+#   external_tls: true
+
+logging:
+  json: true
+  level: info
+
+room:
+  # Max 500 participants per room
+  max_participants: 500
+  # Empty room auto-cleanup after 5 minutes
+  empty_timeout: 300
+  # Departure timeout
+  departure_timeout: 20
+
+  enabled_codecs:
+    - mime: audio/opus
+    - mime: video/VP8
+    - mime: video/H264
