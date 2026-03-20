@@ -9,12 +9,13 @@ interface AuthInputProps extends InputHTMLAttributes<HTMLInputElement> {
 export default function AuthInput({ label, suffix, error, ...props }: AuthInputProps) {
   return (
     <div className="flex flex-col">
-      <label className="mb-2 text-sm font-semibold text-[#00568c]">
+      <label htmlFor={props.id || label} className="mb-2 text-sm font-semibold text-[#00568c]">
         {label}
       </label>
       <div className="relative w-full">
         <input
           {...props}
+          id={props.id || label}
           className={`border-2 rounded-sm px-4 py-2.5 w-full
                     text-sm text-gray-900 placeholder:text-gray-400
                     bg-gray-50 

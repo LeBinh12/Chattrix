@@ -9,7 +9,7 @@ export default defineConfig({
     host: true,      //  Quan trọng: mở cho mọi IP trong mạng LAN
     port: 5173,      // optional: giữ nguyên port
   },
-
+   
   plugins: [
     react(),
     tailwindcss(),

@@ -12,10 +12,11 @@ import (
 	StorageUser "my-app/modules/user/storage"
 	"time"
 
+	"sync"
+
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
-	"sync"
 )
 
 type Hub struct {
@@ -752,18 +753,35 @@ func (h *Hub) BroadcastUserStatus(userID, status string) {
 	}
 	data, _ := json.Marshal(event)
 
-	// gửi tới tất cả client khác
+	// Kiểm tra nếu là stress user thì không broadcast (tiết kiệm CPU O(N^2))
+	isStress := false
+	if sessions, ok := h.Clients[userID]; ok {
+		for _, c := range sessions {
+			if c.IsStressUser {
+				isStress = true
+				break
+			}
+		}
+	}
+	if isStress {
+		return
+	}
+
+	// gửi tới tất cả client khác - nhưng bỏ qua stress users (họ không cần xem status)
 	for _, sessions := range h.Clients {
 		for _, c := range sessions {
+			if c.IsStressUser {
+				continue
+			}
 			select {
 			case c.Send <- data:
 			default:
-				log.Printf(" Buffer full — dropping status for %s", c.UserID)
+				// Buffer full
 			}
 		}
 	}
 
-	// Lưu DB + Kafka
+	// Lưu DB + Kafka - CHỈ CHO USER THẬT
 	kafka.SendMessageAsync("user-status-topic", userID, string(data))
 }
 

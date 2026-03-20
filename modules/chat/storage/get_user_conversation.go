@@ -9,11 +9,9 @@ import (
 )
 
 func (s *MongoChatStore) getUserConversations(ctx context.Context, userObjectID primitive.ObjectID, page, limit int, keyword string, filterIDs []primitive.ObjectID) ([]temp, int64, error) {
-	// Optimization: If keyword is empty, aggregate on messages collection to find active conversations
-	// instead of scanning all users.
-	// if keyword == "" {
-	// 	return s.getUserConversationsOptimized(ctx, userObjectID, page, limit)
-	// }
+	if keyword == "" && len(filterIDs) == 0 {
+		return s.getUserConversationsOptimized(ctx, userObjectID, page, limit)
+	}
 
 	userCollection := s.db.Collection("users")
 

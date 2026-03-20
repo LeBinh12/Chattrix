@@ -40,6 +40,7 @@ interface MetricsSnapshot {
   memory_mb: number;
   status: 'running' | 'completed' | 'stopped' | 'idle';
   elapsed_seconds: number;
+  target_users?: number;
 }
 
 interface ChartPoint {
@@ -178,13 +179,14 @@ const SummaryReportModal: React.FC<SummaryReportModalProps> = ({ isOpen, onClose
   const handleSave = () => {
     if (onSave) {
       onSave(saveName);
+      downloadJson(saveName);
       setIsSaved(true);
     }
   };
 
-  const handleExportJson = () => {
+  const downloadJson = (name: string) => {
     const exportData = {
-      test_case: saveName || `Stress ${config.target_users} user`,
+      test_case: name || `Stress ${config.target_users} user`,
       config,
       stats,
       exported_at: new Date().toISOString()
@@ -193,12 +195,14 @@ const SummaryReportModal: React.FC<SummaryReportModalProps> = ({ isOpen, onClose
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `stress_report_${config.target_users}u_${new Date().getTime()}.json`;
+    a.download = `report_${config.target_users}u_${Date.now()}.json`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
   };
+
+  const handleExportJson = () => downloadJson(saveName);
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 animate-in fade-in duration-300">
@@ -211,7 +215,7 @@ const SummaryReportModal: React.FC<SummaryReportModalProps> = ({ isOpen, onClose
               <CheckCircle2 size={18} />
             </div>
             <div>
-              <h2 className="text-lg font-semibold text-slate-900 leading-tight italic">Stress Test Summary</h2>
+              <h2 className="text-lg font-semibold !text-gray-800 leading-tight italic">Stress Test Summary</h2>
               <p className="text-slate-500 text-xs font-medium">Final performance metrics for high load</p>
             </div>
           </div>
@@ -250,7 +254,7 @@ const SummaryReportModal: React.FC<SummaryReportModalProps> = ({ isOpen, onClose
               <div className="grid grid-cols-2 gap-2">
                 {[
                   { label: 'Total Time', value: stats.elapsed_seconds, unit: 's', cls: 'bg-emerald-50/60 border-emerald-100 text-emerald-600' },
-                  { label: 'CPU Usage', value: stats.cpu_usage_percent.toFixed(1), unit: '%', cls: 'bg-blue-50/60 border-blue-100 text-brand-600' },
+                  { label: 'Avg CPU Use', value: stats.cpu_usage_percent.toFixed(1), unit: '%', cls: 'bg-blue-50/60 border-blue-100 text-brand-600' },
                   { label: 'Avg Latency', value: stats.avg_latency_ms.toFixed(1), unit: 'ms', cls: 'bg-amber-50/60 border-amber-100 text-amber-600' },
                   { label: 'Throughput', value: stats.messages_per_sec.toFixed(1), unit: '/s', cls: 'bg-green-50/60 border-green-100 text-emerald-600' },
                 ].map(({ label, value, unit, cls }) => (
@@ -320,7 +324,7 @@ const SummaryReportModal: React.FC<SummaryReportModalProps> = ({ isOpen, onClose
                   <div className="flex items-center gap-3">
                     <Zap size={14} className="text-purple-500" />
                     <div>
-                      <p className="text-[10px] font-semibold uppercase tracking-wide">Memory Used</p>
+                      <p className="text-[10px] font-semibold uppercase tracking-wide">Avg Memory Used</p>
                       <p className="text-base font-semibold font-mono text-slate-900 leading-tight">{stats.memory_mb.toFixed(0)} MB</p>
                     </div>
                   </div>
@@ -374,6 +378,11 @@ const StressTestingDashboard: React.FC = () => {
   
   const sseRef = useRef<EventSource | null>(null);
   const lastMetricsRef = useRef<MetricsSnapshot | null>(null);
+  
+  // Refs for calculating averages
+  const cpuSumRef = useRef(0);
+  const memSumRef = useRef(0);
+  const sampleCountRef = useRef(0);
 
   const appendChartPoint = useCallback((snap: MetricsSnapshot) => {
     const point: ChartPoint = {
@@ -390,6 +399,8 @@ const StressTestingDashboard: React.FC = () => {
     });
   }, []);
 
+  const connectSSERef = useRef<() => void>(() => {});
+
   const connectSSE = useCallback(() => {
     if (sseRef.current) sseRef.current.close();
     const es = new EventSource(`${API_BASE}/stats`);
@@ -403,13 +414,54 @@ const StressTestingDashboard: React.FC = () => {
         lastMetricsRef.current = snap;
         appendChartPoint(snap);
 
+        // Accumulate for averages during running state
+        if (snap.status === 'running') {
+          cpuSumRef.current += snap.cpu_usage_percent;
+          memSumRef.current += snap.memory_mb;
+          sampleCountRef.current += 1;
+        }
+
         if ((snap.status === 'completed' || snap.status === 'stopped') && prevStatus === 'running') {
-          setFinalStats(snap);
+          // Calculate averages
+          const avgCpu = sampleCountRef.current > 0 ? cpuSumRef.current / sampleCountRef.current : snap.cpu_usage_percent;
+          const avgMem = sampleCountRef.current > 0 ? memSumRef.current / sampleCountRef.current : snap.memory_mb;
+          
+          const finalSnap = {
+            ...snap,
+            cpu_usage_percent: avgCpu,
+            memory_mb: avgMem
+          };
+          
+          setFinalStats(finalSnap);
           setShowSummary(true);
         }
       } catch {}
     };
+
+    es.onerror = () => {
+      if (lastMetricsRef.current?.status === 'running') {
+        const snap = lastMetricsRef.current;
+        const avgCpu = sampleCountRef.current > 0 ? cpuSumRef.current / sampleCountRef.current : snap.cpu_usage_percent;
+        const avgMem = sampleCountRef.current > 0 ? memSumRef.current / sampleCountRef.current : snap.memory_mb;
+        
+        const finalSnap: MetricsSnapshot = {
+          ...snap,
+          status: 'stopped' as const,
+          cpu_usage_percent: avgCpu,
+          memory_mb: avgMem
+        };
+        
+        setFinalStats(finalSnap);
+        setShowSummary(true);
+      }
+      es.close();
+      setTimeout(() => connectSSERef.current(), 3000);
+    };
   }, [appendChartPoint]);
+
+  useEffect(() => {
+    connectSSERef.current = connectSSE;
+  }, [connectSSE]);
 
   useEffect(() => {
     connectSSE();
@@ -437,6 +489,11 @@ const StressTestingDashboard: React.FC = () => {
   const handleStartStress = async () => {
     setError(null);
     setChartData([]);
+    // Reset averages
+    cpuSumRef.current = 0;
+    memSumRef.current = 0;
+    sampleCountRef.current = 0;
+    
     try {
       const res = await fetch(`${API_BASE}/stress-start`, {
         method: 'POST',
@@ -475,7 +532,7 @@ const StressTestingDashboard: React.FC = () => {
                   <Zap className="text-white w-5 h-5" />
                </div>
                 <div>
-                  <span className="text-xl font-semibold tracking-tight">Stress Test Dashboard (1000 Users)</span>
+                  <span className="text-xl font-semibold tracking-tight">Stress Test Dashboard ({config.target_users.toLocaleString()} Users)</span>
                   <div className="flex items-center gap-2">
                     <span className={`w-2 h-2 rounded-full ${isRunning ? 'bg-green-500 animate-pulse' : 'bg-slate-600'}`} />
                     <span className="text-xs text-slate-400 font-semibold uppercase tracking-widest">
@@ -523,17 +580,19 @@ const StressTestingDashboard: React.FC = () => {
                   disabled={isSeeding || isRunning}
                   className={`flex items-center gap-2 px-6 py-3 rounded-2xl transition-all font-semibold text-base ${isSeeding ? 'bg-slate-800 text-slate-500' : 'bg-brand-600 hover:bg-brand-700 text-white shadow-lg shadow-brand-500/10 active:scale-95'}`}
                 >
-                  <Users size={18} /> {isSeeding ? 'Seeding...' : 'Seed 1000 Users'}
+                  <Users size={18} /> {isSeeding ? 'Seeding...' : 'Seed 5000 Users'}
                 </button>
 
-                {!isRunning ? (
                   <button
                     onClick={handleStartStress}
-                    className="flex items-center gap-2 bg-orange-600 hover:bg-orange-700 text-white font-semibold px-6 py-3 rounded-2xl transition-all shadow-lg shadow-orange-500/10 active:scale-95 text-base"
+                    disabled={isSeeding}
+                    className={`flex items-center gap-2 bg-orange-600 hover:bg-orange-700 text-white font-semibold px-6 py-3 rounded-2xl transition-all shadow-lg shadow-orange-500/10 active:scale-95 text-base ${isSeeding ? 'opacity-50 cursor-not-allowed' : ''}`}
                   >
-                    <Play size={18} fill="currentColor" /> Start Stress Test
+                    <Play size={18} fill="currentColor" /> {isRunning ? 'Increase Load' : 'Start Stress Test'}
                   </button>
-                ) : (
+
+                
+                {isRunning && (
                   <button
                     onClick={handleStop}
                     className="flex items-center gap-2 bg-rose-600 hover:bg-rose-700 text-white font-semibold px-6 py-3 rounded-2xl transition-all shadow-lg shadow-rose-600/10 active:scale-95 text-base"
@@ -584,7 +643,7 @@ const StressTestingDashboard: React.FC = () => {
                    <p className="text-xs text-slate-400 font-semibold uppercase tracking-widest mb-1.5">Load Status</p>
                    <div className="flex items-baseline gap-1.5">
                      <span className="text-2xl font-semibold text-white leading-none">{activeCount}</span>
-                     <span className="text-xs text-slate-400 font-semibold uppercase">/ {config.target_users}</span>
+                     <span className="text-xs text-slate-400 font-semibold uppercase">/ {metrics?.target_users ?? config.target_users}</span>
                   </div>
                </div>
             </div>
@@ -657,16 +716,19 @@ const StressTestingDashboard: React.FC = () => {
          stats={finalStats}
          onSave={(name) => {
             if (!finalStats) return;
+            const successRate = ((finalStats.success_messages / (finalStats.total_messages_sent || 1)) * 100);
+            const connectedUsers = Math.round(config.target_users * (successRate / 100));
             const result = {
                name,
                users: config.target_users,
                throughput: finalStats.messages_per_sec,
-               memory: finalStats.memory_mb,
-               cpu: finalStats.cpu_usage_percent,
-               successRate: ((finalStats.success_messages / (finalStats.total_messages_sent || 1)) * 100),
+               memory: Math.round(finalStats.memory_mb),
+               cpu: parseFloat(finalStats.cpu_usage_percent.toFixed(1)),
+               successRate: parseFloat(successRate.toFixed(2)),
+               connectionsSucceeded: `${connectedUsers} / ${config.target_users}`,
             };
-            const history = JSON.parse(localStorage.getItem('stress_test_history') || '[]');
-            localStorage.setItem('stress_test_history', JSON.stringify([result, ...history].slice(0, 20)));
+            const history = JSON.parse(localStorage.getItem('test_comparison_history') || '[]');
+            localStorage.setItem('test_comparison_history', JSON.stringify([result, ...history].slice(0, 20)));
          }}
       />
     </div>

@@ -10,6 +10,8 @@ import (
 	"log"
 	"math/rand"
 	"net/http"
+	"os"
+	"path/filepath"
 	"runtime"
 	"sync"
 	"sync/atomic"
@@ -24,17 +26,20 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"golang.org/x/crypto/bcrypt"
+
+	"github.com/shirou/gopsutil/v3/cpu"
 )
 
 // ======================== Types ========================
 
 // LoadTestConfig là cấu hình đầu vào từ client
 type LoadTestConfig struct {
-	TargetUsers     int    `json:"target_users"`     // Số lượng concurrent users
-	RampUpSeconds   int    `json:"ramp_up_seconds"`  // Thời gian ramp-up (giây)
-	TestDuration    int    `json:"test_duration"`    // Thời gian chạy test (giây)
-	MessageInterval int    `json:"message_interval"` // Khoảng cách giữa messages (ms)
-	ServerURL       string `json:"server_url"`       // WebSocket server URL
+	TargetUsers     int    `json:"target_users"`      // Số lượng concurrent users
+	RampUpSeconds   int    `json:"ramp_up_seconds"`   // Thời gian ramp-up (giây)
+	TestDuration    int    `json:"test_duration"`     // Thời gian chạy test (giây)
+	RampDownSeconds int    `json:"ramp_down_seconds"` // Thời gian ramp-down (giây)
+	MessageInterval int    `json:"message_interval"`  // Khoảng cách giữa messages (ms)
+	ServerURL       string `json:"server_url"`        // WebSocket server URL
 }
 
 // MetricsSnapshot là bản chụp metrics tại một thời điểm
@@ -53,6 +58,7 @@ type MetricsSnapshot struct {
 	Status                string   `json:"status"` // "running" | "completed" | "stopped"
 	ElapsedSeconds        int      `json:"elapsed_seconds"`
 	ReceivedUserIDs       []string `json:"received_user_ids"`
+	TargetUsers           int64    `json:"target_users"`
 }
 
 // LoadTestState lưu trạng thái của một phiên test đang chạy
@@ -69,22 +75,37 @@ type LoadTestState struct {
 	lastMsgTime   time.Time
 	lastMsgCount  int64
 	status        string
+	ctx           context.Context
 	cancelFunc    context.CancelFunc
 	passiveUsers  []models.User
 	receivedMap   sync.Map // Map[uid]bool
+	targetUsers   int64
+	wg            sync.WaitGroup
 }
 
 // LoadTestManager quản lý phiên test hiện tại (singleton)
 type LoadTestManager struct {
-	mu      sync.Mutex
-	current *LoadTestState
-	db      *mongo.Database
+	mu       sync.Mutex
+	current  *LoadTestState
+	db       *mongo.Database
+	cpuUsage float64
 }
 
 var manager = &LoadTestManager{}
 
 func SetDB(db *mongo.Database) {
 	manager.db = db
+	// Start periodic CPU monitor
+	go func() {
+		for {
+			percents, err := cpu.Percent(1*time.Second, false)
+			if err == nil && len(percents) > 0 {
+				manager.mu.Lock()
+				manager.cpuUsage = percents[0]
+				manager.mu.Unlock()
+			}
+		}
+	}()
 }
 
 // ======================== Start Handler ========================
@@ -116,26 +137,53 @@ func StartLoadTest(c *gin.Context) {
 		config.ServerURL = "ws://localhost:8088/v1/chat/ws"
 	}
 
-	// Dừng test đang chạy (nếu có)
+	// Dừng test đang chạy hoặc tiếp tục
 	manager.mu.Lock()
+	var state *LoadTestState
+	isNewTest := false
 	if manager.current != nil && manager.current.status == "running" {
-		if manager.current.cancelFunc != nil {
-			manager.current.cancelFunc()
+		state = manager.current
+		atomic.AddInt64(&state.targetUsers, int64(config.TargetUsers))
+	} else {
+		isNewTest = true
+		testCtx, cancel := context.WithCancel(context.Background())
+		state = &LoadTestState{
+			status:      "running",
+			startTime:   time.Now(),
+			lastMsgTime: time.Now(),
+			ctx:         testCtx,
+			cancelFunc:  cancel,
+			targetUsers: int64(config.TargetUsers),
 		}
+		manager.current = state
 	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(config.TestDuration+config.RampUpSeconds+5)*time.Second)
-	state := &LoadTestState{
-		status:      "running",
-		startTime:   time.Now(),
-		lastMsgTime: time.Now(),
-		cancelFunc:  cancel,
-	}
-	manager.current = state
 	manager.mu.Unlock()
 
+	// Mỗi batch có timeout riêng
+	batchCtx, batchCancel := context.WithTimeout(state.ctx, time.Duration(config.TestDuration+config.RampUpSeconds+5)*time.Second)
+
 	// Chạy test trong background goroutine
-	go runLoadTest(ctx, cancel, config, state)
+	state.wg.Add(2)
+	go func() {
+		defer state.wg.Done()
+		runLoadTest(batchCtx, batchCancel, config, state)
+	}()
+	go func() {
+		defer state.wg.Done()
+		startMetricLogging(batchCtx, config)
+	}()
+
+	// Monitor completion only for the first batch or if we want global monitoring
+	if isNewTest {
+		go func() {
+			state.wg.Wait()
+			state.mu.Lock()
+			if state.status == "running" {
+				state.status = "completed"
+			}
+			state.mu.Unlock()
+		}()
+	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"message":      "Load test started",
@@ -155,7 +203,7 @@ func SeedStressUsers(c *gin.Context) {
 
 	ctx := c.Request.Context()
 	store := storage.NewMongoStore(manager.db)
-	const count = 1000
+	const count = 20000
 	const defaultPassword = "123456"
 
 	hash, _ := bcrypt.GenerateFromPassword([]byte(defaultPassword), bcrypt.DefaultCost)
@@ -226,41 +274,75 @@ func StartStressTest(c *gin.Context) {
 		return
 	}
 
-	// Giới hạn target users không vượt quá số user đã seed
-	targetCount := config.TargetUsers
-	if targetCount > len(seededUsers) {
-		targetCount = len(seededUsers)
+	// Xây dựng danh sách userID theo target (reuse nếu target > số đã seed)
+	const maxUsers = 100000
+	if config.TargetUsers > maxUsers {
+		config.TargetUsers = maxUsers
 	}
-
-	userIDs := make([]string, len(seededUsers))
+	poolSize := len(seededUsers)
+	userIDs := make([]string, poolSize)
 	for i, u := range seededUsers {
 		userIDs[i] = u.ID.Hex()
 	}
 
-	// Dừng test đang chạy
-	manager.mu.Lock()
-	if manager.current != nil && manager.current.status == "running" {
-		if manager.current.cancelFunc != nil {
-			manager.current.cancelFunc()
-		}
+	// Tạo danh sách active users - nếu target > pool, reuse theo vòng
+	activeUserIDs := make([]string, config.TargetUsers)
+	for i := 0; i < config.TargetUsers; i++ {
+		activeUserIDs[i] = userIDs[i%poolSize]
 	}
 
-	testCtx, cancel := context.WithTimeout(context.Background(), time.Duration(config.TestDuration+config.RampUpSeconds+5)*time.Second)
-	state := &LoadTestState{
-		status:      "running",
-		startTime:   time.Now(),
-		lastMsgTime: time.Now(),
-		cancelFunc:  cancel,
+	// Dừng test đang chạy hoặc tiếp tục
+	manager.mu.Lock()
+	var state *LoadTestState
+	isAppending := false
+	if manager.current != nil && manager.current.status == "running" {
+		state = manager.current
+		isAppending = true
+		// Cộng dồn target_users
+		atomic.AddInt64(&state.targetUsers, int64(config.TargetUsers))
+	} else {
+		testCtx, cancel := context.WithCancel(context.Background())
+		state = &LoadTestState{
+			status:      "running",
+			startTime:   time.Now(),
+			lastMsgTime: time.Now(),
+			ctx:         testCtx,
+			cancelFunc:  cancel,
+			targetUsers: int64(config.TargetUsers),
+		}
+		manager.current = state
 	}
-	manager.current = state
 	manager.mu.Unlock()
 
+	// Mỗi batch có timeout riêng nhưng thuộc về master context của state
+	batchCtx, batchCancel := context.WithTimeout(state.ctx, time.Duration(config.TestDuration+config.RampUpSeconds+5)*time.Second)
+
 	// Chạy test với userIDs thật
-	go runLoadTestWithUsers(testCtx, cancel, config, state, userIDs[:targetCount], userIDs)
+	state.wg.Add(2)
+	go func() {
+		defer state.wg.Done()
+		runLoadTestWithUsers(batchCtx, batchCancel, config, state, activeUserIDs, userIDs)
+	}()
+	go func() {
+		defer state.wg.Done()
+		startMetricLogging(batchCtx, config)
+	}()
+
+	if !isAppending {
+		// Monitor completion only for the first batch or if we want global monitoring
+		go func() {
+			state.wg.Wait()
+			state.mu.Lock()
+			if state.status == "running" {
+				state.status = "completed"
+			}
+			state.mu.Unlock()
+		}()
+	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"message":      "Stress test started with real seeded users",
-		"target_users": targetCount,
+		"message":      fmt.Sprintf("Stress test started with real seeded users (pool: %d, target: %d)", poolSize, config.TargetUsers),
+		"target_users": config.TargetUsers,
 		"duration_s":   config.TestDuration,
 	})
 }
@@ -322,8 +404,9 @@ func GetLoadTestUsers(c *gin.Context) {
 // StartMassConnection kết nối một lượng user ngẫu nhiên để nhận thông báo
 func StartMassConnection(c *gin.Context) {
 	var req struct {
-		TargetUsers int      `json:"target_users"`
-		UserIDs     []string `json:"user_ids"`
+		TargetUsers   int      `json:"target_users"`
+		UserIDs       []string `json:"user_ids"`
+		RampUpSeconds int      `json:"ramp_up_seconds"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
@@ -379,27 +462,50 @@ func StartMassConnection(c *gin.Context) {
 
 	// Khởi tạo state nếu chưa có để track connections
 	manager.mu.Lock()
+	var state *LoadTestState
 	if manager.current != nil && manager.current.status == "running" {
-		// Cleanup previous test state if necessary, but here we might want to append
-		// For simplicity, let's reset
-		if manager.current.cancelFunc != nil {
-			manager.current.cancelFunc()
+		state = manager.current
+		state.passiveUsers = append(state.passiveUsers, users...)
+		atomic.AddInt64(&state.targetUsers, int64(len(users)))
+	} else {
+		testCtx, cancel := context.WithCancel(context.Background())
+		state = &LoadTestState{
+			status:       "running",
+			startTime:    time.Now(),
+			ctx:          testCtx,
+			cancelFunc:   cancel,
+			passiveUsers: users,
+			targetUsers:  int64(len(users)),
 		}
+		manager.current = state
 	}
-
-	testCtx, cancel := context.WithCancel(context.Background())
-	state := &LoadTestState{
-		status:       "running",
-		startTime:    time.Now(),
-		cancelFunc:   cancel,
-		passiveUsers: users,
-	}
-	manager.current = state
 	manager.mu.Unlock()
 
+	testCtx := state.ctx
+
+	// Tính khoảng cách spawn giữa các user để ramp-up đều
+	spawnInterval := time.Duration(0)
+	if len(users) > 1 && req.RampUpSeconds > 0 {
+		spawnInterval = time.Duration(float64(req.RampUpSeconds) * float64(time.Second) / float64(len(users)))
+	}
+
 	// Kết nối từng user
-	for _, u := range users {
+	for i, u := range users {
+		select {
+		case <-testCtx.Done():
+			return
+		default:
+		}
+
 		go runPassiveUser(testCtx, serverURL, u.ID.Hex(), state)
+
+		if spawnInterval > 0 && i < len(users)-1 {
+			select {
+			case <-testCtx.Done():
+				return
+			case <-time.After(spawnInterval):
+			}
+		}
 	}
 
 	// Trả về danh sách user cho FE
@@ -409,7 +515,7 @@ func StartMassConnection(c *gin.Context) {
 			ID:          u.ID.Hex(),
 			Username:    u.Username,
 			DisplayName: u.DisplayName,
-			Status:      "online",
+			Status:      "connecting",
 		}
 	}
 
@@ -423,7 +529,9 @@ func StartMassConnection(c *gin.Context) {
 // BroadcastMessage gửi tin nhắn từ 1 user cho tất cả passive users
 func BroadcastMessage(c *gin.Context) {
 	var req struct {
-		Message string `json:"message"`
+		Message    string `json:"message"`
+		BatchSize  int    `json:"batch_size"`
+		IntervalMs int    `json:"interval_ms"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid message"})
@@ -439,6 +547,13 @@ func BroadcastMessage(c *gin.Context) {
 		return
 	}
 
+	if req.BatchSize <= 0 {
+		req.BatchSize = 1 //Default to 1 for gradual
+	}
+	if req.IntervalMs < 0 {
+		req.IntervalMs = 100 // Default 100ms
+	}
+
 	// Reset received map and counter
 	state.receivedMap = sync.Map{}
 	atomic.StoreInt64(&state.totalReceived, 0)
@@ -450,37 +565,50 @@ func BroadcastMessage(c *gin.Context) {
 		receiverIDs = append(receiverIDs, u.ID.Hex())
 	}
 
-	// Tạo connection tạm thời để gửi (hoặc dùng 1 cái có sẵn nếu được,
-	// nhưng runPassiveUser đang giữ conn trong loop ReadMessage.
-	// Cho đơn giản, ta mở 1 conn mới để gửi broadcast)
-	serverURL := "ws://localhost:8088/v1/chat/ws"
-	conn, err := connectWS(serverURL, sender.ID.Hex())
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to connect sender: " + err.Error()})
-		return
-	}
-	defer conn.Close()
+	// Gửi broadcast theo batch trong background để không block HTTP response
+	go func() {
+		serverURL := "ws://localhost:8088/v1/chat/ws"
+		conn, err := connectWS(serverURL, sender.ID.Hex())
+		if err != nil {
+			log.Printf("[Broadcast] Failed to connect sender: %v", err)
+			return
+		}
+		defer conn.Close()
 
-	msgPayload := map[string]interface{}{
-		"type": "notification",
-		"notification": map[string]interface{}{
-			"sender_id":         sender.ID.Hex(),
-			"receiver_id":       receiverIDs,
-			"group_id":          []string{},
-			"content":           req.Message,
-			"type":              "text",
-			"sender_name":       sender.DisplayName,
-			"notification_type": "system",
-		},
-	}
-	data, _ := json.Marshal(msgPayload)
-	if err := conn.WriteMessage(websocket.TextMessage, data); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to send broadcast: " + err.Error()})
-		return
-	}
+		for i := 0; i < len(receiverIDs); i += req.BatchSize {
+			end := i + req.BatchSize
+			if end > len(receiverIDs) {
+				end = len(receiverIDs)
+			}
+			batch := receiverIDs[i:end]
+
+			msgPayload := map[string]interface{}{
+				"type": "notification",
+				"notification": map[string]interface{}{
+					"sender_id":         sender.ID.Hex(),
+					"receiver_id":       batch,
+					"group_id":          []string{},
+					"content":           req.Message,
+					"type":              "text",
+					"sender_name":       sender.DisplayName,
+					"notification_type": "system",
+				},
+			}
+			data, _ := json.Marshal(msgPayload)
+			if err := conn.WriteMessage(websocket.TextMessage, data); err != nil {
+				log.Printf("[Broadcast] Failed to send batch %d-%d: %v", i, end, err)
+				return
+			}
+
+			if end < len(receiverIDs) && req.IntervalMs > 0 {
+				time.Sleep(time.Duration(req.IntervalMs) * time.Millisecond)
+			}
+		}
+		log.Printf("[Broadcast] Finished sending to %d users in batches of %d", len(receiverIDs), req.BatchSize)
+	}()
 
 	c.JSON(http.StatusOK, gin.H{
-		"message": fmt.Sprintf("Broadcast sent from %s to %d users", sender.DisplayName, len(receiverIDs)),
+		"message": fmt.Sprintf("Broadcast started from %s to %d users (Batch: %d, Interval: %dms)", sender.DisplayName, len(receiverIDs), req.BatchSize, req.IntervalMs),
 		"sender":  sender.DisplayName,
 	})
 }
@@ -591,13 +719,6 @@ func GetStats(c *gin.Context) {
 // runLoadTest là hàm chính điều phối toàn bộ phiên test
 func runLoadTest(ctx context.Context, cancel context.CancelFunc, config LoadTestConfig, state *LoadTestState) {
 	defer cancel()
-	defer func() {
-		if state.status == "running" {
-			state.mu.Lock()
-			state.status = "completed"
-			state.mu.Unlock()
-		}
-	}()
 
 	log.Printf("[LoadTest] Starting: %d users, ramp-up %ds, duration %ds", config.TargetUsers, config.RampUpSeconds, config.TestDuration)
 
@@ -609,28 +730,37 @@ func runLoadTest(ctx context.Context, cancel context.CancelFunc, config LoadTest
 		spawnInterval = time.Duration(float64(config.RampUpSeconds) * float64(time.Second) / float64(config.TargetUsers))
 	}
 
-	// Spawn virtual users — mỗi userID là một valid MongoDB ObjectID hex string
+	// Spawn virtual users - sử dụng channel cancel riêng cho từng user để ramp-down
+	userCancels := make([]context.CancelFunc, 0, config.TargetUsers)
+
 	for i := 0; i < config.TargetUsers; i++ {
 		select {
 		case <-ctx.Done():
 			log.Printf("[LoadTest] Cancelled during ramp-up at user %d", i)
+			for _, c := range userCancels {
+				c()
+			}
 			wg.Wait()
 			return
 		default:
 		}
 
+		userCtx, userCancel := context.WithCancel(ctx)
+		userCancels = append(userCancels, userCancel)
+
 		wg.Add(1)
-		// userID PHẢI là valid MongoDB ObjectID hex (24 ký tự hex)
-		// vì hub.go gọi primitive.ObjectIDFromHex(msg.SenderID) khi xử lý chat
 		userID := primitive.NewObjectID().Hex()
-		go func(uid string) {
+		go func(uCtx context.Context, uid string) {
 			defer wg.Done()
-			runVirtualUser(ctx, config, state, uid)
-		}(userID)
+			runVirtualUser(uCtx, config, state, uid)
+		}(userCtx, userID)
 
 		if spawnInterval > 0 && i < config.TargetUsers-1 {
 			select {
 			case <-ctx.Done():
+				for _, c := range userCancels {
+					c()
+				}
 				wg.Wait()
 				return
 			case <-time.After(spawnInterval):
@@ -644,10 +774,21 @@ func runLoadTest(ctx context.Context, cancel context.CancelFunc, config LoadTest
 	testEnd := time.After(time.Duration(config.TestDuration) * time.Second)
 	select {
 	case <-ctx.Done():
+		log.Println("[LoadTest] Context cancelled, stopping test early.")
 	case <-testEnd:
-		cancel() // kết thúc test - cancel tất cả goroutines
+		log.Printf("[LoadTest] Main duration (%ds) completed. Starting Ramp-down...", config.TestDuration)
+
+		// Ramp-down logic
+		if config.RampDownSeconds > 0 && len(userCancels) > 1 {
+			downInterval := time.Duration(float64(config.RampDownSeconds) * float64(time.Second) / float64(len(userCancels)))
+			for _, stopFunc := range userCancels {
+				stopFunc()
+				time.Sleep(downInterval)
+			}
+		}
 	}
 
+	cancel() // Cuối cùng ngắt toàn bộ context (bao gồm cả logger nếu logger dùng ctx này)
 	wg.Wait()
 	log.Printf("[LoadTest] Test completed. Total sent: %d, Errors: %d", atomic.LoadInt64(&state.totalSent), atomic.LoadInt64(&state.errorCount))
 }
@@ -655,13 +796,6 @@ func runLoadTest(ctx context.Context, cancel context.CancelFunc, config LoadTest
 // runLoadTestWithUsers tương tự runLoadTest nhưng sử dụng danh sách userID có sẵn
 func runLoadTestWithUsers(ctx context.Context, cancel context.CancelFunc, config LoadTestConfig, state *LoadTestState, activeUserIDs []string, allUserIDs []string) {
 	defer cancel()
-	defer func() {
-		if state.status == "running" {
-			state.mu.Lock()
-			state.status = "completed"
-			state.mu.Unlock()
-		}
-	}()
 
 	var wg sync.WaitGroup
 	spawnInterval := time.Duration(0)
@@ -669,19 +803,28 @@ func runLoadTestWithUsers(ctx context.Context, cancel context.CancelFunc, config
 		spawnInterval = time.Duration(float64(config.RampUpSeconds) * float64(time.Second) / float64(len(activeUserIDs)))
 	}
 
+	// Spawn virtual users - sử dụng channel cancel riêng cho từng user để ramp-down
+	userCancels := make([]context.CancelFunc, 0, len(activeUserIDs))
+
 	for i, userID := range activeUserIDs {
 		select {
 		case <-ctx.Done():
+			for _, c := range userCancels {
+				c()
+			}
 			wg.Wait()
 			return
 		default:
 		}
 
+		userCtx, userCancel := context.WithCancel(ctx)
+		userCancels = append(userCancels, userCancel)
+
 		wg.Add(1)
-		go func(uid string) {
+		go func(uCtx context.Context, uid string) {
 			defer wg.Done()
-			runVirtualUserWithPool(ctx, config, state, uid, allUserIDs)
-		}(userID)
+			runVirtualUserWithPool(uCtx, config, state, uid, allUserIDs)
+		}(userCtx, userID)
 
 		if spawnInterval > 0 && i < len(activeUserIDs)-1 {
 			select {
@@ -696,9 +839,21 @@ func runLoadTestWithUsers(ctx context.Context, cancel context.CancelFunc, config
 	testEnd := time.After(time.Duration(config.TestDuration) * time.Second)
 	select {
 	case <-ctx.Done():
+		log.Println("[LoadTest] Context cancelled, stopping test early.")
 	case <-testEnd:
-		cancel()
+		log.Printf("[LoadTest] Main duration (%ds) completed. Starting Ramp-down...", config.TestDuration)
+
+		// Ramp-down logic
+		if config.RampDownSeconds > 0 && len(userCancels) > 1 {
+			downInterval := time.Duration(float64(config.RampDownSeconds) * float64(time.Second) / float64(len(userCancels)))
+			for _, stopFunc := range userCancels {
+				stopFunc()
+				time.Sleep(downInterval)
+			}
+		}
 	}
+
+	cancel()
 
 	wg.Wait()
 }
@@ -858,7 +1013,7 @@ func runVirtualUser(ctx context.Context, config LoadTestConfig, state *LoadTestS
 // connectWS tạo WebSocket connection đến server với một userID giả lập
 func connectWS(serverURL, userID string) (*websocket.Conn, error) {
 	dialer := websocket.Dialer{
-		HandshakeTimeout: 5 * time.Second,
+		HandshakeTimeout: 30 * time.Second,
 	}
 	fullURL := fmt.Sprintf("%s?id=%s", serverURL, userID)
 	conn, _, err := dialer.Dial(fullURL, nil)
@@ -940,14 +1095,18 @@ func collectSnapshot() MetricsSnapshot {
 	runtime.ReadMemStats(&memStats)
 	memMB := float64(memStats.HeapAlloc) / 1024 / 1024
 
-	// CPU estimate dựa trên active goroutines (heuristic đơn giản)
-	numGoroutines := runtime.NumGoroutine()
-	cpuEstimate := float64(numGoroutines) * 0.05 // rough estimate
-	if cpuEstimate > 99 {
-		cpuEstimate = 99
+	// Lấy CPU từ monitor tập trung
+	manager.mu.Lock()
+	cpuUsage := manager.cpuUsage
+	manager.mu.Unlock()
+
+	// Nếu monitor chưa chạy hoặc trả về 0, thử lấy nhanh (nhưng không dùng fallback nhân goroutine nữa)
+	if cpuUsage <= 0 {
+		p, _ := cpu.Percent(0, false)
+		if len(p) > 0 {
+			cpuUsage = p[0]
+		}
 	}
-	// Thêm jitter nhỏ để biểu đồ trông "sống động" hơn
-	cpuEstimate += rand.Float64() * 2
 
 	return MetricsSnapshot{
 		Timestamp:             time.Now().Format(time.RFC3339),
@@ -959,11 +1118,12 @@ func collectSnapshot() MetricsSnapshot {
 		MessagesPerSec:        msgPerSec,
 		ErrorRate:             errorRate,
 		AvgLatencyMs:          avgLatency,
-		CPUUsage:              cpuEstimate,
+		CPUUsage:              cpuUsage,
 		MemoryMB:              memMB,
 		Status:                status,
 		ElapsedSeconds:        elapsed,
 		ReceivedUserIDs:       extractReceivedIDs(state),
+		TargetUsers:           atomic.LoadInt64(&state.targetUsers),
 	}
 }
 
@@ -981,4 +1141,67 @@ func extractReceivedIDs(state *LoadTestState) []string {
 		return true
 	})
 	return ids
+}
+
+func startMetricLogging(ctx context.Context, config LoadTestConfig) {
+	logDir := "test_logs"
+	if err := os.MkdirAll(logDir, 0755); err != nil {
+		log.Printf("[StatsLogger] Failed to create log dir: %v", err)
+		return
+	}
+
+	timestamp := time.Now().Unix()
+	cpuFile := filepath.Join(logDir, fmt.Sprintf("cpu_%du_%d.log", config.TargetUsers, timestamp))
+	ramFile := filepath.Join(logDir, fmt.Sprintf("ram_%du_%d.log", config.TargetUsers, timestamp))
+	connFile := filepath.Join(logDir, fmt.Sprintf("conns_%du_%d.log", config.TargetUsers, timestamp))
+
+	fCpu, err := os.Create(cpuFile)
+	if err != nil {
+		log.Printf("[StatsLogger] Failed to create CPU log: %v", err)
+		return
+	}
+	defer fCpu.Close()
+
+	fRam, err := os.Create(ramFile)
+	if err != nil {
+		log.Printf("[StatsLogger] Failed to create RAM log: %v", err)
+		return
+	}
+	defer fRam.Close()
+
+	fConn, err := os.Create(connFile)
+	if err != nil {
+		log.Printf("[StatsLogger] Failed to create Connection log: %v", err)
+		return
+	}
+	defer fConn.Close()
+
+	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
+
+	log.Printf("[StatsLogger] Started logging for %d users test to %s, %s and %s", config.TargetUsers, cpuFile, ramFile, connFile)
+
+	for {
+		select {
+		case <-ctx.Done():
+			// Khi context bị cancel, ta vẫn chạy thêm một lúc nếu ActiveConns > 0 (tối đa 60s dự phòng)
+			for i := 0; i < 300; i++ { // Chờ tối đa 5 phút cho ramp-down
+				snap := collectSnapshot()
+				fmt.Fprintf(fCpu, "%.2f\n", snap.CPUUsage)
+				fmt.Fprintf(fRam, "%.2f\n", snap.MemoryMB)
+				fmt.Fprintf(fConn, "%d\n", snap.ActiveConns)
+				if snap.ActiveConns <= 0 {
+					break
+				}
+				time.Sleep(1 * time.Second)
+			}
+			log.Printf("[StatsLogger] Stopped logging for %d users test. ActiveConns: %d", config.TargetUsers, manager.current.activeConns)
+			return
+		case <-ticker.C:
+			snap := collectSnapshot()
+			fmt.Fprintf(fCpu, "%.2f\n", snap.CPUUsage)
+			fmt.Fprintf(fRam, "%.2f\n", snap.MemoryMB)
+			fmt.Fprintf(fConn, "%d\n", snap.ActiveConns)
+		}
+	}
 }

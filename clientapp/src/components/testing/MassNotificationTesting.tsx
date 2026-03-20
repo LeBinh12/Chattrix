@@ -29,6 +29,75 @@ interface MetricsSnapshot {
 
 const API_BASE = `${API_BASE_URL.replace('/v1', '')}/v1/load-test`;
 
+interface SummaryReportModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  targetCount: number;
+  stats: MetricsSnapshot | null;
+}
+
+const SummaryReportModal: React.FC<SummaryReportModalProps> = ({ isOpen, onClose, targetCount, stats }) => {
+  if (!isOpen || !stats) return null;
+
+  const downloadJson = () => {
+    const exportData = {
+      test_case: `Broadcast: ${targetCount} users (${new Date().toLocaleTimeString('vi-VN')})`,
+      config: { target_users: targetCount, type: 'broadcast' },
+      stats,
+      exported_at: new Date().toISOString()
+    };
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `report_broadcast_${targetCount}u_${Date.now()}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 animate-in fade-in duration-300">
+      <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" onClick={onClose} />
+      <div className="relative w-full max-w-2xl bg-white border border-slate-200 rounded-3xl shadow-2xl flex flex-col overflow-hidden text-slate-900">
+        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-orange-50">
+          <h2 className="text-xl font-bold">Broadcast Test Summary</h2>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600"><XCircle size={20} /></button>
+        </div>
+        <div className="p-8 space-y-6">
+          <div className="grid grid-cols-2 gap-4">
+             <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                <p className="text-[10px] font-bold uppercase text-slate-400 mb-1">Target Users</p>
+                <p className="text-2xl font-bold">{targetCount.toLocaleString()}</p>
+             </div>
+             <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                <p className="text-[10px] font-bold uppercase text-slate-400 mb-1">Pass / Received</p>
+                <p className="text-2xl font-bold text-orange-600">{stats.total_messages_received.toLocaleString()}</p>
+             </div>
+             <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                <p className="text-[10px] font-bold uppercase text-slate-400 mb-1">Success Rate</p>
+                <p className="text-2xl font-bold text-emerald-600">
+                  {((stats.total_messages_received / (stats.total_messages_sent || 1)) * 100).toFixed(1)}%
+                </p>
+             </div>
+             <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                <p className="text-[10px] font-bold uppercase text-slate-400 mb-1">Avg Latency</p>
+                <p className="text-2xl font-bold">{stats.avg_latency_ms.toFixed(1)}ms</p>
+             </div>
+          </div>
+          <div className="pt-4 flex gap-3">
+             <button onClick={downloadJson} className="flex-1 bg-orange-600 text-white font-bold py-3 rounded-2xl hover:bg-orange-700 transition-all flex items-center justify-center gap-2">
+                <DownloadCloud size={20} /> Export Result JSON
+             </button>
+             <button onClick={onClose} className="px-8 bg-slate-900 text-white font-bold py-3 rounded-2xl">Done</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const MassNotificationTesting: React.FC = () => {
   const [users, setUsers] = useState<UserSocket[]>([]);
   const [loading, setLoading] = useState(false);
@@ -43,8 +112,14 @@ const MassNotificationTesting: React.FC = () => {
     error: 0
   });
   const [targetCount, setTargetCount] = useState(1000);
+  const [rampUpSeconds, setRampUpSeconds] = useState(10);
+  const [broadcastInterval, setBroadcastInterval] = useState(100);
+  const [broadcastBatchSize, setBroadcastBatchSize] = useState(1);
+  const [showSummary, setShowSummary] = useState(false);
+  const [lastMetrics, setLastMetrics] = useState<MetricsSnapshot | null>(null);
 
   const sseRef = useRef<EventSource | null>(null);
+  const prevStatusRef = useRef<string>('idle');
 
   const connectSSE = useCallback(() => {
     if (sseRef.current) sseRef.current.close();
@@ -53,13 +128,20 @@ const MassNotificationTesting: React.FC = () => {
     es.onmessage = (e) => {
       try {
         const snap: MetricsSnapshot = JSON.parse(e.data);
+        const prevStatus = prevStatusRef.current;
         
+        setLastMetrics(snap);
         setStats(prev => ({
           ...prev,
           online: snap.active_connections,
           received: snap.total_messages_received,
           error: snap.error_messages
         }));
+
+        if ((snap.status === 'completed' || snap.status === 'stopped') && prevStatus === 'running') {
+            setShowSummary(true);
+        }
+        prevStatusRef.current = snap.status;
 
         if (snap.received_user_ids && snap.received_user_ids.length > 0) {
             const receivedSet = new Set(snap.received_user_ids);
@@ -68,11 +150,24 @@ const MassNotificationTesting: React.FC = () => {
             ));
         }
 
-        // Cập nhật status online nếu active_connections > 0
-        if (snap.active_connections > 0 && users.some(u => u.status === 'offline')) {
-            // Lưu ý: SSE không trả về list online IDs, nên ta giả định tất cả user hiện tại đang được kết nối
-            // Tuy nhiên, logic backend StartMassConnection kết nối chính xác danh sách IDs truyền lên.
-            setUsers(prev => prev.map(u => u.status === 'offline' ? { ...u, status: 'online' } : u));
+        // Cập nhật status online dựa trên active_connections
+        if (snap.active_connections > 0) {
+            setUsers(prev => {
+                let onlineNeeded = snap.active_connections;
+                // Đã có bao nhiêu người online hoặc received rồi?
+                const alreadyOnlineOrDone = prev.filter(u => u.status === 'online' || u.status === 'received').length;
+                let toAdd = onlineNeeded - alreadyOnlineOrDone;
+
+                if (toAdd <= 0) return prev;
+
+                return prev.map(u => {
+                    if (toAdd > 0 && (u.status === 'offline' || u.status === 'connecting')) {
+                        toAdd--;
+                        return { ...u, status: 'online' };
+                    }
+                    return u;
+                });
+            });
         }
       } catch (err) {}
     };
@@ -123,12 +218,12 @@ const MassNotificationTesting: React.FC = () => {
       const res = await fetch(`${API_BASE}/mass-connect`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_ids: userIds }),
+        body: JSON.stringify({ user_ids: userIds, ramp_up_seconds: rampUpSeconds }),
       });
       const data = await res.json();
       if (res.ok) {
         toast.success(data.message);
-        setUsers(prev => prev.map(u => ({ ...u, status: 'online' })));
+        setUsers(prev => prev.map(u => ({ ...u, status: 'connecting' })));
       } else {
         toast.error(data.error);
       }
@@ -161,7 +256,11 @@ const MassNotificationTesting: React.FC = () => {
       const res = await fetch(`${API_BASE}/broadcast`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message }),
+        body: JSON.stringify({ 
+            message, 
+            batch_size: broadcastBatchSize, 
+            interval_ms: broadcastInterval 
+        }),
       });
       const data = await res.json();
       if (res.ok) {
@@ -184,6 +283,12 @@ const MassNotificationTesting: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-slate-900 text-white selection:bg-orange-500/30 font-roboto text-sm">
+      <SummaryReportModal 
+        isOpen={showSummary} 
+        onClose={() => setShowSummary(false)} 
+        targetCount={targetCount} 
+        stats={lastMetrics} 
+      />
       {/* Header */}
       <header className="border-b border-white/10 bg-slate-900/80 backdrop-blur-2xl sticky top-0 z-40">
         <div className="max-w-[1700px] mx-auto px-6 py-4 flex items-center justify-between">
@@ -204,15 +309,33 @@ const MassNotificationTesting: React.FC = () => {
 
           <div className="flex items-center gap-3">
             <div className="flex flex-col gap-0.5 mr-2">
-                <label className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Target Users</label>
+                <label className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Target</label>
                 <input 
                     type="number" 
                     value={targetCount} 
                     onChange={e => setTargetCount(Number(e.target.value))}
-                    className="bg-white/5 border border-white/10 rounded-lg px-3 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-orange-500 w-24"
+                    className="bg-white/5 border border-white/10 rounded-lg px-3 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-orange-500 w-20"
                     placeholder="Count"
                 />
             </div>
+            <div className="flex flex-col gap-0.5 mr-2">
+                <label className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Ramp-up</label>
+                <input 
+                    type="number" 
+                    value={rampUpSeconds} 
+                    onChange={e => setRampUpSeconds(Number(e.target.value))}
+                    className="bg-white/5 border border-white/10 rounded-lg px-3 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-orange-500 w-16"
+                    placeholder="Sec"
+                />
+            </div>
+            {lastMetrics && (
+              <button 
+                onClick={() => setShowSummary(true)}
+                className="flex items-center gap-2 bg-white/5 hover:bg-white/10 text-slate-300 font-semibold px-4 py-2.5 rounded-xl border border-white/10 transition-all"
+              >
+                <DownloadCloud size={16} /> Results
+              </button>
+            )}
             <button
               onClick={handleFetchUsers}
               disabled={loading}
@@ -221,6 +344,7 @@ const MassNotificationTesting: React.FC = () => {
               {loading ? <Loader2 className="animate-spin" size={16} /> : <DownloadCloud size={16} />} 
               Load Users
             </button>
+
             <button
               onClick={handleConnectAll}
               disabled={isConnecting || users.length === 0}
@@ -273,12 +397,30 @@ const MassNotificationTesting: React.FC = () => {
             />
           </div>
           <div className="flex items-center gap-3 w-full lg:w-auto">
+            <div className="flex flex-col gap-0.5">
+                <label className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Batch</label>
+                <input 
+                    type="number" 
+                    value={broadcastBatchSize} 
+                    onChange={e => setBroadcastBatchSize(Number(e.target.value))}
+                    className="bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-orange-500 w-16"
+                />
+            </div>
+            <div className="flex flex-col gap-0.5">
+                <label className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Intv(ms)</label>
+                <input 
+                    type="number" 
+                    value={broadcastInterval} 
+                    onChange={e => setBroadcastInterval(Number(e.target.value))}
+                    className="bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-orange-500 w-20"
+                />
+            </div>
             <input
               type="text"
               placeholder="Enter message for broadcast blast..."
               value={message}
               onChange={e => setMessage(e.target.value)}
-              className="flex-1 lg:w-96 bg-slate-800/50 border border-white/10 rounded-2xl px-6 py-3.5 text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-orange-500/40 transition-all text-sm"
+              className="flex-1 lg:w-64 bg-slate-800/50 border border-white/10 rounded-2xl px-6 py-3.5 text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-orange-500/40 transition-all text-sm"
             />
             <button
               onClick={handleSendMassNotification}
@@ -333,6 +475,12 @@ const MassNotificationTesting: React.FC = () => {
                                     <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-green-500/10 border border-green-500/20 text-green-500 font-bold text-[10px] uppercase tracking-widest">
                                         <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
                                         Online
+                                    </div>
+                                )}
+                                {user.status === 'connecting' && (
+                                    <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 font-bold text-[10px] uppercase tracking-widest">
+                                        <Loader2 size={12} className="animate-spin" />
+                                        Connecting...
                                     </div>
                                 )}
                                 {user.status === 'received' && (

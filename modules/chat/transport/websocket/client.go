@@ -19,14 +19,15 @@ import (
 )
 
 type Client struct {
-	Hub       *Hub
-	Conn      *websocket.Conn
-	Send      chan []byte
-	UserID    string
-	SessionID string
-	LastSeen  time.Time
-	mu        sync.Mutex
-	closed    bool
+	Hub          *Hub
+	Conn         *websocket.Conn
+	Send         chan []byte
+	UserID       string
+	SessionID    string
+	LastSeen     time.Time
+	mu           sync.Mutex
+	closed       bool
+	IsStressUser bool // Đánh dấu nếu là user từ bộ load test
 }
 
 type WSMessage struct {
@@ -437,9 +438,11 @@ func (c *Client) handleChatMessage(msg *models.MessageResponse) {
 		return
 	}
 	newID := primitive.NewObjectID()
-	data, _ := json.Marshal(msg)
-	_ = os.WriteFile("modules/chat/transport/websocket/last_msg.json", data, 0644)
-	log.Printf("[WS] Incoming chat message logged to modules/chat/transport/websocket/last_msg.json")
+	// Đừng ghi file và gửi Kafka cho stress users để giảm tải hệ thống
+	if !c.IsStressUser {
+		data, _ := json.Marshal(msg)
+		_ = os.WriteFile("modules/chat/transport/websocket/last_msg.json", data, 0644)
+	}
 	// Xử lý group message
 	if msg.GroupID != primitive.NilObjectID {
 		msg.CreatedAt = time.Now()
@@ -447,9 +450,11 @@ func (c *Client) handleChatMessage(msg *models.MessageResponse) {
 		msg.ID = newID
 		msg.Status = models.StatusDelivered
 
-		// FIX: Gửi Kafka với retry logic
-		msgCopy := *msg
-		go c.sendToKafkaWithRetry("chat-topic", msgCopy.SenderID.Hex(), msgCopy)
+		// FIX: Gửi Kafka với retry logic - CHỈ CHO USER THẬT
+		if !c.IsStressUser {
+			msgCopy := *msg
+			go c.sendToKafkaWithRetry("chat-topic", msgCopy.SenderID.Hex(), msgCopy)
+		}
 
 		c.Hub.Broadcast <- HubEvent{
 			Type:    "chat",
@@ -472,9 +477,11 @@ func (c *Client) handleChatMessage(msg *models.MessageResponse) {
 		msg.ID = newID
 		msg.CreatedAt = time.Now()
 
-		// FIX: Gửi Kafka với retry logic
-		msgCopy := *msg
-		go c.sendToKafkaWithRetry("chat-topic", msgCopy.SenderID.Hex(), msgCopy)
+		// FIX: Gửi Kafka với retry logic - CHỈ CHO USER THẬT
+		if !c.IsStressUser {
+			msgCopy := *msg
+			go c.sendToKafkaWithRetry("chat-topic", msgCopy.SenderID.Hex(), msgCopy)
+		}
 
 		c.Hub.Broadcast <- HubEvent{
 			Type:    "chat",

@@ -7,30 +7,30 @@ import { canAccessAdminPanel } from "../constants/menuPermissions";
 
 function PublicRoute({ children }: { children: JSX.Element }) {
   const token = localStorage.getItem("access_token");
-  if (token) {
-    // Nếu đã có token thì tự động chuyển hướng về home
+  const isAuthLoading = useRecoilValue(isAuthLoadingAtom);
+  const user = useRecoilValue(userAtom);
+
+  if (isAuthLoading) return null;
+
+  if (token && user) {
+    // Nếu đã có token và user thì tự động chuyển hướng về home
     return <Navigate to="/" replace />;
   }
   return children;
 }
 
 function PrivateRoute({ children }: { children: JSX.Element }) {
-  // const user = useRecoilValue(userAtom);
   const token = localStorage.getItem("access_token");
-  // const location = useLocation();
+  const isAuthLoading = useRecoilValue(isAuthLoadingAtom);
+  const user = useRecoilValue(userAtom);
 
-  if (!token) {
-    // Nếu chưa login thì về trang login
+  if (isAuthLoading) return null;
+
+  if (!token || !user) {
+    // Nếu chưa login hoặc chưa có user thì về trang login
     return <Navigate to="/login" replace />;
   }
 
-  // if (
-  //   user?.data.is_completed_friend_setup === false &&
-  //   location.pathname !== "/suggestion"
-  // ) {
-  //   toast.info(`Bạn cần kết bạn ít nhất 5 người`);
-  //   return <Navigate to="/suggestion" replace />;
-  // }
   return children;
 }
 

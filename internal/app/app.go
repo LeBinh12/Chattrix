@@ -13,6 +13,7 @@ import (
 	"my-app/internal/seeder"
 	"my-app/modules/chat/storage"
 	chatws "my-app/modules/chat/transport/websocket"
+	"my-app/modules/loadtest"
 	"my-app/utils"
 
 	"github.com/elastic/go-elasticsearch/v8"
@@ -39,6 +40,7 @@ func New(ctx context.Context, cfg config.AppConfig) (*Application, error) {
 	if err != nil {
 		return nil, err
 	}
+	loadtest.SetDB(db)
 
 	// Auto-seed data if not exists
 	go func() {

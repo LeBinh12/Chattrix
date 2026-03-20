@@ -212,13 +212,13 @@ func StartConsumer(ctx context.Context, brokers []string, groupID string, topics
 	// FIX: DISABLE auto-commit
 	config.Consumer.Offsets.AutoCommit.Enable = false
 
-	config.ChannelBufferSize = 10000
-	config.Consumer.Fetch.Min = 1024 * 1024
-	config.Consumer.Fetch.Default = 1024 * 1024 * 10
-	config.Consumer.MaxProcessingTime = 60 * time.Second
-	config.Consumer.Group.Session.Timeout = 20 * time.Second
-	config.Consumer.Group.Heartbeat.Interval = 6 * time.Second
-	config.Consumer.MaxWaitTime = 500 * time.Millisecond
+	config.ChannelBufferSize = 20000
+	config.Consumer.Fetch.Min = 1024 * 1024 * 5
+	config.Consumer.Fetch.Default = 1024 * 1024 * 20
+	config.Consumer.MaxProcessingTime = 120 * time.Second
+	config.Consumer.Group.Session.Timeout = 30 * time.Second
+	config.Consumer.Group.Heartbeat.Interval = 10 * time.Second
+	config.Consumer.MaxWaitTime = 1000 * time.Millisecond
 	config.Consumer.Offsets.Initial = sarama.OffsetNewest
 
 	consumerGroup, err := sarama.NewConsumerGroup(brokers, groupID, config)

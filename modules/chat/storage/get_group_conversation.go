@@ -47,21 +47,16 @@ func (s *MongoChatStore) getGroupConversations(ctx context.Context, userObjectID
 		}}}
 	}
 
-	// 🔹 Lookup ChatSeenStatus để lấy last_seen_message_id
+	// 🔹 Lookup last_seen_message_id
 	lookupSeenStatus := bson.D{{
 		"$lookup", bson.M{
 			"from": "chat_seen_status",
 			"let":  bson.M{"groupId": bson.M{"$toObjectId": "$group_id"}, "userId": userObjectID},
 			"pipeline": []bson.M{
 				{"$match": bson.M{
-					"$expr": bson.M{
-						"$and": []bson.M{
-							{"$eq": []interface{}{"$conversation_id", "$$groupId"}},
-							{"$eq": []interface{}{"$user_id", "$$userId"}},
-						},
-					},
+					"conversation_id": "$$groupId",
+					"user_id":         "$$userId",
 				}},
-				{"$sort": bson.M{"last_seen_message_id": -1}},
 				{"$limit": 1},
 			},
 			"as": "seen_status",
@@ -71,7 +66,6 @@ func (s *MongoChatStore) getGroupConversations(ctx context.Context, userObjectID
 	unwindSeenStatus := bson.D{{"$unwind", bson.M{"path": "$seen_status", "preserveNullAndEmptyArrays": true}}}
 
 	// 🔹 Lookup unread count based on last_seen_message_id
-	// Use created_at as joined_at fallback for GroupUserRole records
 	lookupUnread := bson.D{{
 		"$lookup", bson.M{
 			"from": "messages",
@@ -82,9 +76,9 @@ func (s *MongoChatStore) getGroupConversations(ctx context.Context, userObjectID
 						"$and": []bson.M{
 							{"$eq": []interface{}{"$group_id", "$$groupId"}},
 							{"$gt": []interface{}{"$_id", bson.M{"$ifNull": []interface{}{"$$lastSeenId", primitive.NilObjectID}}}},
-							{"$gte": []interface{}{"$created_at", "$$joinedAt"}},
 						},
 					},
+					"created_at":        bson.M{"$gte": "$$joinedAt"},
 					"deleted_for":       bson.M{"$ne": userObjectID},
 					"sender_id":         bson.M{"$ne": userObjectID},
 					"type":              bson.M{"$ne": "system"},
@@ -112,12 +106,8 @@ func (s *MongoChatStore) getGroupConversations(ctx context.Context, userObjectID
 			"let":  bson.M{"groupId": bson.M{"$toObjectId": "$group_id"}, "joinedAt": "$created_at"},
 			"pipeline": []bson.M{
 				{"$match": bson.M{
-					"$expr": bson.M{
-						"$and": []bson.M{
-							{"$eq": []interface{}{"$group_id", "$$groupId"}},
-							{"$gte": []interface{}{"$created_at", "$$joinedAt"}},
-						},
-					},
+					"$expr": bson.M{"$eq": []interface{}{"$group_id", "$$groupId"}},
+					"created_at":        bson.M{"$gte": "$$joinedAt"},
 					"deleted_for":       bson.M{"$ne": userObjectID},
 					"parent_message_id": bson.M{"$exists": false},
 				}},

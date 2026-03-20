@@ -21,7 +21,7 @@ func ConnectMongo(ctx context.Context, uri, dbName string) (*mongo.Database, err
 		return nil, errors.New("mongo database name is required")
 	}
 
-	client, err := mongo.NewClient(options.Client().ApplyURI(uri))
+	client, err := mongo.NewClient(options.Client().ApplyURI(uri).SetMaxPoolSize(500))
 	if err != nil {
 		return nil, fmt.Errorf("cannot create mongo client: %w", err)
 	}
