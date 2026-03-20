@@ -11,7 +11,7 @@ import {
   Play,
 } from "lucide-react";
 import type { MediaItem } from "../types/media";
-import { API_ENDPOINTS } from "../config/api";
+import { API_ENDPOINTS, API_BASE_URL } from "../config/api";
 
 interface MediaViewerProps {
   isOpen: boolean;
@@ -178,13 +178,13 @@ export default function MediaViewer({
         >
           {isVideo ? (
             <video
-              src={`http://localhost:3000/v1/upload/media/stream/${currentMedia.url}`}
+              src={`${API_BASE_URL}/upload/media/stream/${currentMedia.url}`}
               controls
               className="max-w-full max-h-[85vh] rounded-lg"
             />
           ) : (
             <img
-              src={`http://localhost:3000/v1/upload/media/${currentMedia.url}`}
+              src={`${API_BASE_URL}/upload/media/${currentMedia.url}`}
               alt={currentMedia.filename}
               className="max-w-full max-h-[85vh] object-contain select-none rounded-lg"
               style={{
@@ -214,7 +214,7 @@ export default function MediaViewer({
                 {m.type === "video" ? (
                   <div className="relative">
                     <video
-                      src={`http://localhost:3000/v1/upload/media/${m.url}`}
+                      src={`${API_BASE_URL}/upload/media/${m.url}`}
                       className="w-full h-full object-cover"
                     />
                     <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
@@ -223,7 +223,7 @@ export default function MediaViewer({
                   </div>
                 ) : (
                   <img
-                    src={`http://localhost:3000/v1/upload/media/${m.url}`}
+                    src={`${API_BASE_URL}/upload/media/${m.url}`}
                     className="w-full h-full object-cover"
                   />
                 )}

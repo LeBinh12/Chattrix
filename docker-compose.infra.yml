@@ -1,0 +1,100 @@
+services:
+  # --------------------
+  # MinIO
+  # --------------------
+  minio:
+    image: minio/minio:RELEASE.2023-07-07T07-13-57Z
+    ports:
+      - "9000:9000"
+      - "9003:9001"
+    environment:
+      MINIO_ROOT_USER: dthuadmin
+      MINIO_ROOT_PASSWORD: SuperStrongPwd123!
+    volumes:
+      - minio_data_dthu:/data
+    command: server /data --console-address ":9001"
+    restart: always
+
+  # --------------------
+  # MongoDB
+  # --------------------
+  mongodb:
+    image: mongo:6.0
+    container_name: mongodb_dthu
+    restart: always
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: 19006292
+    ports:
+      - "27018:27017"
+    volumes:
+      - mongo_data_dthu:/data/db
+
+  # --------------------
+  # Zookeeper (for Kafka)
+  # --------------------
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.6.0
+    container_name: zookeeper_dthu
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+    ports:
+      - "2181:2181"
+    restart: always
+
+  # --------------------
+  # Kafka broker
+  # --------------------
+  kafka:
+    image: confluentinc/cp-kafka:7.6.0
+    container_name: kafka_dthu
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_INTERNAL:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092,PLAINTEXT_INTERNAL://kafka:29092
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT_INTERNAL
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    restart: always
+
+  # --------------------
+  # Elasticsearch
+  # --------------------
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.12.0
+    container_name: elasticsearch_dthu
+    environment:
+      - discovery.type=single-node
+      - ES_JAVA_OPTS=-Xms1g -Xmx1g
+      - xpack.security.enabled=true
+      - ELASTIC_PASSWORD=MyStrongPassword123
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    volumes:
+      - es_data_dthu:/usr/share/elasticsearch/data
+    restart: always
+
+  # --------------------
+  # LiveKit Server (Video Call)
+  # --------------------
+  livekit:
+    image: livekit/livekit-server:latest
+    container_name: livekit_dthu
+    command: --config /etc/livekit.yaml --dev
+    ports:
+      - "7880:7880"
+      - "7881:7881"
+      - "7882:7882/udp"
+    volumes:
+      - ./livekit.yaml:/etc/livekit.yaml
+    restart: always
+
+volumes:
+  es_data_dthu:
+  minio_data_dthu:
+  mongo_data_dthu:

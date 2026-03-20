@@ -3,8 +3,13 @@ set -e
 
 # =============================================================================
 # NKPT Teamflow - Deploy Script
-# Usage: ./deploy.sh [staging|prod|--help]
+# Usage: ./deploy.sh [staging|prod|dthu|--help]
 # =============================================================================
+
+# --- Remote Config ---
+REMOTE_HOST="180.93.144.15"
+REMOTE_USER="root"
+REMOTE_DIR="~/KhoaLuan"
 
 # --- Colors ---
 RED='\033[0;31m'
@@ -30,56 +35,56 @@ detect_docker_compose() {
     elif command -v docker-compose &> /dev/null; then
         echo "docker-compose"
     else
-        print_error "Khong tim thay Docker Compose. Vui long cai dat Docker Compose."
-        exit 1
+        echo "docker compose" # Default fallback
     fi
 }
 
-# --- Usage ---
-show_usage() {
-    echo -e "${BOLD}NKPT Teamflow - Deploy Script${NC}"
-    echo ""
-    echo "Usage: ./deploy.sh [staging|prod]"
-    echo ""
-    echo "  staging - Deploy full stack voi config .env.staging"
-    echo "  prod    - Deploy full stack voi config .env.prod"
-    echo ""
-    echo "Neu khong truyen tham so, ban se duoc hoi chon moi truong."
-}
+# --- Default to dthu for direct deployment ---
+ENV=${1:-"dthu"}
 
-# --- Parse arguments or interactive menu ---
-ENV=""
+# =============================================================================
+# REMOTE DEPLOYMENT (DTHU)
+# =============================================================================
+if [ "$ENV" = "dthu" ]; then
+    echo -e "${BOLD}-------------------------------------------${NC}"
+    echo -e "  Moi truong  : ${YELLOW}REMOTE (DTHU)${NC}"
+    echo -e "  Server      : ${BLUE}${REMOTE_USER}@${REMOTE_HOST}${NC}"
+    echo -e "  Folder      : ${BLUE}${REMOTE_DIR}${NC}"
+    echo -e "  Compose file: ${BLUE}docker-compose.dthu.yml${NC}"
+    echo -e "  Hanh dong   : Sync + Build + Deploy (DIRECT)${NC}"
+    echo -e "${BOLD}-------------------------------------------${NC}"
+    echo ""
 
-if [ "$1" = "--help" ] || [ "$1" = "-h" ]; then
-    show_usage
+    # Step 1: Create remote folder if not exists
+    print_info "Dang kiem tra thu muc tren server..."
+    ssh ${REMOTE_USER}@${REMOTE_HOST} "mkdir -p ${REMOTE_DIR}"
+
+    # Step 2: Sync files to server
+    print_info "Dang tai code len server (rsync/scp)..."
+    if command -v rsync &> /dev/null; then
+        rsync -avz --exclude '.git' --exclude 'node_modules' --exclude 'clientapp/node_modules' --exclude 'data' --exclude 'mongo-data' ./ ${REMOTE_USER}@${REMOTE_HOST}:${REMOTE_DIR}/
+    else
+        print_warning "Rsync khong tim thay, su dung scp (cham hon)..."
+        tar -czf project.tar.gz --exclude='.git' --exclude='node_modules' --exclude='clientapp/node_modules' --exclude='data' --exclude='mongo-data' .
+        scp project.tar.gz ${REMOTE_USER}@${REMOTE_HOST}:${REMOTE_DIR}/
+        ssh ${REMOTE_USER}@${REMOTE_HOST} "cd ${REMOTE_DIR} && tar -xzf project.tar.gz && rm project.tar.gz"
+        rm project.tar.gz
+    fi
+    print_success "Da tai code len server."
+
+    # Step 3: Run docker-compose on server
+    print_info "Dang build va khoi dong containers tren server..."
+    ssh ${REMOTE_USER}@${REMOTE_HOST} "cd ${REMOTE_DIR} && \
+        docker compose -f docker-compose.dthu.yml up -d --build --remove-orphans && \
+        docker image prune -f"
+    
+    print_success "Deploy REMOTE [${REMOTE_HOST}] hoan tat! ($(date '+%Y-%m-%d %H:%M:%S'))"
     exit 0
-elif [ "$1" = "staging" ] || [ "$1" = "prod" ]; then
-    ENV="$1"
-elif [ -n "$1" ]; then
-    print_error "Moi truong khong hop le: $1"
-    echo ""
-    show_usage
-    exit 1
-else
-    echo ""
-    echo -e "${BOLD}==========================================${NC}"
-    echo -e "${BOLD}  NKPT Teamflow - Deploy Script${NC}"
-    echo -e "${BOLD}==========================================${NC}"
-    echo ""
-    echo "Chon moi truong deploy:"
-    echo -e "  ${GREEN}1)${NC} staging - Moi truong staging"
-    echo -e "  ${GREEN}2)${NC} prod    - Moi truong production"
-    echo ""
-    read -p "Nhap lua chon [1/2]: " choice
-    case "$choice" in
-        1) ENV="staging" ;;
-        2) ENV="prod" ;;
-        *)
-            print_error "Lua chon khong hop le."
-            exit 1
-            ;;
-    esac
 fi
+
+# =============================================================================
+# LOCAL DEPLOYMENT (STAGING/PROD)
+# =============================================================================
 
 # --- Set env file ---
 ENV_FILE=".env.${ENV}"
@@ -94,13 +99,10 @@ fi
 validate_env() {
     local missing=()
     while IFS= read -r line; do
-        # Skip comments and empty lines
         [[ "$line" =~ ^[[:space:]]*# ]] && continue
         [[ -z "${line// }" ]] && continue
-        # Get key and value
         key="${line%%=*}"
         value="${line#*=}"
-        # Check if value is empty or placeholder
         if [ -z "$value" ] || [ "$value" = "YOUR_PASSWORD" ]; then
             missing+=("$key")
         fi
@@ -124,10 +126,8 @@ COMPOSE_FILE="docker-compose.prod.yml"
 COMPOSE_CMD=$(detect_docker_compose)
 CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown")
 
-# --- Validate env ---
 validate_env
 
-# --- Confirmation ---
 echo ""
 echo -e "${BOLD}-------------------------------------------${NC}"
 echo -e "  Moi truong  : ${YELLOW}${ENV}${NC}"
@@ -145,28 +145,21 @@ if [ "$confirm" != "y" ] && [ "$confirm" != "Y" ]; then
 fi
 
 echo ""
-
-# --- Step 1: Git pull ---
 print_info "Dang pull code moi nhat..."
 git pull
 print_success "Da cap nhat code."
 
-# --- Step 2: Build and start containers with env file ---
 print_info "Dang build va khoi dong containers (${ENV})..."
 $COMPOSE_CMD --env-file "$ENV_FILE" -f "$COMPOSE_FILE" up -d --build --remove-orphans
 print_success "Containers da khoi dong."
 
-# --- Step 3: Cleanup ---
 print_info "Dang don dep images khong su dung..."
 docker image prune -f
 print_success "Da don dep xong."
 
-# --- Step 4: Show status ---
 echo ""
 print_info "Trang thai containers:"
 echo ""
 $COMPOSE_CMD --env-file "$ENV_FILE" -f "$COMPOSE_FILE" ps
 
-# --- Done ---
-echo ""
 print_success "Deploy [${ENV}] hoan tat! ($(date '+%Y-%m-%d %H:%M:%S'))"

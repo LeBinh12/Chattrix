@@ -10,6 +10,7 @@ import { Search } from "lucide-react";
 import { Howl } from "howler";
 import { TING } from "../../assets/paths";
 import { LOGO } from "../../assets/paths";
+import { API_BASE_URL } from "../../config/api";
 
 type ConversationSocketPayload = {
   type?: string;
@@ -98,6 +99,7 @@ export default function MessagesTab({ onFriend, onOpenId }: Props) {
           status: oldConv?.status || "offline",
           updated_at: new Date().toISOString(),
           sender_id: msg.sender_id,
+          last_message_id: oldConv?.last_message_id || "",
         };
 
         // Nếu đã tồn tại conversation, xóa cũ và thêm mới lên đầu
@@ -194,7 +196,7 @@ export default function MessagesTab({ onFriend, onOpenId }: Props) {
               <div
                 onClick={() => {
                   onFriend(conv);
-                  onOpenId?.(conv.user_id || conv.group_id);
+                  onOpenId?.(conv.user_id || conv.group_id || "");
                 }}
                 className="flex items-center p-4 bg-purple-50 rounded-lg shadow-sm hover:bg-[#cedbfb] transition cursor-pointer"
               >
@@ -202,7 +204,7 @@ export default function MessagesTab({ onFriend, onOpenId }: Props) {
                   <img
                     src={
                       conv.avatar && conv.avatar !== "null"
-                        ? `http://localhost:3000/v1/upload/media/${conv.avatar}`
+                        ? `${API_BASE_URL}/upload/media/${conv.avatar}`
                         : LOGO
                     }
                     alt={conv.display_name}
