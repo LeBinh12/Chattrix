@@ -8,6 +8,8 @@ services:
         - VITE_GO_URL=http://180.93.144.15:9002/v1
     ports:
       - "9001:9001"
+    networks:
+      - elasticsearch_default
     restart: always
 
 
@@ -41,4 +43,24 @@ services:
       - LIVEKIT_API_SECRET=secret
       - LIVEKIT_URL=http://livekit_dthu:7880
 
+    networks:
+      - elasticsearch_default
+      - mongodb_default
+      - kafka_default
+      - livekit_default
+
     restart: always
+
+
+networks:
+  elasticsearch_default:
+    external: true
+
+  mongodb_default:
+    external: true
+
+  kafka_default:
+    external: true
+
+  livekit_default:
+    external: true
