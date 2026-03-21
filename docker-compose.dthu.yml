@@ -40,9 +40,3 @@ services:
       - LIVEKIT_API_SECRET=secret
       - LIVEKIT_URL=http://180.93.144.15:7880
     restart: always
-    networks:
-      - chattrix-network
-
-networks:
-  chattrix-network:
-    external: true
