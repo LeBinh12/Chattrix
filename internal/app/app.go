@@ -10,8 +10,8 @@ import (
 	"my-app/common/kafka"
 	"my-app/config"
 	"my-app/database"
+	"my-app/internal/indexer"
 	"my-app/internal/seeder"
-	"my-app/modules/chat/storage"
 	chatws "my-app/modules/chat/transport/websocket"
 	"my-app/modules/loadtest"
 	"my-app/utils"
@@ -47,7 +47,7 @@ func New(ctx context.Context, cfg config.AppConfig) (*Application, error) {
 		log.Println("Checking database seeding...")
 		seeder.Execute(db)
 		log.Println("Ensuring database indexes...")
-		storage.EnsureChatIndexes(ctx, db)
+		indexer.Execute(db)
 	}()
 
 	if err := kafka.InitAsyncProducer(cfg.Kafka.Brokers); err != nil {

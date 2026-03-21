@@ -54,17 +54,65 @@ func Execute(db *mongo.Database) {
 
 	// 2. Collection "chat_seen_status"
 	seenStatus := db.Collection("chat_seen_status")
-	createIndex(ctx, seenStatus, "user_conv", bson.D{
+	createIndex(ctx, seenStatus, "idx_user_conv_unique", bson.D{
 		{Key: "user_id", Value: 1},
 		{Key: "conversation_id", Value: 1},
-	}, true) // Unique if needed
+	}, true)
 
 	// 3. Collection "group_user_roles"
 	groupRoles := db.Collection("group_user_roles")
-	createIndex(ctx, groupRoles, "group_user", bson.D{
+	createIndex(ctx, groupRoles, "idx_group_user_unique", bson.D{
 		{Key: "group_id", Value: 1},
 		{Key: "user_id", Value: 1},
 	}, true)
+
+	// 4. Collection "users"
+	users := db.Collection("users")
+	createIndex(ctx, users, "idx_username_unique", bson.D{
+		{Key: "username", Value: 1},
+	}, true)
+	createIndex(ctx, users, "idx_email_unique", bson.D{
+		{Key: "email", Value: 1},
+	}, true)
+
+	// 5. Collection "friend_ship"
+	friendShip := db.Collection("friend_ship")
+	createIndex(ctx, friendShip, "idx_user_friend", bson.D{
+		{Key: "user_id", Value: 1},
+		{Key: "friend_id", Value: 1},
+	}, false)
+
+	// 6. Collection "user_roles"
+	userRoles := db.Collection("user_roles")
+	createIndex(ctx, userRoles, "idx_user_role", bson.D{
+		{Key: "user_id", Value: 1},
+		{Key: "role_id", Value: 1},
+	}, false)
+
+	// 7. Collection "roles"
+	roles := db.Collection("roles")
+	createIndex(ctx, roles, "idx_role_code_unique", bson.D{
+		{Key: "code", Value: 1},
+	}, true)
+
+	// 8. Collection "permissions"
+	permissions := db.Collection("permissions")
+	createIndex(ctx, permissions, "idx_perm_code_unique", bson.D{
+		{Key: "code", Value: 1},
+	}, true)
+
+	// 9. Collection "modules"
+	modules := db.Collection("modules")
+	createIndex(ctx, modules, "idx_module_code_unique", bson.D{
+		{Key: "code", Value: 1},
+	}, true)
+
+	// 10. Collection "role_permissions"
+	rolePerms := db.Collection("role_permissions")
+	createIndex(ctx, rolePerms, "idx_role_perm", bson.D{
+		{Key: "role_id", Value: 1},
+		{Key: "permission_id", Value: 1},
+	}, false)
 
 	log.Println("✅ All indexes created successfully.")
 }
