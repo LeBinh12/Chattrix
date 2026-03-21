@@ -112,7 +112,7 @@ export default function ChatHeaderWindow({
       {/* Right: Action buttons */}
       <div className="!flex !items-center !gap-1">
         {/* Call button stays outside for quick access */}
-        <button
+        {/* <button
           onClick={onToggleCall}
           className={`!flex !items-center !justify-center !w-8 !h-8 !rounded-full !transition-colors !cursor-pointer 
             ${isCalling
@@ -127,7 +127,7 @@ export default function ChatHeaderWindow({
           ) : (
             <Video size={18} strokeWidth={2} />
           )}
-        </button>
+        </button> */}
 
         {/* 3-dot More Options Menu */}
         <div className="relative" ref={menuRef}>
