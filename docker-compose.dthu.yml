@@ -1,42 +1,31 @@
-services:
-  # --------------------
-  # Frontend (Client App)
-  # --------------------
-  frontend:
-    build:
-      context: ./clientapp
-      dockerfile: Dockerfile
-      args:
-        - VITE_GO_URL=http://180.93.144.15:9002/v1
-    ports:
-      - "9001:9001"
-    restart: always
+backend:
+  build:
+    context: .
+    dockerfile: Dockerfile
+  ports:
+    - "9002:3000"
+  environment:
+    - HTTP_ADDRESS=0.0.0.0:3000
 
+    - MONGO_URI=mongodb://root:19006292@localhost:27018/unichat?authSource=admin
+    - MONGO_DB=unichat
 
-  # --------------------
-  # Backend (Go API)
-  # --------------------
-  backend:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    ports:
-      - "9002:3000"
-    environment:
-      - HTTP_ADDRESS=0.0.0.0:3000
-      - MONGO_URI=mongodb://root:19006292@mongodb_dthu:27017/unichat?authSource=admin
-      - MONGO_DB=unichat
-      - KAFKA_BROKERS=kafka_dthu:29092
-      - KAFKA_GROUP_ID=chat-group
-      - ES_ADDRESSES=http://elasticsearch_dthu:9200
-      - ES_USER=elastic
-      - ES_PASSWORD=MyStrongPassword123
-      - MINIO_ENDPOINT=minio-minio-1:9000
-      - MINIO_ROOT_USER=dthuadmin
-      - MINIO_ROOT_PASSWORD=SuperStrongPwd123!
-      - MINIO_USE_SSL=false
-      - CORS_ALLOWED_ORIGINS=http://180.93.144.15:9001
-      - LIVEKIT_API_KEY=devkey
-      - LIVEKIT_API_SECRET=secret
-      - LIVEKIT_URL=http://180.93.144.15:7880
-    restart: always
+    - KAFKA_BROKERS=localhost:9092
+    - KAFKA_GROUP_ID=chat-group
+
+    - ES_ADDRESSES=http://localhost:9200
+    - ES_USER=elastic
+    - ES_PASSWORD=MyStrongPassword123
+
+    - MINIO_ENDPOINT=localhost:9000
+    - MINIO_ROOT_USER=dthuadmin
+    - MINIO_ROOT_PASSWORD=SuperStrongPwd123!
+    - MINIO_USE_SSL=false
+
+    - CORS_ALLOWED_ORIGINS=http://180.93.144.15:9001
+
+    - LIVEKIT_API_KEY=devkey
+    - LIVEKIT_API_SECRET=secret
+    - LIVEKIT_URL=http://180.93.144.15:7880
+
+  restart: always
