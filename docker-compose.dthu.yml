@@ -11,8 +11,7 @@ services:
     ports:
       - "9001:9001"
     restart: always
-    networks:
-      - chattrix-network
+
 
   # --------------------
   # Backend (Go API)
