@@ -8,10 +8,14 @@ import (
 	"my-app/modules/chat/models"
 
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 func (s *MongoChatStore) SaveMessage(ctx context.Context, msg *models.Message) error {
 	_, err := s.db.Collection("messages").InsertOne(ctx, msg)
+	if mongo.IsDuplicateKeyError(err) {
+		return nil
+	}
 	return err
 }
 

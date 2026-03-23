@@ -286,6 +286,14 @@ func (c *chatConsumer) commitWorker(ctx context.Context) {
 			commitBatch = commitBatch[:0]
 
 		case <-ctx.Done():
+			// Final flush on shutdown
+			if len(commitBatch) > 0 {
+				for _, t := range commitBatch {
+					t.session.MarkMessage(t.message, "")
+				}
+				commitBatch[0].session.Commit()
+				log.Printf(" [Consumer] Final flush: committed %d messages before shutdown", len(commitBatch))
+			}
 			return
 		}
 	}
