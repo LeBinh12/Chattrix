@@ -9,12 +9,11 @@ import (
 )
 
 func (s *MongoChatStore) getUserConversations(ctx context.Context, userObjectID primitive.ObjectID, page, limit int, keyword string, filterIDs []primitive.ObjectID) ([]temp, int64, error) {
-	// 1. If no search/filter, use optimized path (Message-driven) for high performance
-	if keyword == "" && len(filterIDs) == 0 {
-		return s.getUserConversationsOptimized(ctx, userObjectID, page, limit)
-	}
+	// Bỏ redirection sang optimized để lấy tất cả user ngay cả khi chưa có tin nhắn
+	// if keyword == "" && len(filterIDs) == 0 {
+	// 	return s.getUserConversationsOptimized(ctx, userObjectID, page, limit)
+	// }
 
-	// 2. Otherwise use User-driven path (for search)
 	userCollection := s.db.Collection("users")
 
 	filter := bson.M{
@@ -30,7 +29,7 @@ func (s *MongoChatStore) getUserConversations(ctx context.Context, userObjectID 
 		filter["_id"] = bson.M{"$in": filterIDs}
 	}
 
-	// 3. Pipeline optimization: Pagination should be EARLY if possible, 
+	// 3. Pipeline optimization: Pagination should be EARLY if possible,
 	// but since we sort by last_message.created_at later, we can't fully skip.
 	// However, we can at least avoid counting unread for ALL users during a search.
 
