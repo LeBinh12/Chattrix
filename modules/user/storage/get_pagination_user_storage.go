@@ -73,15 +73,7 @@ func (s *mongoStore) GetPaginatedUsersWithStatus(ctx context.Context, page, limi
 	}
 
 	pipeline = append(pipeline,
-		// 2. Join with messages to count messages
-		bson.D{{Key: "$lookup", Value: bson.M{
-			"from":         "messages",
-			"localField":   "_id",
-			"foreignField": "sender_id",
-			"as":           "messages_info",
-		}}},
-
-		// 2.1 Join with user_roles to get role_ids
+		// 2. Join with user_roles to get role_ids
 		bson.D{{Key: "$lookup", Value: bson.M{
 			"from":         "user_roles",
 			"localField":   "_id",
@@ -89,7 +81,7 @@ func (s *mongoStore) GetPaginatedUsersWithStatus(ctx context.Context, page, limi
 			"as":           "user_roles_info",
 		}}},
 
-		// 2.2 Join with roles collection to get role name
+		// 2.1 Join with roles collection to get role name
 		bson.D{{Key: "$lookup", Value: bson.M{
 			"from": "roles",
 			"let": bson.M{
@@ -112,7 +104,26 @@ func (s *mongoStore) GetPaginatedUsersWithStatus(ctx context.Context, page, limi
 			"as": "roles_info",
 		}}},
 
-		// 3. Project - KEEP STRUCTURE, do not nest into "user"
+		// 3. Sort online first, newest later
+		bson.D{{Key: "$sort", Value: bson.D{
+			{Key: "temp_status", Value: -1},
+			{Key: "updated_at", Value: -1},
+		}}},
+
+		// 4. Pagination
+		bson.D{{Key: "$skip", Value: (page - 1) * limit}},
+		bson.D{{Key: "$limit", Value: limit}},
+
+		// 5. Join with messages to count messages - AFTER PAGINATION
+		// This ensures we only count for the current page of users
+		bson.D{{Key: "$lookup", Value: bson.M{
+			"from":         "messages",
+			"localField":   "_id",
+			"foreignField": "sender_id",
+			"as":           "messages_info",
+		}}},
+
+		// 6. Project final format - do not nest into "user"
 		bson.D{{Key: "$project", Value: bson.M{
 			"_id":                       1,
 			"created_at":                1,
@@ -142,20 +153,10 @@ func (s *mongoStore) GetPaginatedUsersWithStatus(ctx context.Context, page, limi
 							"name": "$$role.name",
 						},
 					}},
-					[]interface{}{}, // Return empty array if roles_info is null
+					[]interface{}{},
 				},
 			},
 		}}},
-
-		// 4. Sort online first, newest later
-		bson.D{{Key: "$sort", Value: bson.D{
-			{Key: "status", Value: -1},
-			{Key: "updated_at", Value: -1},
-		}}},
-
-		// 5. Pagination
-		bson.D{{Key: "$skip", Value: (page - 1) * limit}},
-		bson.D{{Key: "$limit", Value: limit}},
 	)
 
 	cursor, err := collection.Aggregate(ctx, pipeline)

@@ -47,9 +47,26 @@ func Execute(db *mongo.Database) {
 		{Key: "created_at", Value: -1},
 	}, false)
 
-	// Deleted for (thường dùng cho query lọc tin nhắn đã xóa)
+	// Deleted for
 	createIndex(ctx, messages, "deleted_for", bson.D{
 		{Key: "deleted_for", Value: 1},
+	}, false)
+	
+	// Optimized for conversation list
+	createIndex(ctx, messages, "idx_msg_conv_sender", bson.D{
+		{Key: "sender_id", Value: 1},
+		{Key: "deleted_for", Value: 1},
+		{Key: "group_id", Value: 1},
+		{Key: "parent_message_id", Value: 1},
+		{Key: "created_at", Value: -1},
+	}, false)
+	
+	createIndex(ctx, messages, "idx_msg_conv_receiver", bson.D{
+		{Key: "receiver_id", Value: 1},
+		{Key: "deleted_for", Value: 1},
+		{Key: "group_id", Value: 1},
+		{Key: "parent_message_id", Value: 1},
+		{Key: "created_at", Value: -1},
 	}, false)
 
 	// 2. Collection "chat_seen_status"
@@ -58,6 +75,13 @@ func Execute(db *mongo.Database) {
 		{Key: "user_id", Value: 1},
 		{Key: "conversation_id", Value: 1},
 	}, true)
+
+	// User Status (cho sorting)
+	userStatus := db.Collection("user_status")
+	createIndex(ctx, userStatus, "idx_status_updated", bson.D{
+		{Key: "status", Value: -1},
+		{Key: "updated_at", Value: -1},
+	}, false)
 
 	// 3. Collection "group_user_roles"
 	groupRoles := db.Collection("group_user_roles")
@@ -74,6 +98,19 @@ func Execute(db *mongo.Database) {
 	createIndex(ctx, users, "idx_email_unique", bson.D{
 		{Key: "email", Value: 1},
 	}, true)
+	
+	// Performance optimization for user management
+	createIndex(ctx, users, "idx_user_status_sort", bson.D{
+		{Key: "is_deleted", Value: 1},
+		{Key: "status", Value: -1},
+		{Key: "updated_at", Value: -1},
+	}, false)
+	createIndex(ctx, users, "idx_user_display_name", bson.D{
+		{Key: "display_name", Value: 1},
+	}, false)
+	createIndex(ctx, users, "idx_user_phone", bson.D{
+		{Key: "phone", Value: 1},
+	}, false)
 
 	// 5. Collection "friend_ship"
 	friendShip := db.Collection("friend_ship")

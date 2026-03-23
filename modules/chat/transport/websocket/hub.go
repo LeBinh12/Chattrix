@@ -26,6 +26,7 @@ type Hub struct {
 	Register   chan *Client
 	Unregister chan *Client
 	Cache      *sync.Map
+	mu         sync.RWMutex
 }
 
 type HubEvent struct {
@@ -51,22 +52,30 @@ func (h *Hub) Run() {
 	for {
 		select {
 		case client := <-h.Register:
+			h.mu.Lock()
 			if h.Clients[client.UserID] == nil {
 				h.Clients[client.UserID] = make(map[string]*Client)
 			}
 			h.Clients[client.UserID][client.SessionID] = client
+			h.mu.Unlock()
 			client.LastSeen = time.Now()
 
 			h.BroadcastUserStatus(client.UserID, "online")
 
 		case client := <-h.Unregister:
+			h.mu.Lock()
 			sessions := h.Clients[client.UserID]
-			delete(sessions, client.SessionID)
+			if sessions != nil {
+				delete(sessions, client.SessionID)
+				if len(sessions) == 0 {
+					delete(h.Clients, client.UserID)
+				}
+			}
+			h.mu.Unlock()
 
 			// Nếu user hết session -> offline
-			if len(sessions) == 0 {
+			if sessions == nil || len(sessions) == 0 {
 				h.BroadcastUserStatus(client.UserID, "offline")
-				delete(h.Clients, client.UserID)
 			}
 
 			client.SafeClose()
@@ -753,7 +762,7 @@ func (h *Hub) BroadcastUserStatus(userID, status string) {
 	}
 	data, _ := json.Marshal(event)
 
-	// Kiểm tra nếu là stress user thì không broadcast (tiết kiệm CPU O(N^2))
+	h.mu.RLock()
 	isStress := false
 	if sessions, ok := h.Clients[userID]; ok {
 		for _, c := range sessions {
@@ -763,10 +772,13 @@ func (h *Hub) BroadcastUserStatus(userID, status string) {
 			}
 		}
 	}
+	h.mu.RUnlock()
+
 	if isStress {
 		return
 	}
 
+	h.mu.RLock()
 	// gửi tới tất cả client khác - nhưng bỏ qua stress users (họ không cần xem status)
 	for _, sessions := range h.Clients {
 		for _, c := range sessions {
@@ -780,6 +792,7 @@ func (h *Hub) BroadcastUserStatus(userID, status string) {
 			}
 		}
 	}
+	h.mu.RUnlock()
 
 	// Lưu DB + Kafka - CHỈ CHO USER THẬT
 	kafka.SendMessageAsync("user-status-topic", userID, string(data))
@@ -791,6 +804,7 @@ func (h *Hub) CheckOfflineTimeout() {
 
 	for range ticker.C {
 		now := time.Now()
+		h.mu.RLock()
 		for userID, sessions := range h.Clients {
 			for sessionID, c := range sessions {
 				if now.Sub(c.LastSeen) > 60*time.Second {
@@ -799,6 +813,7 @@ func (h *Hub) CheckOfflineTimeout() {
 				}
 			}
 		}
+		h.mu.RUnlock()
 	}
 }
 
@@ -916,13 +931,19 @@ func (h *Hub) broadcastChatMessage(msg *models.MessageResponse) {
 }
 
 func (h *Hub) sendToUser(userID string, data []byte) {
-	if sessions, ok := h.Clients[userID]; ok {
-		for _, c := range sessions {
-			select {
-			case c.Send <- data:
-			default:
-				// Buffer full
-			}
+	h.mu.RLock()
+	sessions, ok := h.Clients[userID]
+	if !ok {
+		h.mu.RUnlock()
+		return
+	}
+
+	for _, c := range sessions {
+		select {
+		case c.Send <- data:
+		default:
+			// Buffer full
 		}
 	}
+	h.mu.RUnlock()
 }

@@ -9,11 +9,12 @@ import (
 )
 
 func (s *MongoChatStore) getUserConversations(ctx context.Context, userObjectID primitive.ObjectID, page, limit int, keyword string, filterIDs []primitive.ObjectID) ([]temp, int64, error) {
-	// Bỏ redirection sang optimized để lấy tất cả user ngay cả khi chưa có tin nhắn
-	// if keyword == "" && len(filterIDs) == 0 {
-	// 	return s.getUserConversationsOptimized(ctx, userObjectID, page, limit)
-	// }
+	// 1. If no search/filter, use optimized path (Message-driven) for high performance
+	if keyword == "" && len(filterIDs) == 0 {
+		return s.getUserConversationsOptimized(ctx, userObjectID, page, limit)
+	}
 
+	// 2. Otherwise use User-driven path (for search)
 	userCollection := s.db.Collection("users")
 
 	filter := bson.M{
@@ -29,107 +30,96 @@ func (s *MongoChatStore) getUserConversations(ctx context.Context, userObjectID 
 		filter["_id"] = bson.M{"$in": filterIDs}
 	}
 
-	matchUsers := bson.D{{"$match", filter}}
+	// 3. Pipeline optimization: Pagination should be EARLY if possible, 
+	// but since we sort by last_message.created_at later, we can't fully skip.
+	// However, we can at least avoid counting unread for ALL users during a search.
 
-	lookupMessages := bson.D{{
-		"$lookup", bson.M{
-			"from": "messages",
-			"let":  bson.M{"partnerId": "$_id", "userId": userObjectID},
-			"pipeline": []bson.M{
-				{"$match": bson.M{
-					"$expr": bson.M{
-						"$or": []bson.M{
-							{"$and": []bson.M{
-								{"$eq": []interface{}{"$sender_id", "$$userId"}},
-								{"$eq": []interface{}{"$receiver_id", "$$partnerId"}},
-							}},
-							{"$and": []bson.M{
+	pipeline := mongo.Pipeline{
+		bson.D{{"$match", filter}},
+		// Sort by display name if searching
+		bson.D{{"$sort", bson.M{"display_name": 1}}},
+		bson.D{{"$skip", int64((page - 1) * limit)}},
+		bson.D{{"$limit", int64(limit)}},
+
+		// Only lookup details for the 20 users on the current page
+		bson.D{{
+			"$lookup", bson.M{
+				"from": "messages",
+				"let":  bson.M{"partnerId": "$_id", "userId": userObjectID},
+				"pipeline": []bson.M{
+					{"$match": bson.M{
+						"$expr": bson.M{
+							"$or": []bson.M{
+								{"$and": []bson.M{
+									{"$eq": []interface{}{"$sender_id", "$$userId"}},
+									{"$eq": []interface{}{"$receiver_id", "$$partnerId"}},
+								}},
+								{"$and": []bson.M{
+									{"$eq": []interface{}{"$sender_id", "$$partnerId"}},
+									{"$eq": []interface{}{"$receiver_id", "$$userId"}},
+								}},
+							},
+						},
+						"deleted_for":       bson.M{"$ne": userObjectID},
+						"parent_message_id": bson.M{"$exists": false},
+					}},
+					{"$sort": bson.M{"created_at": -1}},
+					{"$limit": 1},
+				},
+				"as": "last_message",
+			},
+		}},
+		bson.D{{"$unwind", bson.M{"path": "$last_message", "preserveNullAndEmptyArrays": true}}},
+
+		bson.D{{
+			"$lookup", bson.M{
+				"from": "messages",
+				"let":  bson.M{"partnerId": "$_id", "userId": userObjectID},
+				"pipeline": []bson.M{
+					{"$match": bson.M{
+						"$expr": bson.M{
+							"$and": []bson.M{
 								{"$eq": []interface{}{"$sender_id", "$$partnerId"}},
 								{"$eq": []interface{}{"$receiver_id", "$$userId"}},
-							}},
+								{"$eq": []interface{}{"$is_read", false}},
+								{"$ne": []interface{}{"$type", "system"}},
+								{"$or": []bson.M{
+									{"$eq": []interface{}{"$parent_message_id", nil}},
+									{"$not": []interface{}{bson.M{"$ifNull": []interface{}{"$parent_message_id", false}}}},
+								}},
+							},
 						},
-					},
-					"deleted_for":       bson.M{"$ne": userObjectID},
-					"parent_message_id": bson.M{"$exists": false},
-				}},
-				{"$sort": bson.M{"created_at": -1}},
-				{"$limit": 1},
+					}},
+				},
+				"as": "unread_messages",
 			},
-			"as": "last_message",
-		},
-	}}
-
-	unwindMsg := bson.D{{"$unwind", bson.M{"path": "$last_message", "preserveNullAndEmptyArrays": true}}}
-
-	addUnread := bson.D{{
-		"$lookup", bson.M{
-			"from": "messages",
-			"let":  bson.M{"partnerId": "$_id", "userId": userObjectID},
-			"pipeline": []bson.M{
-				{"$match": bson.M{
-					"$expr": bson.M{
-						"$and": []bson.M{
-							{"$eq": []interface{}{"$sender_id", "$$partnerId"}},
-							{"$eq": []interface{}{"$receiver_id", "$$userId"}},
-							{"$eq": []interface{}{"$is_read", false}},
-							{"$ne": []interface{}{"$type", "system"}},
-							{"$or": []bson.M{
-								{"$eq": []interface{}{"$parent_message_id", nil}},
-								{"$not": []interface{}{bson.M{"$ifNull": []interface{}{"$parent_message_id", false}}}},
-							}},
-						},
-					},
-				}},
+		}},
+		bson.D{{
+			"$addFields", bson.M{
+				"unread_count": bson.M{"$size": "$unread_messages"},
 			},
-			"as": "unread_messages",
-		},
-	}}
+		}},
 
-	lookupStatus := bson.D{{
-		"$lookup", bson.M{
-			"from":         "user_status",
-			"localField":   "_id",
-			"foreignField": "user_id",
-			"as":           "status_info",
-		},
-	}}
+		bson.D{{
+			"$lookup", bson.M{
+				"from":         "user_status",
+				"localField":   "_id",
+				"foreignField": "user_id",
+				"as":           "status_info",
+			},
+		}},
+		bson.D{{"$unwind", bson.M{"path": "$status_info", "preserveNullAndEmptyArrays": true}}},
 
-	unwindStatus := bson.D{{"$unwind", bson.M{"path": "$status_info", "preserveNullAndEmptyArrays": true}}}
-
-	addStatusFields := bson.D{{
-		"$addFields", bson.M{
-			"status":     "$status_info.status",
-			"updated_at": "$status_info.updated_at",
-			"is_deleted": "$is_deleted",
-		},
-	}}
-
-	addUnreadCount := bson.D{{
-		"$addFields", bson.M{
-			"unread_count": bson.M{"$size": "$unread_messages"},
-		},
-	}}
-
-	sortByLastMessage := bson.D{{"$sort", bson.M{"last_message.created_at": -1}}}
-
-	skipLimit := []bson.D{
-		{{"$skip", int64((page - 1) * limit)}},
-		{{"$limit", int64(limit)}},
+		bson.D{{
+			"$addFields", bson.M{
+				"status":     "$status_info.status",
+				"updated_at": "$status_info.updated_at",
+				"is_deleted": "$is_deleted",
+			},
+		}},
 	}
 
-	cursor, err := userCollection.Aggregate(ctx, mongo.Pipeline{
-		matchUsers,
-		lookupMessages,
-		unwindMsg,
-		addUnread,
-		addUnreadCount,
-		lookupStatus,
-		unwindStatus,
-		addStatusFields,
-		sortByLastMessage,
-		skipLimit[0],
-		skipLimit[1],
-	})
+	cursor, err := userCollection.Aggregate(ctx, pipeline)
 	if err != nil {
 		return nil, 0, err
 	}
