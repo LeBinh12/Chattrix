@@ -102,6 +102,8 @@ export default function ChannelList({ width }: ChannelListProps) {
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [activeClassifications, setActiveClassifications] = useState<string[]>([]);
+  const [isSearchOpen, setIsSearchOpen] = useState(false); // For narrow/mobile: toggle search bar
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   // Refs
   const listContainerRef = useRef<HTMLDivElement>(null);
@@ -828,7 +830,10 @@ const loadMore = useCallback(async () => {
                 <motion.button
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
-                  onClick={() => {/* Focus search or open mini search */}}
+                  onClick={() => {
+                    setIsSearchOpen(true);
+                    setTimeout(() => searchInputRef.current?.focus(), 50);
+                  }}
                   className={`!flex !items-center !justify-center !w-8 !h-8 !rounded-full !transition-colors !cursor-pointer !text-[#00568c] hover:!bg-blue-50`}
                   title="Tìm kiếm"
                 >
@@ -849,6 +854,42 @@ const loadMore = useCallback(async () => {
               <UserPlus size={18} />
             </motion.button>
           </div>
+
+          {/* Expanded search bar for narrow/mobile widths */}
+          {isSearchOpen && width <= 280 && (
+            <div className="flex items-center gap-2 px-2 py-1.5 border-b border-gray-100 bg-white">
+              <div className="relative flex-1">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                  <Search size={18} />
+                </span>
+                <input
+                  ref={searchInputRef}
+                  type="text"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Escape") {
+                      setIsSearchOpen(false);
+                      handleClearSearch();
+                    } else {
+                      handleSearchKeyDown(e);
+                    }
+                  }}
+                  placeholder="Tìm kiếm"
+                  className="!w-full !h-8 !pl-9 !pr-9 !text-[13px] !rounded-full focus:!outline-none focus:!ring-2 focus:!ring-[#00568c]/20 !transition-all !border-none !bg-gray-100 !text-gray-900 !placeholder-gray-400 focus:!bg-white focus:!ring-[#00568c]"
+                />
+              </div>
+              <button
+                onClick={() => {
+                  setIsSearchOpen(false);
+                  handleClearSearch();
+                }}
+                className="!flex !items-center !justify-center !w-8 !h-8 !rounded-full !text-gray-400 hover:!text-[#00568c] hover:!bg-blue-50 !transition-colors !cursor-pointer flex-shrink-0"
+              >
+                <X size={18} />
+              </button>
+            </div>
+          )}
 
           {/* Filter Tabs - Zalo Style (Underline) */}
           <div className="flex items-center px-2 mt-0 border-t border-gray-100">

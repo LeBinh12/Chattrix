@@ -9,9 +9,10 @@ import (
 )
 
 func (s *MongoChatStore) getUserConversations(ctx context.Context, userObjectID primitive.ObjectID, page, limit int, keyword string, filterIDs []primitive.ObjectID) ([]temp, int64, error) {
-	if keyword == "" && len(filterIDs) == 0 {
-		return s.getUserConversationsOptimized(ctx, userObjectID, page, limit)
-	}
+	// Bỏ redirection sang optimized để lấy tất cả user ngay cả khi chưa có tin nhắn
+	// if keyword == "" && len(filterIDs) == 0 {
+	// 	return s.getUserConversationsOptimized(ctx, userObjectID, page, limit)
+	// }
 
 	userCollection := s.db.Collection("users")
 
