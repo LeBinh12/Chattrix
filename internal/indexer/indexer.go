@@ -17,57 +17,51 @@ func Execute(db *mongo.Database) {
 	// 1. Collection "messages"
 	messages := db.Collection("messages")
 
-	createIndex(ctx, messages, "sender_receiver_read_id", bson.D{
+	// 1-on-1 Chat History & Unread Count (Consolidated)
+	createIndex(ctx, messages, "idx_msg_1to1_history", bson.D{
 		{Key: "sender_id", Value: 1},
 		{Key: "receiver_id", Value: 1},
+		{Key: "created_at", Value: -1},
 		{Key: "is_read", Value: 1},
-		{Key: "_id", Value: -1},
 	}, false)
 
+	createIndex(ctx, messages, "idx_msg_1to1_reverse", bson.D{
+		{Key: "receiver_id", Value: 1},
+		{Key: "sender_id", Value: 1},
+		{Key: "created_at", Value: -1},
+		{Key: "is_read", Value: 1},
+	}, false)
+
+	// 1. Group Read ID
 	createIndex(ctx, messages, "group_read_id", bson.D{
 		{Key: "group_id", Value: 1},
 		{Key: "is_read", Value: 1},
 		{Key: "_id", Value: -1},
 	}, false)
 
-	createIndex(ctx, messages, "sender_receiver_created", bson.D{
-		{Key: "sender_id", Value: 1},
-		{Key: "receiver_id", Value: 1},
-		{Key: "created_at", Value: -1},
-	}, false)
-
-	createIndex(ctx, messages, "receiver_sender_created", bson.D{
-		{Key: "receiver_id", Value: 1},
-		{Key: "sender_id", Value: 1},
-		{Key: "created_at", Value: -1},
-	}, false)
-
+	// 2. Group Created
 	createIndex(ctx, messages, "group_created", bson.D{
 		{Key: "group_id", Value: 1},
 		{Key: "created_at", Value: -1},
 	}, false)
 
-	// Deleted for
-	createIndex(ctx, messages, "deleted_for", bson.D{
-		{Key: "deleted_for", Value: 1},
-	}, false)
-	
-	// Optimized for conversation list
-	createIndex(ctx, messages, "idx_msg_conv_sender", bson.D{
+	// 3. Partial Indexes for Conversation List (Saves HUGE RAM)
+	// Only indexes root 1-on-1 messages, ignoring group chats and replies
+	createPartialIndex(ctx, messages, "idx_msg_conv_sender_partial", bson.D{
 		{Key: "sender_id", Value: 1},
-		{Key: "deleted_for", Value: 1},
-		{Key: "group_id", Value: 1},
-		{Key: "parent_message_id", Value: 1},
 		{Key: "created_at", Value: -1},
-	}, false)
-	
-	createIndex(ctx, messages, "idx_msg_conv_receiver", bson.D{
+	}, bson.M{
+		"group_id":          bson.M{"$exists": false},
+		"parent_message_id": bson.M{"$exists": false},
+	})
+
+	createPartialIndex(ctx, messages, "idx_msg_conv_receiver_partial", bson.D{
 		{Key: "receiver_id", Value: 1},
-		{Key: "deleted_for", Value: 1},
-		{Key: "group_id", Value: 1},
-		{Key: "parent_message_id", Value: 1},
 		{Key: "created_at", Value: -1},
-	}, false)
+	}, bson.M{
+		"group_id":          bson.M{"$exists": false},
+		"parent_message_id": bson.M{"$exists": false},
+	})
 
 	// 2. Collection "chat_seen_status"
 	seenStatus := db.Collection("chat_seen_status")
@@ -98,13 +92,8 @@ func Execute(db *mongo.Database) {
 	createIndex(ctx, users, "idx_email_unique", bson.D{
 		{Key: "email", Value: 1},
 	}, true)
-	
-	// Performance optimization for user management
-	createIndex(ctx, users, "idx_user_status_sort", bson.D{
-		{Key: "is_deleted", Value: 1},
-		{Key: "status", Value: -1},
-		{Key: "updated_at", Value: -1},
-	}, false)
+
+	// Performance optimization for user search
 	createIndex(ctx, users, "idx_user_display_name", bson.D{
 		{Key: "display_name", Value: 1},
 	}, false)
@@ -164,5 +153,20 @@ func createIndex(ctx context.Context, col *mongo.Collection, name string, keys b
 		log.Printf("⚠️ Could not create index %s on %s: %v", name, col.Name(), err)
 	} else {
 		log.Printf("🚀 Created index %s on %s", name, col.Name())
+	}
+}
+
+func createPartialIndex(ctx context.Context, col *mongo.Collection, name string, keys bson.D, filter bson.M) {
+	indexModel := mongo.IndexModel{
+		Keys: keys,
+		Options: options.Index().
+			SetName(name).
+			SetPartialFilterExpression(filter),
+	}
+	_, err := col.Indexes().CreateOne(ctx, indexModel)
+	if err != nil {
+		log.Printf("⚠️ Could not create partial index %s on %s: %v", name, col.Name(), err)
+	} else {
+		log.Printf("🚀 Created partial index %s on %s", name, col.Name())
 	}
 }
