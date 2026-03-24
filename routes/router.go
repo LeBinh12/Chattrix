@@ -51,8 +51,13 @@ func InitRouter(r *gin.Engine, db *mongo.Database, hub *websocket.Hub, esClient 
 	v1NoMiddleware := r.Group("/v1")
 	{
 		api.RegisterChatRoutes(v1NoMiddleware, db, hub)
+	}
+
+	v1LoadTest := r.Group("/v1")
+	v1LoadTest.Use(middleware.LoggerMiddleware())
+	{
 		// Load test routes — không cần auth để tiện gọi từ dashboard
-		api.RegisterLoadTestRoutes(v1NoMiddleware, db)
+		api.RegisterLoadTestRoutes(v1LoadTest, db)
 	}
 
 	v1Upload := r.Group("/v1")

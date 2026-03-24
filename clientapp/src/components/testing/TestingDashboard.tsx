@@ -651,6 +651,14 @@ const TestingDashboard: React.FC = () => {
                   <BarChart3 size={18} className="text-brand-600 group-hover:scale-110 transition-transform" />
                   So sánh Kịch bản
                 </button>
+
+                <button
+                  onClick={() => window.open(`${API_BASE}/download-logs`, '_blank')}
+                  className="flex items-center gap-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 px-6 py-3 rounded-2xl transition-all font-semibold text-base group text-slate-700"
+                >
+                  <Download size={18} className="text-brand-600 group-hover:scale-110 transition-transform" />
+                  Tải log (.zip)
+                </button>
               </div>
             </div>
           </div>

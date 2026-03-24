@@ -4,9 +4,11 @@
 package loadtest
 
 import (
+	"archive/zip"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"math/rand"
 	"net/http"
@@ -27,8 +29,23 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"golang.org/x/crypto/bcrypt"
 
+	"github.com/natefinch/lumberjack"
+	"github.com/rs/zerolog"
 	"github.com/shirou/gopsutil/v3/cpu"
 )
+
+var ltLogger zerolog.Logger
+
+func init() {
+	ltLogger = zerolog.New(&lumberjack.Logger{
+		Filename:   "logs/loadtest.log",
+		MaxSize:    5, // megabytes
+		MaxBackups: 3,
+		MaxAge:     7, //days
+		Compress:   true,
+		LocalTime:  true,
+	}).With().Timestamp().Logger()
+}
 
 // ======================== Types ========================
 
@@ -570,7 +587,7 @@ func BroadcastMessage(c *gin.Context) {
 		serverURL := "ws://localhost:8088/v1/chat/ws"
 		conn, err := connectWS(serverURL, sender.ID.Hex())
 		if err != nil {
-			log.Printf("[Broadcast] Failed to connect sender: %v", err)
+			ltLogger.Error().Err(err).Str("sender_id", sender.ID.Hex()).Msg("[Broadcast] Failed to connect sender")
 			return
 		}
 		defer conn.Close()
@@ -596,7 +613,7 @@ func BroadcastMessage(c *gin.Context) {
 			}
 			data, _ := json.Marshal(msgPayload)
 			if err := conn.WriteMessage(websocket.TextMessage, data); err != nil {
-				log.Printf("[Broadcast] Failed to send batch %d-%d: %v", i, end, err)
+				ltLogger.Error().Err(err).Int("batch_start", i).Int("batch_end", end).Msg("[Broadcast] Failed to send batch")
 				return
 			}
 
@@ -604,7 +621,10 @@ func BroadcastMessage(c *gin.Context) {
 				time.Sleep(time.Duration(req.IntervalMs) * time.Millisecond)
 			}
 		}
-		log.Printf("[Broadcast] Finished sending to %d users in batches of %d", len(receiverIDs), req.BatchSize)
+		ltLogger.Info().
+			Int("receiver_count", len(receiverIDs)).
+			Int("batch_size", req.BatchSize).
+			Msg("Broadcast finished")
 	}()
 
 	c.JSON(http.StatusOK, gin.H{
@@ -618,8 +638,10 @@ func runPassiveUser(ctx context.Context, serverURL, userID string, state *LoadTe
 	conn, err := connectWS(serverURL, userID)
 	if err != nil {
 		atomic.AddInt64(&state.errorCount, 1)
+		ltLogger.Error().Err(err).Str("user_id", userID).Msg("Passive user connect failed")
 		return
 	}
+	ltLogger.Info().Str("user_id", userID).Msg("Passive user connected")
 	defer conn.Close()
 
 	atomic.AddInt64(&state.activeConns, 1)
@@ -640,6 +662,7 @@ func runPassiveUser(ctx context.Context, serverURL, userID string, state *LoadTe
 			_, data, err := conn.ReadMessage()
 			if err != nil {
 				atomic.AddInt64(&state.errorCount, 1)
+				ltLogger.Warn().Err(err).Str("user_id", userID).Msg("Passive user failed to read message")
 				return
 			}
 
@@ -651,6 +674,7 @@ func runPassiveUser(ctx context.Context, serverURL, userID string, state *LoadTe
 				if msg.Type == "notification" || msg.Type == "chat" || msg.Type == "conversations" {
 					if _, loaded := state.receivedMap.LoadOrStore(userID, true); !loaded {
 						atomic.AddInt64(&state.totalReceived, 1)
+						ltLogger.Info().Str("user_id", userID).Str("type", msg.Type).Msg("Passive user received message")
 					}
 				}
 			}
@@ -720,7 +744,11 @@ func GetStats(c *gin.Context) {
 func runLoadTest(ctx context.Context, cancel context.CancelFunc, config LoadTestConfig, state *LoadTestState) {
 	defer cancel()
 
-	log.Printf("[LoadTest] Starting: %d users, ramp-up %ds, duration %ds", config.TargetUsers, config.RampUpSeconds, config.TestDuration)
+	ltLogger.Info().
+		Int("target_users", config.TargetUsers).
+		Int("ramp_up_seconds", config.RampUpSeconds).
+		Int("test_duration", config.TestDuration).
+		Msg("Load test starting")
 
 	var wg sync.WaitGroup
 
@@ -736,7 +764,7 @@ func runLoadTest(ctx context.Context, cancel context.CancelFunc, config LoadTest
 	for i := 0; i < config.TargetUsers; i++ {
 		select {
 		case <-ctx.Done():
-			log.Printf("[LoadTest] Cancelled during ramp-up at user %d", i)
+			ltLogger.Warn().Int("user_index", i).Msg("Load test cancelled during ramp-up")
 			for _, c := range userCancels {
 				c()
 			}
@@ -768,15 +796,15 @@ func runLoadTest(ctx context.Context, cancel context.CancelFunc, config LoadTest
 		}
 	}
 
-	log.Printf("[LoadTest] All %d virtual users spawned. Waiting for test duration...", config.TargetUsers)
+	ltLogger.Info().Int("target_users", config.TargetUsers).Msg("All virtual users spawned. Waiting for test duration...")
 
 	// Chờ hết test duration từ lúc spawn xong
 	testEnd := time.After(time.Duration(config.TestDuration) * time.Second)
 	select {
 	case <-ctx.Done():
-		log.Println("[LoadTest] Context cancelled, stopping test early.")
+		ltLogger.Info().Msg("Context cancelled, stopping test early.")
 	case <-testEnd:
-		log.Printf("[LoadTest] Main duration (%ds) completed. Starting Ramp-down...", config.TestDuration)
+		ltLogger.Info().Int("duration", config.TestDuration).Msg("Main duration completed. Starting Ramp-down...")
 
 		// Ramp-down logic
 		if config.RampDownSeconds > 0 && len(userCancels) > 1 {
@@ -790,7 +818,10 @@ func runLoadTest(ctx context.Context, cancel context.CancelFunc, config LoadTest
 
 	cancel() // Cuối cùng ngắt toàn bộ context (bao gồm cả logger nếu logger dùng ctx này)
 	wg.Wait()
-	log.Printf("[LoadTest] Test completed. Total sent: %d, Errors: %d", atomic.LoadInt64(&state.totalSent), atomic.LoadInt64(&state.errorCount))
+	ltLogger.Info().
+		Int64("total_sent", atomic.LoadInt64(&state.totalSent)).
+		Int64("errors", atomic.LoadInt64(&state.errorCount)).
+		Msg("Load test completed")
 }
 
 // runLoadTestWithUsers tương tự runLoadTest nhưng sử dụng danh sách userID có sẵn
@@ -839,9 +870,9 @@ func runLoadTestWithUsers(ctx context.Context, cancel context.CancelFunc, config
 	testEnd := time.After(time.Duration(config.TestDuration) * time.Second)
 	select {
 	case <-ctx.Done():
-		log.Println("[LoadTest] Context cancelled, stopping test early.")
+		ltLogger.Info().Msg("Context cancelled, stopping test early.")
 	case <-testEnd:
-		log.Printf("[LoadTest] Main duration (%ds) completed. Starting Ramp-down...", config.TestDuration)
+		ltLogger.Info().Int("duration", config.TestDuration).Msg("Main duration completed. Starting Ramp-down...")
 
 		// Ramp-down logic
 		if config.RampDownSeconds > 0 && len(userCancels) > 1 {
@@ -864,8 +895,10 @@ func runVirtualUserWithPool(ctx context.Context, config LoadTestConfig, state *L
 	if err != nil {
 		atomic.AddInt64(&state.errorCount, 1)
 		atomic.AddInt64(&state.totalSent, 1)
+		ltLogger.Error().Err(err).Str("user_id", userID).Msg("Stress user connect failed")
 		return
 	}
+	ltLogger.Info().Str("user_id", userID).Msg("Stress user connected")
 	defer conn.Close()
 
 	atomic.AddInt64(&state.activeConns, 1)
@@ -878,9 +911,11 @@ func runVirtualUserWithPool(ctx context.Context, config LoadTestConfig, state *L
 	go func() {
 		for {
 			if _, _, err := conn.ReadMessage(); err != nil {
+				ltLogger.Warn().Err(err).Str("user_id", userID).Msg("Stress user failed to read message")
 				return
 			}
 			atomic.AddInt64(&state.totalReceived, 1)
+			ltLogger.Info().Str("user_id", userID).Msg("Stress user received message")
 		}
 	}()
 
@@ -907,12 +942,15 @@ func runVirtualUserWithPool(ctx context.Context, config LoadTestConfig, state *L
 			if err != nil {
 				atomic.AddInt64(&state.errorCount, 1)
 				consecutiveErrors++
+				ltLogger.Warn().Err(err).Str("sender", userID).Str("receiver", targetID).Msg("Stress message send failed")
 				if consecutiveErrors >= 3 {
+					ltLogger.Warn().Str("user_id", userID).Msg("Stress user disconnecting after 3 errors")
 					return
 				}
 			} else {
 				consecutiveErrors = 0
 				atomic.AddInt64(&state.successCount, 1)
+				ltLogger.Info().Str("sender", userID).Str("receiver", targetID).Int64("latency_ms", latencyMs).Msg("Stress message sent")
 			}
 
 			state.mu.Lock()
@@ -944,7 +982,7 @@ func runVirtualUser(ctx context.Context, config LoadTestConfig, state *LoadTestS
 	if err != nil {
 		atomic.AddInt64(&state.errorCount, 1)
 		atomic.AddInt64(&state.totalSent, 1)
-		log.Printf("[VUser %s] Connect failed: %v", userID, err)
+		ltLogger.Error().Err(err).Str("user_id", userID).Msg("Connect failed")
 		return
 	}
 	defer conn.Close()
@@ -961,9 +999,11 @@ func runVirtualUser(ctx context.Context, config LoadTestConfig, state *LoadTestS
 		for {
 			_, _, err := conn.ReadMessage()
 			if err != nil {
+				ltLogger.Warn().Err(err).Str("user_id", userID).Msg("Virtual user failed to read message")
 				return
 			}
 			atomic.AddInt64(&state.totalReceived, 1)
+			ltLogger.Info().Str("user_id", userID).Msg("Virtual user received message")
 		}
 	}()
 
@@ -980,9 +1020,9 @@ func runVirtualUser(ctx context.Context, config LoadTestConfig, state *LoadTestS
 			latencyMs := time.Since(startTs).Milliseconds()
 
 			if err == nil {
-				log.Printf("[VUser %s] Sent message successfully (Latency: %dms)", userID, latencyMs)
+				ltLogger.Info().Str("user_id", userID).Int64("latency_ms", latencyMs).Msg("Sent message successfully")
 			} else {
-				log.Printf("[VUser %s] Failed to send message: %v", userID, err)
+				ltLogger.Warn().Err(err).Str("user_id", userID).Msg("Failed to send message")
 			}
 
 			atomic.AddInt64(&state.totalSent, 1)
@@ -994,7 +1034,7 @@ func runVirtualUser(ctx context.Context, config LoadTestConfig, state *LoadTestS
 				consecutiveErrors++
 				// Chỉ disconnect sau 3 lỗi liên tiếp để tránh mất kết nối do timeout nhất thời
 				if consecutiveErrors >= 3 {
-					log.Printf("[VUser %s] 3 consecutive errors, disconnecting: %v", userID, err)
+					ltLogger.Warn().Err(err).Str("user_id", userID).Msg("3 consecutive errors, disconnecting")
 					return
 				}
 			} else {
@@ -1146,7 +1186,7 @@ func extractReceivedIDs(state *LoadTestState) []string {
 func startMetricLogging(ctx context.Context, config LoadTestConfig) {
 	logDir := "test_logs"
 	if err := os.MkdirAll(logDir, 0755); err != nil {
-		log.Printf("[StatsLogger] Failed to create log dir: %v", err)
+		ltLogger.Error().Err(err).Msg("[StatsLogger] Failed to create log dir")
 		return
 	}
 
@@ -1157,21 +1197,21 @@ func startMetricLogging(ctx context.Context, config LoadTestConfig) {
 
 	fCpu, err := os.Create(cpuFile)
 	if err != nil {
-		log.Printf("[StatsLogger] Failed to create CPU log: %v", err)
+		ltLogger.Error().Err(err).Msg("[StatsLogger] Failed to create CPU log")
 		return
 	}
 	defer fCpu.Close()
 
 	fRam, err := os.Create(ramFile)
 	if err != nil {
-		log.Printf("[StatsLogger] Failed to create RAM log: %v", err)
+		ltLogger.Error().Err(err).Msg("[StatsLogger] Failed to create RAM log")
 		return
 	}
 	defer fRam.Close()
 
 	fConn, err := os.Create(connFile)
 	if err != nil {
-		log.Printf("[StatsLogger] Failed to create Connection log: %v", err)
+		ltLogger.Error().Err(err).Msg("[StatsLogger] Failed to create Connection log")
 		return
 	}
 	defer fConn.Close()
@@ -1179,7 +1219,12 @@ func startMetricLogging(ctx context.Context, config LoadTestConfig) {
 	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
 
-	log.Printf("[StatsLogger] Started logging for %d users test to %s, %s and %s", config.TargetUsers, cpuFile, ramFile, connFile)
+	ltLogger.Info().
+		Int("target_users", config.TargetUsers).
+		Str("cpu_log", cpuFile).
+		Str("ram_log", ramFile).
+		Str("conn_log", connFile).
+		Msg("StatsLogger started")
 
 	for {
 		select {
@@ -1195,7 +1240,10 @@ func startMetricLogging(ctx context.Context, config LoadTestConfig) {
 				}
 				time.Sleep(1 * time.Second)
 			}
-			log.Printf("[StatsLogger] Stopped logging for %d users test. ActiveConns: %d", config.TargetUsers, manager.current.activeConns)
+			ltLogger.Info().
+				Int("target_users", config.TargetUsers).
+				Int64("active_conns", manager.current.activeConns).
+				Msg("StatsLogger stopped")
 			return
 		case <-ticker.C:
 			snap := collectSnapshot()
@@ -1203,5 +1251,53 @@ func startMetricLogging(ctx context.Context, config LoadTestConfig) {
 			fmt.Fprintf(fRam, "%.2f\n", snap.MemoryMB)
 			fmt.Fprintf(fConn, "%d\n", snap.ActiveConns)
 		}
+	}
+}
+
+// DownloadAllLogs nén các thư mục logs và test_logs thành file zip và gửi về cho user.
+func DownloadAllLogs(c *gin.Context) {
+	c.Header("Content-Disposition", "attachment; filename=loadtest_logs.zip")
+	c.Header("Content-Type", "application/zip")
+
+	zipWriter := zip.NewWriter(c.Writer)
+	defer zipWriter.Close()
+
+	addDirToZip := func(dirPath string) error {
+		// Kiểm tra thư mục có tồn tại không
+		if _, err := os.Stat(dirPath); os.IsNotExist(err) {
+			return nil
+		}
+
+		return filepath.Walk(dirPath, func(path string, info os.FileInfo, err error) error {
+			if err != nil {
+				return err
+			}
+			if info.IsDir() {
+				return nil
+			}
+
+			file, err := os.Open(path)
+			if err != nil {
+				return err
+			}
+			defer file.Close()
+
+			// Lưu vào zip với đường dẫn tương đối, đảm bảo dùng '/' cho zip entry
+			zipPath := filepath.ToSlash(path)
+			w, err := zipWriter.Create(zipPath)
+			if err != nil {
+				return err
+			}
+
+			_, err = io.Copy(w, file)
+			return err
+		})
+	}
+
+	if err := addDirToZip("logs"); err != nil {
+		ltLogger.Error().Err(err).Msg("Failed to zip logs directory")
+	}
+	if err := addDirToZip("test_logs"); err != nil {
+		ltLogger.Error().Err(err).Msg("Failed to zip test_logs directory")
 	}
 }

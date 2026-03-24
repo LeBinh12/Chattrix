@@ -27,5 +27,7 @@ func RegisterLoadTestRoutes(rg *gin.RouterGroup, db *mongo.Database) {
 		lt.POST("/stress-start", loadtest.StartStressTest)
 		lt.POST("/mass-connect", loadtest.StartMassConnection)
 		lt.POST("/broadcast", loadtest.BroadcastMessage)
+		// GET /v1/load-test/download-logs - Tải về toàn bộ log files dạng zip
+		lt.GET("/download-logs", loadtest.DownloadAllLogs)
 	}
 }

@@ -1,11 +1,14 @@
 package middleware
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log"
+	"net"
+	"net/http"
 	"net/url"
 	"strings"
 	"time"
@@ -23,6 +26,33 @@ type CustomResponseWriter struct {
 func (w *CustomResponseWriter) Write(data []byte) (n int, err error) {
 	w.body.Write(data)
 	return w.ResponseWriter.Write(data)
+}
+
+func (w *CustomResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	if hj, ok := w.ResponseWriter.(http.Hijacker); ok {
+		return hj.Hijack()
+	}
+	return nil, nil, fmt.Errorf("http.Hijacker interface not stackable")
+}
+
+func (w *CustomResponseWriter) Flush() {
+	if fl, ok := w.ResponseWriter.(http.Flusher); ok {
+		fl.Flush()
+	}
+}
+
+func (w *CustomResponseWriter) CloseNotify() <-chan bool {
+	if cn, ok := w.ResponseWriter.(http.CloseNotifier); ok {
+		return cn.CloseNotify()
+	}
+	return nil
+}
+
+func (w *CustomResponseWriter) Push(target string, opts *http.PushOptions) error {
+	if p, ok := w.ResponseWriter.(http.Pusher); ok {
+		return p.Push(target, opts)
+	}
+	return http.ErrNotSupported
 }
 
 func LoggerMiddleware() gin.HandlerFunc {

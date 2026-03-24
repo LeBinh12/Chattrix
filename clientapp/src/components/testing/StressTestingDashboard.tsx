@@ -608,6 +608,14 @@ const StressTestingDashboard: React.FC = () => {
                   <Maximize2 size={18} className="text-orange-500 group-hover:scale-110 transition-transform" />
                   Real-time Reports
                 </button>
+
+                <button
+                  onClick={() => window.open(`${API_BASE}/download-logs`, '_blank')}
+                  className="flex items-center gap-2 bg-white/5 hover:bg-white/10 border border-white/10 px-6 py-3 rounded-2xl transition-all font-semibold text-base group text-slate-200"
+                >
+                  <Download size={18} className="!text-orange-500 group-hover:scale-110 transition-transform" />
+                  Download Logs (.zip)
+                </button>
               </div>
             </div>
           </div>

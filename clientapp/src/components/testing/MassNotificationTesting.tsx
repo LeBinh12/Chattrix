@@ -359,6 +359,13 @@ const MassNotificationTesting: React.FC = () => {
             >
               <Square size={16} fill="currentColor" /> Stop
             </button>
+
+            <button
+              onClick={() => window.open(`${API_BASE}/download-logs`, '_blank')}
+              className="flex items-center gap-2 bg-white/5 hover:bg-white/10 text-slate-300 font-semibold px-4 py-2.5 rounded-xl border border-white/10 transition-all"
+            >
+              <DownloadCloud size={16} /> Logs (.zip)
+            </button>
           </div>
         </div>
       </header>
