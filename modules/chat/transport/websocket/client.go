@@ -467,8 +467,7 @@ func (c *Client) handleChatMessage(msg *models.MessageResponse) {
 			return
 		}
 
-		_, ok := c.Hub.Clients[msg.ReceiverID.Hex()]
-		if ok {
+		if c.Hub.IsUserOnline(msg.ReceiverID.Hex()) {
 			msg.Status = models.StatusDelivered
 		} else {
 			msg.Status = models.StatusSent
@@ -650,7 +649,7 @@ func (c *Client) handleForwardMessage(req *models.ForwardMessageRequest) {
 		}
 
 		// Check if receiver is online to set status
-		if _, ok := c.Hub.Clients[rid.Hex()]; ok {
+		if c.Hub.IsUserOnline(rid.Hex()) {
 			newMsg.Status = models.StatusDelivered
 		} else {
 			newMsg.Status = models.StatusSent

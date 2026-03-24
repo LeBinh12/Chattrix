@@ -947,3 +947,10 @@ func (h *Hub) sendToUser(userID string, data []byte) {
 	}
 	h.mu.RUnlock()
 }
+
+func (h *Hub) IsUserOnline(userID string) bool {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	_, ok := h.Clients[userID]
+	return ok
+}
