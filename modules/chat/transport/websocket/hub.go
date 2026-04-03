@@ -159,7 +159,11 @@ func (h *Hub) Run() {
 						for _, memberID := range members {
 							if sessions, ok := h.Clients[memberID.Hex()]; ok {
 								for _, c := range sessions {
-									c.Send <- data
+									select {
+									case c.Send <- data:
+									default:
+										log.Printf("Buffer full — dropping edit_message_update for %s\n", c.UserID)
+									}
 								}
 							}
 						}
@@ -168,12 +172,20 @@ func (h *Hub) Run() {
 					// Nếu là nhắn 1-1
 					if sessions, ok := h.Clients[receiverIDStr]; ok {
 						for _, c := range sessions {
-							c.Send <- data
+							select {
+							case c.Send <- data:
+							default:
+								log.Printf("Buffer full — dropping edit_message_update for %s\n", c.UserID)
+							}
 						}
 					}
 					if sessions, ok := h.Clients[senderIDStr]; ok {
 						for _, c := range sessions {
-							c.Send <- data
+							select {
+							case c.Send <- data:
+							default:
+								log.Printf("Buffer full — dropping edit_message_update for %s\n", c.UserID)
+							}
 						}
 					}
 				}
@@ -529,6 +541,7 @@ func (h *Hub) Run() {
 						select {
 						case c.Send <- data:
 						default:
+							log.Printf("Buffer full — dropping account_deleted for %s\n", deletedUserID)
 						}
 						// Ta không close ngay lập tức để client nhận được message
 					}
@@ -601,6 +614,7 @@ func (h *Hub) Run() {
 								select {
 								case c.Send <- data:
 								default:
+									log.Printf("Buffer full — dropping reaction_update for %s\n", c.UserID)
 								}
 							}
 						}
@@ -626,6 +640,7 @@ func (h *Hub) Run() {
 								select {
 								case c.Send <- data:
 								default:
+									log.Printf("Buffer full — dropping reaction_update for %s\n", c.UserID)
 								}
 							}
 						}
@@ -788,14 +803,14 @@ func (h *Hub) BroadcastUserStatus(userID, status string) {
 			select {
 			case c.Send <- data:
 			default:
-				// Buffer full
+				log.Printf("Buffer full — dropping user_status update for %s\n", c.UserID)
 			}
 		}
 	}
 	h.mu.RUnlock()
 
 	// Lưu DB + Kafka - CHỈ CHO USER THẬT
-	kafka.SendMessageAsync("user-status-topic", userID, string(data))
+	go kafka.SendMessageAsync("user-status-topic", userID, string(data))
 }
 
 func (h *Hub) CheckOfflineTimeout() {
