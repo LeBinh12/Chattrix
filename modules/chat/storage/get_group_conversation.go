@@ -106,7 +106,7 @@ func (s *MongoChatStore) getGroupConversations(ctx context.Context, userObjectID
 			"let":  bson.M{"groupId": bson.M{"$toObjectId": "$group_id"}, "joinedAt": "$created_at"},
 			"pipeline": []bson.M{
 				{"$match": bson.M{
-					"$expr": bson.M{"$eq": []interface{}{"$group_id", "$$groupId"}},
+					"$expr":             bson.M{"$eq": []interface{}{"$group_id", "$$groupId"}},
 					"created_at":        bson.M{"$gte": "$$joinedAt"},
 					"deleted_for":       bson.M{"$ne": userObjectID},
 					"parent_message_id": bson.M{"$exists": false},
@@ -127,6 +127,7 @@ func (s *MongoChatStore) getGroupConversations(ctx context.Context, userObjectID
 					nil,
 				},
 			},
+			"updated_at": "$created_at",
 		},
 	}}
 

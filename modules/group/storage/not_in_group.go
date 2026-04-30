@@ -57,7 +57,7 @@ func (s *mongoStoreGroup) ListUsersNotInGroup(
 	findOptions := options.Find().
 		SetLimit(limit).
 		SetSkip(skip).
-		SetSort(bson.M{"created_at": -1})
+		SetSort(bson.M{"display_name": 1})
 
 	userCursor, err := userColl.Find(ctx, filter, findOptions)
 	if err != nil {

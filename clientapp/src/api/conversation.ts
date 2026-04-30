@@ -7,7 +7,8 @@ export const conversationApi = {
     limit: number = 10,
     keyword: string,
     tags: string[] = [],
-    type: string = ""
+    type: string = "",
+    sort_by: string = ""
   ): Promise<ConversationResponse> => {
     const response = await axiosClient.get<ConversationResponse>(
       `/conversations/list`,
@@ -17,7 +18,8 @@ export const conversationApi = {
           limit,
           keyword,
           tags,
-          type
+          type,
+          sort_by
         },
       }
     );

@@ -1,5 +1,5 @@
 import type { Conversation } from "../../types/conversation";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Camera } from "lucide-react";
 import { conversationApi } from "../../api/conversation";
 import { toast } from "react-toastify";
@@ -26,19 +26,32 @@ export default function CreateGroupModal({
   const [imagePreview, setImagePreview] = useState("");
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const setConversationList = useSetRecoilState(conversationListAtom);
 
-  // Fetch users
-  useEffect(() => {
-    if (!isOpen) return;
-
-    const fetchUsers = async () => {
+  const fetchUsers = useCallback(
+    async (pageToFetch = 1, currentSearchQuery = searchQuery) => {
       try {
-        setLoading(true);
-        const res = await conversationApi.getConversation(1, 50, searchQuery);
+        if (pageToFetch === 1) {
+          setLoading(true);
+        } else {
+          setLoadingMore(true);
+        }
+
+        const res = await conversationApi.getConversation(
+          pageToFetch,
+          50,
+          currentSearchQuery,
+          [],
+          "",
+          "name"
+        );
         if (res.status === 200) {
-          const mappedUsers: User[] = (res.data.data as Conversation[])
+          const apiData = res.data.data as Conversation[];
+          const mappedUsers: User[] = apiData
             .filter((item) => !!item.user_id)
             .map((item) => ({
               id: item.user_id!,
@@ -46,17 +59,41 @@ export default function CreateGroupModal({
               avatar: item.avatar || "https://via.placeholder.com/150",
               online: item.status === "online",
             }));
-          setUsers(mappedUsers);
+
+          if (pageToFetch === 1) {
+            setUsers(mappedUsers);
+          } else {
+            setUsers((prev) => [...prev, ...mappedUsers]);
+          }
+
+          setHasMore(apiData.length === 50);
+          setPage(pageToFetch);
         }
       } catch (error) {
         console.error("Error loading user list:", error);
       } finally {
         setLoading(false);
+        setLoadingMore(false);
       }
-    };
+    },
+    [searchQuery]
+  );
 
-    fetchUsers();
-  }, [isOpen, searchQuery]);
+  // Fetch users on open or search
+  useEffect(() => {
+    if (!isOpen) return;
+
+    // Only fetch if we don't have users or if searching
+    if (users.length === 0 || searchQuery !== "") {
+      fetchUsers(1, searchQuery);
+    }
+  }, [isOpen, searchQuery, fetchUsers, users.length]);
+
+  const handleLoadMore = useCallback(() => {
+    if (!loading && !loadingMore && hasMore) {
+      fetchUsers(page + 1, searchQuery);
+    }
+  }, [fetchUsers, loading, loadingMore, hasMore, page, searchQuery]);
 
   // Reset when modal closes
   useEffect(() => {
@@ -246,7 +283,11 @@ export default function CreateGroupModal({
       headerSection={headerSection}
       users={users}
       loading={loading}
+      onLoadMore={handleLoadMore}
+      hasMore={hasMore}
+      loadingMore={loadingMore}
       onSubmit={handleSubmit}
+      onSearch={setSearchQuery}
       emptyListMessage="Không tìm thấy người dùng nào"
       listTitle="Trò chuyện gần đây"
       showCategories={false}

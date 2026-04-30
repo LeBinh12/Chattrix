@@ -34,6 +34,7 @@ interface UserSelectionModalProps {
   hasMore?: boolean;
   loadingMore?: boolean;
   singleSelection?: boolean;
+  onSearch?: (query: string) => void;
 }
 
 const getFirstLetter = (name: string): string => {
@@ -65,6 +66,7 @@ export default function UserSelectionModal({
   hasMore = false,
   loadingMore = false,
   singleSelection = false,
+  onSearch,
 }: UserSelectionModalProps) {
   const [selectedMembers, setSelectedMembers] = useState<Set<string>>(new Set());
   const [submitting, setSubmitting] = useState(false);
@@ -92,7 +94,8 @@ export default function UserSelectionModal({
       },
       {
         root: listRef.current,
-        threshold: 0.1,
+        threshold: 0,
+        rootMargin: "100px",
       }
     );
 
@@ -107,6 +110,17 @@ export default function UserSelectionModal({
       }
     };
   }, [isOpen, onLoadMore, hasMore, loadingMore]);
+
+  // Notify parent of search changes (debounced)
+  useEffect(() => {
+    if (!onSearch) return;
+    
+    const timer = setTimeout(() => {
+      onSearch(searchQuery);
+    }, 400);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery, onSearch]);
 
   const toggleMember = (userId: string) => {
     setSelectedMembers(prev => {
@@ -125,11 +139,14 @@ export default function UserSelectionModal({
 
   // Filter users based on search query
   const filteredUsers = useMemo(() => {
-    if (!searchQuery.trim()) return users;
-    const lowerQuery = searchQuery.toLowerCase().trim();
-    return users.filter((user) =>
-      user.display_name?.toLowerCase().includes(lowerQuery)
-    );
+    let result = [...users];
+    if (searchQuery.trim()) {
+      const lowerQuery = searchQuery.toLowerCase().trim();
+      result = result.filter((user) =>
+        user.display_name?.toLowerCase().includes(lowerQuery)
+      );
+    }
+    return result.sort((a, b) => (a.display_name || "").localeCompare(b.display_name || ""));
   }, [users, searchQuery]);
 
   // Group users by first letter
@@ -190,7 +207,7 @@ export default function UserSelectionModal({
         transition={{ duration: 0.2 }}
       >
         <motion.div
-          className="!bg-white w-full !max-w-[520px] !h-auto !max-h-[85vh] flex flex-col !shadow-2xl !rounded-xl !overflow-hidden"
+          className="!bg-white w-full !max-w-[520px] !h-[85vh] !max-h-[85vh] flex flex-col !shadow-2xl !rounded-xl !overflow-hidden"
           onClick={(e) => e.stopPropagation()}
           initial={{ scale: 0.95, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
@@ -209,7 +226,7 @@ export default function UserSelectionModal({
           </div>
 
           {/* Content */}
-          <div className="flex-1 overflow-hidden flex flex-col min-h-0">
+          <div className="flex-1 overflow-hidden flex flex-col min-h-0 bg-white">
             {/* Header Section (Group Info) */}
             {headerSection && headerSection}
 
@@ -239,10 +256,10 @@ export default function UserSelectionModal({
 
             {/* Members List */}
             {!loading || users.length > 0 ? (
-<div className="flex-1 flex flex-col min-h-0">
+              <div className="flex-1 flex flex-col min-h-0 relative bg-white">
                 <div
                   ref={listRef}
-                  className={`${PX_ALL} h-full overflow-y-auto custom-scrollbar pb-2`}
+                  className={`${PX_ALL} flex-1 overflow-y-auto custom-scrollbar pb-4`}
                 >
                   <p className="text-xs font-bold text-gray-800 mb-2 mt-1">{listTitle}</p>
                   {groupedUsers.keys.length === 0 ? (
@@ -310,14 +327,16 @@ export default function UserSelectionModal({
                       })}
 
                       {/* Infinite Scroll Trigger */}
-                      {hasMore && (
-                        <div ref={observerTarget} className="py-4 flex justify-center">
-                          {loadingMore && (
-                            <div className="w-6 h-6 border-2 border-gray-100 border-t-[#00568c] rounded-full animate-spin"></div>
-                          )}
-                        </div>
-                      )}
                     </>
+                  )}
+
+                  {/* Infinite Scroll Trigger - Moved outside ternary to always be present if hasMore is true */}
+                  {hasMore && (
+                    <div ref={observerTarget} className="py-4 flex justify-center min-h-[40px]">
+                      {loadingMore && (
+                        <div className="w-6 h-6 border-2 border-gray-100 border-t-[#00568c] rounded-full animate-spin"></div>
+                      )}
+                    </div>
                   )}
                 </div>
               </div>

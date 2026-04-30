@@ -22,13 +22,21 @@ export default function AddMemberModal({
 }: AddMemberModalProps) {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(false);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const selectedChat = useRecoilValue(selectedChatState);
   const userRecoil = useRecoilValue(userAtom);
 
   const fetchUsers = useCallback(
     async (pageToFetch = 1) => {
       try {
-        setLoading(true);
+        if (pageToFetch === 1) {
+          setLoading(true);
+        } else {
+          setLoadingMore(true);
+        }
+
         const res = await groupApi.getNumber(groupId, pageToFetch, 50);
 
         if (res.status === 200) {
@@ -51,20 +59,38 @@ export default function AddMemberModal({
           } else {
             setUsers((prev) => [...prev, ...mappedUsers]);
           }
+
+          setHasMore(mappedUsers.length === 50);
+          setPage(pageToFetch);
         }
       } catch (error) {
         console.error("Error loading user list:", error);
       } finally {
         setLoading(false);
+        setLoadingMore(false);
       }
     },
     [groupId]
   );
 
+  const handleLoadMore = useCallback(() => {
+    if (!loading && !loadingMore && hasMore) {
+      fetchUsers(page + 1);
+    }
+  }, [fetchUsers, loading, loadingMore, hasMore, page]);
+
+  useEffect(() => {
+    setUsers([]);
+    setPage(1);
+    setHasMore(true);
+  }, [groupId]);
+
   useEffect(() => {
     if (!isOpen) return;
-    fetchUsers(1);
-  }, [isOpen, fetchUsers]);
+    if (users.length === 0) {
+      fetchUsers(1);
+    }
+  }, [isOpen, fetchUsers, users.length]);
 
   const handleSubmit = async (selectedIds: string[]) => {
     if (selectedIds.length === 0) {
@@ -123,6 +149,9 @@ export default function AddMemberModal({
       loadingText="Đang thêm..."
       users={users}
       loading={loading}
+      onLoadMore={handleLoadMore}
+      hasMore={hasMore}
+      loadingMore={loadingMore}
       onSubmit={handleSubmit}
       emptySearchMessage="Không tìm thấy kết quả phù hợp"
       emptyListMessage="Không có người dùng nào chưa trong nhóm"

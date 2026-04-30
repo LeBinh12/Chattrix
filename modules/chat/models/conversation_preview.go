@@ -33,4 +33,5 @@ type ConversationRequest struct {
 	Keyword string   `form:"keyword"`
 	Tags    []string `form:"tags"`
 	Type    string   `form:"type" binding:"omitempty,oneof=user group all"`
+	SortBy  string   `form:"sort_by" binding:"omitempty,oneof=date name"`
 }

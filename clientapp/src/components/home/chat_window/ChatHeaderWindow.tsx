@@ -31,6 +31,7 @@ export default function ChatHeaderWindow({
   status,
   update_at,
   receiver_id,
+  group_id,
   isDeleted,
   onToggleCall,
   isCalling,
@@ -89,7 +90,7 @@ export default function ChatHeaderWindow({
           <p className="!text-[15px] !font-bold !truncate !leading-tight !text-gray-900">
             {isDeleted ? "Tài khoản đã bị xóa" : display_name}
           </p>
-          {receiver_id && (
+          {receiver_id && !group_id && (
             <div className="!flex !items-center !mt-0.5">
               {status === "online" && !isDeleted ? (
                 <span className="!text-[12px] !font-medium !text-emerald-600">

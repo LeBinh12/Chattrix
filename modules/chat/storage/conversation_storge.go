@@ -32,10 +32,11 @@ type groupTemp struct {
 	GroupInfo   groupInfo              `bson:"group_info"`
 	LastMessage *models.MessagePreview `bson:"last_message,omitempty"`
 	UnreadCount int                    `bson:"unread_count"`
+	UpdatedAt   *time.Time             `bson:"updated_at,omitempty"`
 }
 
 // Xử lý lấy hết tất cả, không quan tâm có tin nhắn không
-func (s *MongoChatStore) GetConversations(ctx context.Context, userID string, page, limit int, keyword string, tags []string, convType string) ([]models.ConversationPreview, int64, error) {
+func (s *MongoChatStore) GetConversations(ctx context.Context, userID string, page, limit int, keyword string, tags []string, convType string, sortBy string) ([]models.ConversationPreview, int64, error) {
 	userObjectID := convertToObjectID(userID)
 
 	var filterIDs []primitive.ObjectID
@@ -127,19 +128,36 @@ func (s *MongoChatStore) GetConversations(ctx context.Context, userID string, pa
 
 		}
 		preview.UnreadCount = g.UnreadCount
+		if g.UpdatedAt != nil {
+			preview.UpdatedAt = *g.UpdatedAt
+		}
 		results = append(results, preview)
 	}
 
-	// 🔹 SẮP XẾP THEO THỜI GIAN TIN NHẮN CUỐI
+	// 🔹 SẮP XẾP
 	sort.Slice(results, func(i, j int) bool {
-		// Nếu không có LastDate, đẩy xuống cuối
-		if results[i].LastDate.IsZero() {
+		if sortBy == "name" {
+			return results[i].DisplayName < results[j].DisplayName
+		}
+
+		// Mặc định: THEO THỜI GIAN TIN NHẮN CUỐI (HOẶC THỜI GIAN CẬP NHẬT)
+		timeI := results[i].LastDate
+		if timeI.IsZero() {
+			timeI = results[i].UpdatedAt
+		}
+
+		timeJ := results[j].LastDate
+		if timeJ.IsZero() {
+			timeJ = results[j].UpdatedAt
+		}
+
+		if timeI.IsZero() {
 			return false
 		}
-		if results[j].LastDate.IsZero() {
+		if timeJ.IsZero() {
 			return true
 		}
-		return results[i].LastDate.After(results[j].LastDate)
+		return timeI.After(timeJ)
 	})
 
 	// 🔹 PHÂN TRANG SAU KHI SẮP XẾP
