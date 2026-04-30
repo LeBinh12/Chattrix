@@ -1,0 +1,8 @@
+.git
+node_modules
+clientapp/node_modules
+clientapp/dist
+.env
+Dockerfile
+docker-compose.yml
+*.log
