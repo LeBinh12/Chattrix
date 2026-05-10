@@ -48,6 +48,7 @@ services:
       - mongodb_default
       - kafka_default
       - livekit_default
+      - minio_default
       - default
 
     restart: always
@@ -64,6 +65,9 @@ networks:
     external: true
 
   livekit_default:
+    external: true
+
+  minio_default:
     external: true
 
   default:
