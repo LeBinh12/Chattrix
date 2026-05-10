@@ -117,7 +117,7 @@ export default function UserSelectionModal({
     
     const timer = setTimeout(() => {
       onSearch(searchQuery);
-    }, 400);
+    }, 300);
 
     return () => clearTimeout(timer);
   }, [searchQuery, onSearch]);
@@ -137,17 +137,17 @@ export default function UserSelectionModal({
     });
   };
 
-  // Filter users based on search query
   const filteredUsers = useMemo(() => {
     let result = [...users];
-    if (searchQuery.trim()) {
+    // Nếu có onSearch (server-side), chúng ta tin tưởng hoàn toàn vào danh sách 'users' từ parent
+    if (!onSearch && searchQuery.trim()) {
       const lowerQuery = searchQuery.toLowerCase().trim();
       result = result.filter((user) =>
         user.display_name?.toLowerCase().includes(lowerQuery)
       );
     }
     return result.sort((a, b) => (a.display_name || "").localeCompare(b.display_name || ""));
-  }, [users, searchQuery]);
+  }, [users, searchQuery, onSearch]);
 
   // Group users by first letter
   const groupedUsers = useMemo(() => {
@@ -248,8 +248,8 @@ export default function UserSelectionModal({
             </div>
 
             {/* Loading */}
-            {loading && users.length === 0 && (
-              <div className="flex-1 flex items-center justify-center min-h-[200px]">
+            {loading && (
+              <div className={`absolute inset-0 bg-white/50 z-20 flex items-center justify-center ${users.length > 0 ? 'bg-white/40' : ''}`}>
                 <div className="w-8 h-8 border-2 border-gray-100 border-t-[#00568c] rounded-full animate-spin"></div>
               </div>
             )}
