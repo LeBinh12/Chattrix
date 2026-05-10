@@ -247,100 +247,98 @@ export default function UserSelectionModal({
               </div>
             </div>
 
-            {/* Loading */}
-            {loading && (
-              <div className={`absolute inset-0 bg-white/50 z-20 flex items-center justify-center ${users.length > 0 ? 'bg-white/40' : ''}`}>
-                <div className="w-8 h-8 border-2 border-gray-100 border-t-[#00568c] rounded-full animate-spin"></div>
-              </div>
-            )}
-
             {/* Members List */}
-            {!loading || users.length > 0 ? (
-              <div className="flex-1 flex flex-col min-h-0 relative bg-white">
-                <div
-                  ref={listRef}
-                  className={`${PX_ALL} flex-1 overflow-y-auto custom-scrollbar pb-4`}
-                >
-                  <p className="text-xs font-bold text-gray-800 mb-2 mt-1">{listTitle}</p>
-                  {groupedUsers.keys.length === 0 ? (
-                    <div className="text-center py-8">
-                      <p className="text-gray-400 text-sm">
-                        {searchQuery ? emptySearchMessage : emptyListMessage}
-                      </p>
-                    </div>
-                  ) : (
-                    <>
-                      {groupedUsers.keys.map((letter) => {
-                        const userGroup = groupedUsers.groups.get(letter);
-                        if (!userGroup || userGroup.length === 0) return null;
-
-                        return (
-                          <div
-                            key={letter}
-                            id={`section-${letter}`}
-                            className="mb-1"
-                          >
-                            {/* Section Header */}
-                            <div className="text-[11px] font-bold text-[#00568c] mb-1 ml-1 sticky top-0 bg-white z-10 py-1">
-                              {letter === "#" ? "Khác" : letter}
-                            </div>
-
-                            {/* User List */}
-                            {userGroup.map((user) => {
-                              const isSelected = selectedMembers.has(user.id);
-
-                              return (
-                                <div
-                                  key={user.id}
-                                  onClick={() => toggleMember(user.id)}
-                                  className="flex items-center gap-3 py-2 px-2 cursor-pointer
-                                    hover:bg-gray-50 transition-all rounded-md group select-none"
-                                >
-                                  <UserAvatar
-                                    avatar={user.avatar}
-                                    display_name={user.display_name}
-                                    isOnline={user.online}
-                                    size={36}
-                                    showOnlineStatus={false}
-                                  />
-                                  <div className="flex-1 min-w-0">
-                                    <p className="font-medium text-gray-900 text-[14px] truncate leading-tight">
-                                      {user.display_name}
-                                    </p>
-                                  </div>
-                                  <div
-                                    className={`w-5 h-5 rounded-full border flex items-center justify-center flex-shrink-0 transition-all ${
-                                      isSelected
-                                        ? "bg-[#00568c] border-[#00568c] shadow-sm"
-                                        : "border-gray-200 bg-white group-hover:border-gray-300"
-                                    }`}
-                                  >
-                                    {isSelected && (
-                                      <Check size={12} className="text-white" strokeWidth={3} />
-                                    )}
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        );
-                      })}
-
-                      {/* Infinite Scroll Trigger */}
-                    </>
-                  )}
-
-                  {/* Infinite Scroll Trigger - Moved outside ternary to always be present if hasMore is true */}
-                  {hasMore && (
-                    <div ref={observerTarget} className="py-4 flex justify-center min-h-[40px]">
-                      {loadingMore && (
-                        <div className="w-6 h-6 border-2 border-gray-100 border-t-[#00568c] rounded-full animate-spin"></div>
-                      )}
-                    </div>
-                  )}
+            <div className="flex-1 flex flex-col min-h-0 relative bg-white">
+              {/* Loading Overlay - Now only covers this section */}
+              {loading && (
+                <div className={`absolute inset-0 bg-white/50 z-20 flex items-center justify-center ${users.length > 0 ? 'bg-white/40' : ''}`}>
+                  <div className="w-8 h-8 border-2 border-gray-100 border-t-[#00568c] rounded-full animate-spin"></div>
                 </div>
+              )}
+
+              <div
+                ref={listRef}
+                className={`${PX_ALL} flex-1 overflow-y-auto custom-scrollbar pb-4`}
+              >
+                <p className="text-xs font-bold text-gray-800 mb-2 mt-1">{listTitle}</p>
+                {groupedUsers.keys.length === 0 ? (
+                  <div className="text-center py-8">
+                    <p className="text-gray-400 text-sm">
+                      {!loading && (searchQuery ? emptySearchMessage : emptyListMessage)}
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    {groupedUsers.keys.map((letter) => {
+                      const userGroup = groupedUsers.groups.get(letter);
+                      if (!userGroup || userGroup.length === 0) return null;
+
+                      return (
+                        <div
+                          key={letter}
+                          id={`section-${letter}`}
+                          className="mb-1"
+                        >
+                          {/* Section Header */}
+                          <div className="text-[11px] font-bold text-[#00568c] mb-1 ml-1 sticky top-0 bg-white z-10 py-1">
+                            {letter === "#" ? "Khác" : letter}
+                          </div>
+
+                          {/* User List */}
+                          {userGroup.map((user) => {
+                            const isSelected = selectedMembers.has(user.id);
+
+                            return (
+                              <div
+                                key={user.id}
+                                onClick={() => toggleMember(user.id)}
+                                className="flex items-center gap-3 py-2 px-2 cursor-pointer
+                                  hover:bg-gray-50 transition-all rounded-md group select-none"
+                              >
+                                <UserAvatar
+                                  avatar={user.avatar}
+                                  display_name={user.display_name}
+                                  isOnline={user.online}
+                                  size={36}
+                                  showOnlineStatus={false}
+                                />
+                                <div className="flex-1 min-w-0">
+                                  <p className="font-medium text-gray-900 text-[14px] truncate leading-tight">
+                                    {user.display_name}
+                                  </p>
+                                </div>
+                                <div
+                                  className={`w-5 h-5 rounded-full border flex items-center justify-center flex-shrink-0 transition-all ${
+                                    isSelected
+                                      ? "bg-[#00568c] border-[#00568c] shadow-sm"
+                                      : "border-gray-200 bg-white group-hover:border-gray-300"
+                                  }`}
+                                >
+                                  {isSelected && (
+                                    <Check size={12} className="text-white" strokeWidth={3} />
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      );
+                    })}
+
+                    {/* Infinite Scroll Trigger */}
+                  </>
+                )}
+
+                {/* Infinite Scroll Trigger - Moved outside ternary to always be present if hasMore is true */}
+                {hasMore && (
+                  <div ref={observerTarget} className="py-4 flex justify-center min-h-[40px]">
+                    {loadingMore && (
+                      <div className="w-6 h-6 border-2 border-gray-100 border-t-[#00568c] rounded-full animate-spin"></div>
+                    )}
+                  </div>
+                )}
               </div>
-            ) : null}
+            </div>
           </div>
 
           {/* Footer */}
