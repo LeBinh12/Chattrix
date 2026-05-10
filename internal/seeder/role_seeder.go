@@ -20,32 +20,32 @@ func SeedRoles(db *mongo.Database) {
 		{
 			Code:        "system_admin",
 			Name:        "Quản trị viên hệ thống",
-			Description: "Quản trị viên cấp cao nhất của toàn bộ nền tảng, chịu trách nhiệm vận hành và giám sát toàn hệ thống đa phòng khám.",
+			Description: "Quản trị viên cấp cao nhất của toàn bộ nền tảng, chịu trách nhiệm vận hành và giám sát toàn bộ hệ thống.",
 		},
 		{
-			Code:        "clinic_admin",
-			Name:        "Quản lý phòng khám",
-			Description: "Người quản lý phòng khám, đại diện chính chịu trách nhiệm điều hành hoạt động của một phòng khám cụ thể.",
+			Code:        "org_admin",
+			Name:        "Quản lý cơ quan",
+			Description: "Người quản lý cơ quan hoặc đơn vị, chịu trách nhiệm điều hành hoạt động nội bộ của tổ chức.",
 		},
 		{
-			Code:        "dentist",
-			Name:        "Bác sĩ nha khoa",
-			Description: "Bác sĩ nha khoa, người trực tiếp khám và điều trị cho bệnh nhân.",
+			Code:        "department_head",
+			Name:        "Trưởng phòng / Trưởng khoa",
+			Description: "Trưởng phòng ban hoặc trưởng khoa, chịu trách nhiệm quản lý nhân sự và hoạt động của phòng/khoa trực thuộc.",
 		},
 		{
-			Code:        "receptionist",
-			Name:        "Lễ tân",
-			Description: "Lễ tân, chịu trách nhiệm tiếp đón, hỗ trợ bệnh nhân và phối hợp công việc hành chính tại phòng khám.",
+			Code:        "teacher",
+			Name:        "Giảng viên / Giáo viên",
+			Description: "Giảng viên hoặc giáo viên, thực hiện nhiệm vụ giảng dạy và hướng dẫn học tập trong cơ quan/trường.",
 		},
 		{
-			Code:        "assistant",
-			Name:        "Trợ tá nha khoa",
-			Description: "Trợ tá nha khoa, hỗ trợ bác sĩ trong các công việc lâm sàng và chăm sóc bệnh nhân.",
+			Code:        "staff",
+			Name:        "Nhân viên",
+			Description: "Nhân viên hành chính hoặc chuyên viên, hỗ trợ các hoạt động vận hành và quản lý trong cơ quan.",
 		},
 		{
-			Code:        "app.customer",
-			Name:        "Bệnh nhân",
-			Description: "Bệnh nhân sử dụng hệ thống để liên lạc, nhận tư vấn và theo dõi quá trình điều trị của bản thân.",
+			Code:        "student",
+			Name:        "Học sinh / Sinh viên",
+			Description: "Học sinh hoặc sinh viên, sử dụng hệ thống để liên lạc, học tập và theo dõi tiến trình học tập.",
 		},
 		{
 			Code:        "user",
@@ -70,11 +70,22 @@ func SeedRoles(db *mongo.Database) {
 		},
 	}
 
+	// ====== Dọn dẹp các vai trò cũ không còn phù hợp ======
+	obsoleteCodes := []string{"clinic_admin", "dentist", "receptionist", "assistant", "app.customer"}
+	for _, code := range obsoleteCodes {
+		res, err := collection.DeleteOne(ctx, bson.M{"code": code})
+		if err != nil {
+			log.Printf("Failed to remove obsolete role (code: %s): %v", code, err)
+		} else if res.DeletedCount > 0 {
+			log.Printf("🗑️  Removed obsolete role with code: %s", code)
+		}
+	}
+
 	for _, role := range roles {
-		// Kiểm tra theo name trước (để tương thích với data cũ)
-		filterByName := bson.M{"name": role.Name}
+		// Kiểm tra theo code (ổn định hơn name)
+		filterByCode := bson.M{"code": role.Code}
 		var existingRole models.Role
-		err := collection.FindOne(ctx, filterByName).Decode(&existingRole)
+		err := collection.FindOne(ctx, filterByCode).Decode(&existingRole)
 
 		if err == mongo.ErrNoDocuments {
 			// Chưa có role này, insert mới
@@ -92,11 +103,11 @@ func SeedRoles(db *mongo.Database) {
 			log.Printf("Error checking role %s: %v", role.Name, err)
 			continue
 		} else {
-			// Role đã tồn tại, cập nhật code nếu thiếu
-			if existingRole.Code == "" || existingRole.Code != role.Code {
+			// Role đã tồn tại theo code, cập nhật name + description nếu thay đổi
+			if existingRole.Name != role.Name || existingRole.Description != role.Description {
 				update := bson.M{
 					"$set": bson.M{
-						"code":        role.Code,
+						"name":        role.Name,
 						"description": role.Description,
 						"updated_at":  time.Now(),
 					},
@@ -105,11 +116,11 @@ func SeedRoles(db *mongo.Database) {
 				if err != nil {
 					log.Printf("Failed to update role %s: %v", role.Name, err)
 				} else {
-					log.Printf("🔄 Updated role: %s with code: %s", role.Name, role.Code)
-					existingRole.Code = role.Code
+					log.Printf("🔄 Updated role: %s (code: %s)", role.Name, role.Code)
+					existingRole.Name = role.Name
 				}
 			} else {
-				log.Printf("Role %s already exists with correct code, skipping...", role.Name)
+				log.Printf("Role %s (code: %s) already up-to-date, skipping...", role.Name, role.Code)
 			}
 		}
 

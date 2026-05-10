@@ -29,10 +29,17 @@ const (
 
 type ReplyMessageMini struct {
 	ID       primitive.ObjectID `bson:"id" json:"id"`
+	SenderID primitive.ObjectID `bson:"sender_id,omitempty" json:"sender_id,omitempty"`
 	Sender   string             `bson:"sender" json:"sender"`
 	Content  string             `bson:"content" json:"content"`
 	MediaUrl string             `bson:"media_url,omitempty" json:"media_url,omitempty"` // tham chiếu nhiều media
 	Type     MediaType          `bson:"type" json:"type"`
+}
+
+type SeenUserInfo struct {
+	ID          primitive.ObjectID `json:"_id" bson:"_id"`
+	DisplayName string             `json:"display_name" bson:"display_name"`
+	Avatar      string             `json:"avatar" bson:"avatar"`
 }
 
 type Message struct {
@@ -149,14 +156,18 @@ type MessageResponse struct {
 
 	ParentID     string     `json:"parent_id,omitempty"`
 	CommentCount int        `json:"comment_count"`
-	EditedAt     *time.Time `json:"edited_at,omitempty"`
+	EditedAt     *time.Time     `json:"edited_at,omitempty"`
+	TotalMembers int            `json:"total_members,omitempty"`
+	SeenBy       []SeenUserInfo `json:"seen_by,omitempty" bson:"seen_by,omitempty"`
+	SeenByCount  int            `json:"seen_by_count" bson:"-"`
 }
 
 type MessageStatusRequest struct {
 	SenderID   string `json:"sender_id,omitempty"`
 	ReceiverID string `json:"receiver_id,omitempty"`
 
-	LastSeenMsgID string `json:"last_seen_message_id,omitempty"`
+	LastSeenMsgID string        `json:"last_seen_message_id,omitempty"`
+	SeenByUser    *SeenUserInfo `json:"seen_by_user,omitempty"`
 }
 
 type DeleteMessageForMe struct {

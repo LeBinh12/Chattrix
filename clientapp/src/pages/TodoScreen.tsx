@@ -273,6 +273,18 @@ export default function TodoScreen() {
         >
           Hoàn thành
         </button>
+        <button
+          onClick={() => setFilterStatus("done_late")}
+          className={`!px-3 !py-1 !rounded-full !text-xs !font-medium !whitespace-nowrap !transition-colors !cursor-pointer ${filterStatus === 'done_late' ? '!bg-red-100 !text-red-700' : '!bg-gray-100 !text-gray-600 hover:!bg-gray-200'}`}
+        >
+          Hoàn thành trễ
+        </button>
+        <button
+          onClick={() => setFilterStatus("overdue")}
+          className={`!px-3 !py-1 !rounded-full !text-xs !font-medium !whitespace-nowrap !transition-colors !cursor-pointer ${filterStatus === 'overdue' ? '!bg-red-600 !text-white' : '!bg-gray-100 !text-gray-600 hover:!bg-gray-200'}`}
+        >
+          Quá hạn
+        </button>
       </div>
 
       {/* Task List */}
@@ -295,6 +307,14 @@ export default function TodoScreen() {
                   {task.status === 'done' ? (
                     <div className="w-10 h-10 rounded-full bg-green-50 flex items-center justify-center text-green-600">
                       <CheckCircle2 size={20} />
+                    </div>
+                  ) : task.status === 'done_late' ? (
+                    <div className="w-10 h-10 rounded-full bg-orange-50 flex items-center justify-center text-orange-600">
+                      <CheckCircle2 size={20} />
+                    </div>
+                  ) : task.status === 'overdue' ? (
+                    <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center text-red-600">
+                      <Clock size={20} />
                     </div>
                   ) : task.status === 'in_progress' ? (
                     <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-[#00568c]">

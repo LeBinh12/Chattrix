@@ -70,7 +70,7 @@ export default function MediaViewer({
 
   const handleDownload = () => {
     const link = document.createElement("a");
-    link.href = `${API_ENDPOINTS.UPLOAD_MEDIA}/${currentMedia.url}`;
+    link.href = `${API_ENDPOINTS.UPLOAD_MEDIA}/${encodeURIComponent(currentMedia.url)}`;
     link.download = currentMedia.filename;
     link.click();
   };
@@ -184,7 +184,7 @@ export default function MediaViewer({
             />
           ) : (
             <img
-              src={`${API_BASE_URL}/upload/media/${currentMedia.url}`}
+              src={`${API_BASE_URL}/upload/media/${encodeURIComponent(currentMedia.url)}`}
               alt={currentMedia.filename}
               className="max-w-full max-h-[85vh] object-contain select-none rounded-lg"
               style={{
@@ -214,7 +214,7 @@ export default function MediaViewer({
                 {m.type === "video" ? (
                   <div className="relative">
                     <video
-                      src={`${API_BASE_URL}/upload/media/${m.url}`}
+                      src={`${API_BASE_URL}/upload/media/${encodeURIComponent(m.url)}`}
                       className="w-full h-full object-cover"
                     />
                     <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
@@ -223,7 +223,7 @@ export default function MediaViewer({
                   </div>
                 ) : (
                   <img
-                    src={`${API_BASE_URL}/upload/media/${m.url}`}
+                    src={`${API_BASE_URL}/upload/media/${encodeURIComponent(m.url)}`}
                     className="w-full h-full object-cover"
                   />
                 )}

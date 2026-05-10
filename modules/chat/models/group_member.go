@@ -11,6 +11,7 @@ type Member struct {
 	UserName    string             `json:"user_name"`
 	DisplayName string             `json:"display_name"`
 	Role        string             ` json:"role,omitempty"` // optional
+	Avatar      string             `json:"avatar,omitempty"`
 }
 
 type GroupMemberRequest struct {

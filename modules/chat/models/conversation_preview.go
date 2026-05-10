@@ -25,6 +25,8 @@ type ConversationPreview struct {
 	IsDeleted       bool                `json:"is_deleted"`
 	RecalledAt      *time.Time          `bson:"recalled_at,omitempty" json:"recalled_at,omitempty"`
 	RecalledBy      *primitive.ObjectID `bson:"recalled_by,omitempty" json:"recalled_by,omitempty"`
+	SeenBy          []SeenUserInfo      `json:"seen_by,omitempty"`
+	SeenByCount     int                 `json:"seen_by_count,omitempty"`
 }
 
 type ConversationRequest struct {

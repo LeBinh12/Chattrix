@@ -46,7 +46,7 @@ export const messageAPI = {
             params: {
                 receiver_id: renderId,
                 group_id: groupID,
-            }
+                }
         });
 
         return response.data;
@@ -65,4 +65,16 @@ export const messageAPI = {
         return response.data;
     },
 
+    getSeenBy: async (messageID: string, groupID?: string, receiverID?: string, page: number = 1, limit: number = 15): Promise<any> => {
+        const response = await axiosClient.get(`/message/seen-by`, {
+            params: {
+                message_id: messageID,
+                group_id: groupID,
+                receiver_id: receiverID,
+                page,
+                limit
+            }
+        });
+        return response.data;
+    },
 }

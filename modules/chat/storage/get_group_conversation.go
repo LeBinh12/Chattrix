@@ -2,10 +2,13 @@ package storage
 
 import (
 	"context"
+	"my-app/modules/chat/models"
+	ModelUser "my-app/modules/user/models"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 func (s *MongoChatStore) getGroupConversations(ctx context.Context, userObjectID primitive.ObjectID, page, limit int, keyword string, filterIDs []primitive.ObjectID) ([]groupTemp, error) {
@@ -54,8 +57,12 @@ func (s *MongoChatStore) getGroupConversations(ctx context.Context, userObjectID
 			"let":  bson.M{"groupId": bson.M{"$toObjectId": "$group_id"}, "userId": userObjectID},
 			"pipeline": []bson.M{
 				{"$match": bson.M{
-					"conversation_id": "$$groupId",
-					"user_id":         "$$userId",
+					"$expr": bson.M{
+						"$and": []bson.M{
+							{"$eq": []interface{}{"$conversation_id", "$$groupId"}},
+							{"$eq": []interface{}{"$user_id", "$$userId"}},
+						},
+					},
 				}},
 				{"$limit": 1},
 			},
@@ -78,7 +85,6 @@ func (s *MongoChatStore) getGroupConversations(ctx context.Context, userObjectID
 							{"$gt": []interface{}{"$_id", bson.M{"$ifNull": []interface{}{"$$lastSeenId", primitive.NilObjectID}}}},
 						},
 					},
-					"created_at":        bson.M{"$gte": "$$joinedAt"},
 					"deleted_for":       bson.M{"$ne": userObjectID},
 					"sender_id":         bson.M{"$ne": userObjectID},
 					"type":              bson.M{"$ne": "system"},
@@ -103,11 +109,10 @@ func (s *MongoChatStore) getGroupConversations(ctx context.Context, userObjectID
 	lookupLastMessage := bson.D{{
 		"$lookup", bson.M{
 			"from": "messages",
-			"let":  bson.M{"groupId": bson.M{"$toObjectId": "$group_id"}, "joinedAt": "$created_at"},
+			"let":  bson.M{"groupId": bson.M{"$toObjectId": "$group_id"}},
 			"pipeline": []bson.M{
 				{"$match": bson.M{
 					"$expr":             bson.M{"$eq": []interface{}{"$group_id", "$$groupId"}},
-					"created_at":        bson.M{"$gte": "$$joinedAt"},
 					"deleted_for":       bson.M{"$ne": userObjectID},
 					"parent_message_id": bson.M{"$exists": false},
 				}},
@@ -155,6 +160,67 @@ func (s *MongoChatStore) getGroupConversations(ctx context.Context, userObjectID
 	var groups []groupTemp
 	if err := cursor.All(ctx, &groups); err != nil {
 		return nil, err
+	}
+
+	// 🔹 FETCH SEEN STATUS FOR LAST MESSAGES
+	for i := range groups {
+		if groups[i].LastMessage == nil {
+			continue
+		}
+
+		lastMsgID := groups[i].LastMessage.ID
+		groupID := groups[i].GroupID
+
+		// Fetch seen statuses sorted by updated_at descending
+		seenCursor, err := s.db.Collection("chat_seen_status").Find(ctx, bson.M{
+			"conversation_id": groupID,
+		}, options.Find().SetSort(bson.M{"updated_at": -1}))
+
+		if err == nil {
+			var seenStatuses []models.ChatSeenStatus
+			if err := seenCursor.All(ctx, &seenStatuses); err == nil {
+				var seenUserIDs []primitive.ObjectID
+				count := 0
+				for _, status := range seenStatuses {
+					// User has seen this message if their last_seen_message_id >= lastMsgID
+					if status.UserID != groups[i].LastMessage.SenderID && (status.LastSeenMessageID == lastMsgID || status.LastSeenMessageID.Timestamp().After(lastMsgID.Timestamp()) || status.LastSeenMessageID.Hex() == lastMsgID.Hex()) {
+						count++
+						if len(seenUserIDs) < 6 {
+							seenUserIDs = append(seenUserIDs, status.UserID)
+						}
+					}
+				}
+
+				if len(seenUserIDs) > 0 {
+					var users []ModelUser.User
+					userCursor, err := s.db.Collection("users").Find(ctx, bson.M{"_id": bson.M{"$in": seenUserIDs}})
+					if err == nil {
+						if err := userCursor.All(ctx, &users); err == nil {
+							// Create a map for quick lookup to maintain order
+							userMap := make(map[primitive.ObjectID]ModelUser.User)
+							for _, u := range users {
+								userMap[u.ID] = u
+							}
+
+							var seenBy []models.SeenUserInfo
+							for _, id := range seenUserIDs {
+								if u, ok := userMap[id]; ok {
+									seenBy = append(seenBy, models.SeenUserInfo{
+										ID:          u.ID,
+										DisplayName: u.DisplayName,
+										Avatar:      u.Avatar,
+									})
+								}
+							}
+							groups[i].SeenBy = seenBy
+							groups[i].SeenByCount = count
+						}
+						userCursor.Close(ctx)
+					}
+				}
+			}
+			seenCursor.Close(ctx)
+		}
 	}
 
 	return groups, nil

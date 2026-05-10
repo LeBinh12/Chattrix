@@ -33,11 +33,11 @@ export const useChatMedia = ({ selectedChat, userId }: UseChatMediaProps) => {
         if (msg.media_ids && msg.media_ids.length > 0) {
             msg.media_ids.forEach((media) => {
                 const timestamp = new Date(msg.created_at).toLocaleDateString("vi-VN");
-                console.log("msg.id", msg.id)
 
                 if (media.type === "image" || media.type === "video") {
                     mediaItems.push({
                         id: `${media.id}`,
+                        message_id: msg.id,
                         type: media.type,
                         url: media.url,
                         filename: media.filename,
@@ -45,6 +45,8 @@ export const useChatMedia = ({ selectedChat, userId }: UseChatMediaProps) => {
                     });
                 } else if (media.type === "file") {
                     fileItems.push({
+                        id: `${media.id}`,
+                        message_id: msg.id,
                         name: media.filename,
                         size: formatFileSize(media.size),
                         url: media.url,
@@ -63,43 +65,57 @@ export const useChatMedia = ({ selectedChat, userId }: UseChatMediaProps) => {
 
         const fetchMediaAndFiles = async () => {
             try {
-                const res = await messageAPI.getMessage(
-                    selectedChat?.user_id ?? "",
-                    selectedChat?.group_id ?? "",
-                    100,
-                    "0"
+                // Fetch all media types in one call (backend now supports empty media_type)
+                const res = await messageAPI.getMediaList(
+                    selectedChat?.user_id,
+                    selectedChat?.group_id,
+                    50, // Fetch enough to cover both sections
+                    ""
                 );
 
-                const messages: Messages[] = res.data.data || [];
-                const allMedia: MediaItem[] = [];
-                const allFiles: FileItem[] = [];
+                const items = res.data.data || [];
 
-                messages.forEach((msg) => {
-                    const { mediaItems, fileItems } = extractMediaFromMessage(msg);
-                    allMedia.push(...mediaItems);
-                    allFiles.push(...fileItems);
-                });
+                const mappedMedia: MediaItem[] = items
+                    .filter(item => item.type === "image" || item.type === "video")
+                    .map(item => ({
+                        id: item.id,
+                        message_id: item.message_id,
+                        type: item.type as "image" | "video",
+                        url: item.url,
+                        filename: item.filename,
+                        timestamp: new Date(item.created_at).toLocaleDateString("vi-VN")
+                    }));
 
-                // Sắp xếp theo thời gian mới nhất
-                setRecentMedia(allMedia.reverse());
-                setRecentFiles(allFiles.reverse());
+                const mappedFiles: FileItem[] = items
+                    .filter(item => item.type === "file")
+                    .map(item => ({
+                        id: item.id,
+                        message_id: item.message_id,
+                        name: item.filename,
+                        size: formatFileSize(item.size),
+                        url: item.url,
+                        timestamp: new Date(item.created_at).toLocaleDateString("vi-VN")
+                    }));
+
+                setRecentMedia(mappedMedia.slice(0, 20));
+                setRecentFiles(mappedFiles.slice(0, 20));
             } catch (err) {
                 console.error(" Lỗi khi tải media/files:", err);
             }
         };
 
         fetchMediaAndFiles();
-    }, [extractMediaFromMessage, selectedChat, userId]);
+    }, [selectedChat?.user_id, selectedChat?.group_id, userId]);
 
     // Lắng nghe socket realtime để cập nhật media/files
     useEffect(() => {
         if (!userId || !selectedChat) return;
 
-        const listener = (data: ChatSocketPayload) => {
+        const listener = (data: any) => {
+            // New message
             if (data.type === "chat" && data.message) {
                 const msg = data.message;
 
-                // Kiểm tra xem tin nhắn có thuộc cuộc trò chuyện hiện tại không
                 const isCurrentChat =
                     (msg.sender_id === userId && msg.receiver_id === selectedChat?.user_id) ||
                     (msg.sender_id === selectedChat?.user_id && msg.receiver_id === userId) ||
@@ -107,27 +123,41 @@ export const useChatMedia = ({ selectedChat, userId }: UseChatMediaProps) => {
 
                 if (!isCurrentChat) return;
 
-                // Extract media và files từ tin nhắn mới
                 const { mediaItems, fileItems } = extractMediaFromMessage(msg);
 
-                // Thêm media mới vào đầu danh sách
                 if (mediaItems.length > 0) {
-                    setRecentMedia((prev) => [...mediaItems, ...prev]);
+                    setRecentMedia((prev) => {
+                        const filtered = prev.filter(p => !mediaItems.some(m => m.id === p.id));
+                        return [...mediaItems, ...filtered].slice(0, 20);
+                    });
                 }
 
-                // Thêm file mới vào đầu danh sách
                 if (fileItems.length > 0) {
-                    setRecentFiles((prev) => [...fileItems, ...prev]);
+                    setRecentFiles((prev) => {
+                        const filtered = prev.filter(p => !fileItems.some(m => m.id === p.id));
+                        return [...fileItems, ...filtered].slice(0, 20);
+                    });
                 }
+            }
+            
+            // Recall message
+            else if (data.type === "recall-message" && data.message) {
+                const recalledMsgId = data.message.id;
+                setRecentMedia((prev) => prev.filter(m => m.message_id !== recalledMsgId));
+                setRecentFiles((prev) => prev.filter(f => f.message_id !== recalledMsgId));
+            }
+            
+            // Delete for me
+            else if (data.type === "delete_for_me" && data.delete_msg) {
+                const deletedMsgIds: string[] = data.delete_msg.message_ids || [];
+                setRecentMedia((prev) => prev.filter(m => !deletedMsgIds.includes(m.message_id || "")));
+                setRecentFiles((prev) => prev.filter(f => !deletedMsgIds.includes(f.message_id || "")));
             }
         };
 
         socketManager.addListener(listener);
-
-        return () => {
-            socketManager.removeListener(listener);
-        };
-    }, [extractMediaFromMessage, selectedChat, userId]);
+        return () => socketManager.removeListener(listener);
+    }, [extractMediaFromMessage, selectedChat?.user_id, selectedChat?.group_id, userId]);
 
     return { recentMedia, recentFiles };
 };

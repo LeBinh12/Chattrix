@@ -51,7 +51,12 @@ func (biz *UpdateTaskBiz) UpdateTaskStatus(ctx context.Context, taskID string, u
 		return nil, fmt.Errorf("không tìm thấy task: %w", err)
 	}
 
-	// 3. Perform the updates
+	// 3. Tự động chuyển done → done_late nếu trễ hạn
+	if req.Status == models.TaskStatusDone && task.EndTime != nil && time.Now().After(*task.EndTime) {
+		req.Status = models.TaskStatusDoneLate
+	}
+
+	// 4. Perform the updates
 	if len(task.Assignees) > 0 {
 		// GROUP TASK: chỉ cập nhật trạng thái riêng của assignee này
 		targetID := updaterObjID
@@ -95,6 +100,8 @@ func (biz *UpdateTaskBiz) UpdateTaskStatus(ctx context.Context, taskID string, u
 		models.TaskStatusTodo:              "Chưa bắt đầu",
 		models.TaskStatusInProgress:        "Đang thực hiện",
 		models.TaskStatusDone:              "Đã hoàn thành",
+		models.TaskStatusDoneLate:          "Hoàn thành trễ hạn",
+		models.TaskStatusOverdue:           "Quá hạn",
 		models.TaskStatusRejected:          "Đã từ chối",
 		models.TaskStatusCancel:            "Đã hủy",
 	}

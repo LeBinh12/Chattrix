@@ -80,7 +80,7 @@ const UserAvatar: React.FC<UserAvatarProps> = ({
     avatar !== "undefined";
 
   const avatarUrl = hasValidAvatar
-    ? `${API_ENDPOINTS.UPLOAD_MEDIA}/${avatar}`
+    ? `${API_ENDPOINTS.UPLOAD_MEDIA}/${encodeURIComponent(avatar || "")}`
     : null;
   const handleImageError = () => {
     setImgError(true);

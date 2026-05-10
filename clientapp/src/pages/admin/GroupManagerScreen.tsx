@@ -30,6 +30,7 @@ export default function GroupManagerScreen() {
   const [totalGroups, setTotalGroups] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(15);
+  const [isLoading, setIsLoading] = useState(false);
 
   // ========== DETAIL MODAL ==========
   const [selectedGroup, setSelectedGroup] = useState<GroupDetail | null>(null);
@@ -37,6 +38,7 @@ export default function GroupManagerScreen() {
 
   // ========== FETCH ==========
   const fetchGroups = useCallback(async () => {
+    setIsLoading(true);
     try {
       const res = await groupAdminApi.getPagination(
         currentPage,
@@ -53,6 +55,8 @@ export default function GroupManagerScreen() {
       if (error.response?.status !== 403) {
         toast.error("Không thể tải danh sách nhóm!");
       }
+    } finally {
+      setIsLoading(false);
     }
   }, [currentPage, pageSize, searchQuery, minMembers, maxMembers]);
 
@@ -274,6 +278,7 @@ export default function GroupManagerScreen() {
           data={groups}
           columns={columns}
           total={totalGroups}
+          loading={isLoading}
           rowKey="id"
           serverSidePagination={true}
           enableNativePagination={false}

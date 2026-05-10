@@ -30,6 +30,8 @@ func (s *MongoChatStore) GetMediaList(
 	messageFilter := bson.M{
 		"type":        bson.M{"$in": []models.MediaType{"image", "video", "file"}},
 		"media_ids.0": bson.M{"$exists": true},
+		"recalled_at": bson.M{"$exists": false},
+		"deleted_for": bson.M{"$ne": currentUserID},
 	}
 
 	if !groupID.IsZero() {

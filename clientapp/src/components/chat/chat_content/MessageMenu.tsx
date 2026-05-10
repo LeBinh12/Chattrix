@@ -144,7 +144,7 @@ export default function MessageMenu({
     { icon: Pin, label: "Ghim tin nhắn", onClick: onPin, hidden: hidePin },
     // { icon: Star, label: "Đánh dấu tin nhắn", onClick: onStar },
     // { icon: List, label: "Chọn nhiều tin nhắn", onClick: onSelectMultiple },
-    // { icon: Info, label: "Xem chi tiết", onClick: onViewDetail },
+    { icon: Info, label: "Xem chi tiết", onClick: onViewDetail },
     {
       icon: Edit2,
       label: "Sửa tin nhắn",

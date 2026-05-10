@@ -2,6 +2,8 @@ package storage
 
 import (
 	"context"
+	"my-app/modules/chat/models"
+	ModelUser "my-app/modules/user/models"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -130,6 +132,53 @@ func (s *MongoChatStore) getUserConversations(ctx context.Context, userObjectID 
 	}
 
 	total, _ := userCollection.CountDocuments(ctx, filter)
+
+	// 🔹 FETCH SEEN STATUS FOR LAST MESSAGES
+	for i := range results {
+		if results[i].LastMessage == nil {
+			continue
+		}
+
+		lastMsgID := results[i].LastMessage.ID
+		partnerID := results[i].ID
+		conversationID := GetConversationID(userObjectID, partnerID)
+
+		seenCursor, err := s.db.Collection("chat_seen_status").Find(ctx, bson.M{
+			"conversation_id": conversationID,
+		})
+
+		if err == nil {
+			var seenStatuses []models.ChatSeenStatus
+			if err := seenCursor.All(ctx, &seenStatuses); err == nil {
+				var seenBy []models.SeenUserInfo
+				count := 0
+				for _, status := range seenStatuses {
+					if status.UserID == results[i].LastMessage.SenderID {
+						continue
+					}
+
+					// User has seen this message if their last_seen_message_id >= lastMsgID
+					if status.LastSeenMessageID == lastMsgID || status.LastSeenMessageID.Timestamp().After(lastMsgID.Timestamp()) || status.LastSeenMessageID.Hex() == lastMsgID.Hex() {
+						count++
+						if len(seenBy) < 6 {
+							var u ModelUser.User
+							if err := s.db.Collection("users").FindOne(ctx, bson.M{"_id": status.UserID}).Decode(&u); err == nil {
+								seenBy = append(seenBy, models.SeenUserInfo{
+									ID:          u.ID,
+									DisplayName: u.DisplayName,
+									Avatar:      u.Avatar,
+								})
+							}
+						}
+					}
+				}
+				results[i].SeenBy = seenBy
+				results[i].SeenByCount = count
+			}
+			seenCursor.Close(ctx)
+		}
+	}
+
 	return results, total, nil
 }
 

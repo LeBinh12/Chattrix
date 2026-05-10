@@ -2,17 +2,21 @@ import { X, Reply, Play, FileText } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRecoilValue, useSetRecoilState } from "recoil";
 import { replyMessageState } from "../../../recoil/atoms/uiAtom";
+import { userAtom } from "../../../recoil/atoms/userAtom";
 import { API_ENDPOINTS } from "../../../config/api";
 
 export default function ReplyPreview() {
   const replyTo = useRecoilValue(replyMessageState);
   const setReplyTo = useSetRecoilState(replyMessageState);
   const getTextContent = (html: string) => {
+    if (!html) return "";
     const temp = document.createElement("div");
     temp.innerHTML = html;
-    return temp.textContent || temp.innerText || "";
+    const text = temp.textContent || temp.innerText || "";
+    return text.trim();
   };
 
+  const user = useRecoilValue(userAtom);
   const handleCancel = () => setReplyTo(null);
 
   const getMediaUrl = (url: string) => {
@@ -51,8 +55,8 @@ export default function ReplyPreview() {
               <div className="flex items-center gap-2 mb-1">
                 <Reply className="w-3.5 h-3.5 text-gray-700 flex-shrink-0" />
                 <span className="text-xs font-semibold text-gray-700 truncate">
-                  Trả lời {replyTo.sender}
-                </span>0
+                  Trả lời {replyTo.sender_id === user?.data.id ? "chính mình" : replyTo.sender}
+                </span>
               </div>
 
               <div className="text-xs text-gray-800 line-clamp-2 break-words">

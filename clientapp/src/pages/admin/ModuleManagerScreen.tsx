@@ -263,6 +263,7 @@ export default function ModuleManagerScreen() {
           data={modules}
           columns={columns}
           total={totalModules}
+          loading={isLoading}
           page={currentPage}
           limit={pageSize}
           onChangePage={setCurrentPage}

@@ -13,6 +13,7 @@ import { groupMembersAtom, groupTotalMembersAtom } from "../../recoil/atoms/grou
 import { groupApi } from "../../api/group";
 import { useCallback, useEffect } from "react";
 import type { GroupMember } from "../../types/group-member";
+import { socketManager } from "../../api/socket";
 
 export default function ChatInfoPanel() {
   const selectedChat = useRecoilValue(selectedChatState);
@@ -74,6 +75,7 @@ export default function ChatInfoPanel() {
       }
     })();
   }, [selectedChat?.group_id, groupMembersMap, setGroupMembersMap, deduplicateMembers]);
+  
 
   const { isOwner, canAdd } = useMemo(() => {
     if (!selectedChat?.group_id || !user?.data.id) return { isOwner: false, canAdd: false };

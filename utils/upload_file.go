@@ -12,6 +12,7 @@ import (
 	"github.com/cloudinary/cloudinary-go/v2/api/uploader"
 	"github.com/google/uuid"
 	"github.com/minio/minio-go/v7"
+	"strings"
 )
 
 func UploadFileToCloudinary(ctx context.Context, fileHeader *multipart.FileHeader) (string, error) {
@@ -34,8 +35,8 @@ func UploadFileToCloudinary(ctx context.Context, fileHeader *multipart.FileHeade
 }
 
 func UploadFileToMinio(file multipart.File, fileHeader *multipart.FileHeader) (string, error) {
-
-	objectName := fmt.Sprintf("%s-%s", uuid.New().String(), fileHeader.Filename)
+	filename := strings.ReplaceAll(fileHeader.Filename, " ", "_")
+	objectName := fmt.Sprintf("%s-%s", uuid.New().String(), filename)
 	bucketName := "unichat"
 	contentType := fileHeader.Header.Get("Content-Type")
 

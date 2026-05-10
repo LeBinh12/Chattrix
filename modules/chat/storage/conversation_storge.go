@@ -20,6 +20,8 @@ type temp struct {
 	Status      string                 `bson:"status,omitempty"`
 	UpdatedAt   *time.Time             `bson:"updated_at,omitempty"`
 	IsDeleted   bool                   `bson:"is_deleted"`
+	SeenBy      []models.SeenUserInfo  `bson:"seen_by,omitempty"`
+	SeenByCount int                    `bson:"seen_by_count,omitempty"`
 }
 
 type groupInfo struct {
@@ -33,6 +35,8 @@ type groupTemp struct {
 	LastMessage *models.MessagePreview `bson:"last_message,omitempty"`
 	UnreadCount int                    `bson:"unread_count"`
 	UpdatedAt   *time.Time             `bson:"updated_at,omitempty"`
+	SeenBy      []models.SeenUserInfo  `bson:"seen_by,omitempty"`
+	SeenByCount int                    `bson:"seen_by_count,omitempty"`
 }
 
 // Xử lý lấy hết tất cả, không quan tâm có tin nhắn không
@@ -103,6 +107,8 @@ func (s *MongoChatStore) GetConversations(ctx context.Context, userID string, pa
 		if u.UpdatedAt != nil {
 			preview.UpdatedAt = *u.UpdatedAt
 		}
+		preview.SeenBy = u.SeenBy
+		preview.SeenByCount = u.SeenByCount
 		results = append(results, preview)
 	}
 
@@ -131,6 +137,8 @@ func (s *MongoChatStore) GetConversations(ctx context.Context, userID string, pa
 		if g.UpdatedAt != nil {
 			preview.UpdatedAt = *g.UpdatedAt
 		}
+		preview.SeenBy = g.SeenBy
+		preview.SeenByCount = g.SeenByCount
 		results = append(results, preview)
 	}
 

@@ -38,7 +38,7 @@ func GetMediaHandler() gin.HandlerFunc {
 		if ctx.Query("download") == "1" {
 			disposition = "attachment"
 		}
-		ctx.Header("Content-Disposition", fmt.Sprintf("%s; filename=%s", disposition, objectName))
+		ctx.Header("Content-Disposition", fmt.Sprintf("%s; filename=\"%s\"", disposition, objectName))
 
 		// Trả về file
 		http.ServeContent(ctx.Writer, ctx.Request, objectName, info.LastModified, obj)

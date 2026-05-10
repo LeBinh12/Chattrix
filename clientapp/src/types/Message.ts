@@ -10,10 +10,17 @@ export type Message = {
 };
 export type ReplyMessage = {
   id: string;
+  sender_id?: string;
   sender: string;
   content: string;
   media_url?: string;
-  type: string
+  type: string;
+};
+
+export type SeenUserInfo = {
+  _id: string;
+  display_name: string;
+  avatar: string;
 };
 
 
@@ -62,6 +69,8 @@ export type Messages = {
   parent_id?: string;
   comment_count?: number;
   edited_at?: string;
+  seen_by?: SeenUserInfo[];
+  seen_by_count?: number;
 }
 
 export type Reaction = {

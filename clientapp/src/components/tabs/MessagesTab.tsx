@@ -204,7 +204,7 @@ export default function MessagesTab({ onFriend, onOpenId }: Props) {
                   <img
                     src={
                       conv.avatar && conv.avatar !== "null"
-                        ? `${API_BASE_URL}/upload/media/${conv.avatar}`
+                        ? `${API_BASE_URL}/upload/media/${encodeURIComponent(conv.avatar)}`
                         : LOGO
                     }
                     alt={conv.display_name}

@@ -1,6 +1,6 @@
 import { type ReactNode, useMemo, useRef, useEffect, useCallback, useState } from "react";
 import { createPortal } from "react-dom";
-import { Notification, Panel, Pagination, Stack, useToaster } from "rsuite";
+import { Notification, Panel, Pagination, Stack, useToaster, Loader } from "rsuite";
 import { AgGridReact } from "ag-grid-react";
 import { themeQuartz } from "ag-grid-community";
 import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
@@ -68,6 +68,7 @@ type DataTableProps<TData> = {
     total?: number;
     page?: number;
     limit?: number;
+    loading?: boolean;
     onChangePage?: (page: number) => void;
     onChangeLimit?: (limit: number) => void;
     columns: Array<DataTableColumn<TData>>;
@@ -305,6 +306,7 @@ const DataTable = <TData,>({
     total = 0,
     page,
     limit,
+    loading = false,
     onChangePage,
     onChangeLimit,
     columns,
@@ -717,8 +719,13 @@ const DataTable = <TData,>({
             onApiReady?.(event.api);
             event.api.resetColumnState(); // Force reset to clear stale overrides (e.g. ghost checkboxes)
             event.api.sizeColumnsToFit();
+
+            // Show loading overlay immediately if already loading
+            if (loading) {
+                event.api.showLoadingOverlay();
+            }
         },
-        [applyQuickFilter, onApiReady, quickFilterText]
+        [applyQuickFilter, loading, onApiReady, quickFilterText]
     );
 
     useEffect(() => {
@@ -726,6 +733,20 @@ const DataTable = <TData,>({
             applyQuickFilter(gridApiRef.current, quickFilterText);
         }
     }, [applyQuickFilter, quickFilterText]);
+
+    // Sync AG Grid built-in loading overlay with `loading` prop
+    useEffect(() => {
+        const api = gridApiRef.current;
+        if (!api) return;
+
+        if (loading) {
+            api.showLoadingOverlay();
+        } else if (!data || data.length === 0) {
+            api.showNoRowsOverlay();
+        } else {
+            api.hideOverlay();
+        }
+    }, [loading, data]);
 
     const handleSelectionChanged = useCallback(() => {
         if (!onSelectionChange || !gridApiRef.current) {
@@ -1353,6 +1374,7 @@ const DataTable = <TData,>({
                             setOpenSubmenuKey(null);
                             setActiveItemKey("copy");
                         }}
+                        loading={loading}
                     />
 
                 </div>

@@ -9,8 +9,10 @@ export type TaskStatus =
   | "todo"
   | "in_progress"
   | "done"
+  | "done_late"
+  | "overdue"
   | "rejected"
-    | "cancel";
+  | "cancel";
 
 export type AssigneeInfo = { assignee_id: string; assignee_name: string };
 

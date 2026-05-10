@@ -3,7 +3,6 @@ package storage
 import (
 	"context"
 	"my-app/modules/chat/models"
-	ModelGroup "my-app/modules/group/models"
 	ModelUser "my-app/modules/user/models"
 	"time"
 
@@ -24,20 +23,22 @@ func (s *MongoChatStore) GetMessageBelow(
 
 	// 1. Lọc theo group hoặc chat riêng
 	if GroupID != primitive.NilObjectID {
-		var member ModelGroup.GroupMember
+		// Kiểm tra quyền thành viên (phải là thành viên hiện tại)
 		err := s.db.Collection("group_user_roles").FindOne(ctx, bson.M{
 			"group_id":   GroupID.Hex(),
 			"user_id":    SenderID.Hex(),
 			"is_deleted": bson.M{"$ne": true},
 			"role_id":    bson.M{"$ne": ""},
-		}).Decode(&member)
+		}).Err()
+
 		if err != nil {
+			// Nếu không tìm thấy hoặc không phải thành viên, không cho xem tin nhắn
 			return []models.MessageResponse{}, nil
 		}
 
 		filter = bson.M{
 			"group_id":    GroupID,
-			"created_at":  bson.M{"$gte": member.CreatedAt, "$gt": afterTime},
+			"created_at":  bson.M{"$gt": afterTime},
 			"deleted_for": bson.M{"$ne": SenderID},
 		}
 

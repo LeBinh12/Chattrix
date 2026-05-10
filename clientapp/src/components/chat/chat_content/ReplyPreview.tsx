@@ -5,6 +5,7 @@ import { API_ENDPOINTS } from "../../../config/api";
 interface ReplyPreviewProps {
   reply: {
     id: string;
+    sender_id?: string;
     sender: string;
     content: string;
     type: string;
@@ -12,12 +13,14 @@ interface ReplyPreviewProps {
   };
   onClickReply: (messageId: string) => void;
   getTextContent: (html: string) => string;
+  currentUserId?: string;
 }
 
 export default React.memo(function ReplyPreview({
   reply,
   onClickReply,
   getTextContent,
+  currentUserId,
 }: ReplyPreviewProps) {
   if (!reply || reply.id === "000000000000000000000000") return null;
 
@@ -62,14 +65,14 @@ export default React.memo(function ReplyPreview({
 
         <div className={`flex-1 min-w-0 ${hasReplyMedia ? "" : "ml-0"}`}>
           <div className="text-sm font-semibold text-blue-600 truncate">
-            {reply.sender}
+            {reply.sender_id === currentUserId ? "Bạn" : reply.sender}
           </div>
 
           <div className="text-sm text-gray-700 line-clamp-2 break-words">
             {reply.type === "image" && "[Hình Ảnh]"}
             {reply.type === "video" && "[Video]"}
             {reply.type === "file" && (
-              <span className="text-blue-600">[File] {reply.content}</span>
+              <span className="text-blue-600">[File] {getTextContent(reply.content) || "Tập tin"}</span>
             )}
             {(!reply.media_url || reply.type === "text") &&
               getTextContent(reply.content)}

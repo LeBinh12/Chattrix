@@ -381,6 +381,7 @@ export default function PermissionManagerScreen() {
           data={permissions}
           columns={columns}
           total={totalPermissions}
+          loading={isLoading}
           page={currentPage}
           limit={pageSize}
           onChangePage={setCurrentPage}

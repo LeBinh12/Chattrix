@@ -69,7 +69,7 @@ export default function TaskDetailModal({
   const myEffectiveStatus = (isGroupTask && myAssigneeStatus)
     ? myAssigneeStatus.status
     : task.status;
-  const isTerminalStatus = myEffectiveStatus === "rejected" || myEffectiveStatus === "cancel" || myEffectiveStatus === "done";
+  const isTerminalStatus = myEffectiveStatus === "rejected" || myEffectiveStatus === "cancel" || myEffectiveStatus === "done" || myEffectiveStatus === "done_late";
   const isAssigneeOfTask = currentUserId === task.assignee_id || (isGroupTask && myAssigneeStatus != null);
   const canUpdateStatus = (currentUserId === task.creator_id || isAssigneeOfTask) && !isTerminalStatus;
 
@@ -457,6 +457,8 @@ const confirmDeleteComment = async () => {
     { value: "todo", label: "Chưa bắt đầu", color: "text-orange-500" },
     { value: "in_progress", label: "Đang thực hiện", color: "text-blue-600" },
     { value: "done", label: "Đã hoàn thành", color: "text-green-600" },
+    { value: "done_late", label: "Hoàn thành trễ hẹn", color: "text-red-500" },
+    { value: "overdue", label: "Quá hạn", color: "text-red-700" },
     { value: "rejected", label: "Đã từ chối", color: "text-red-600" },
     { value: "cancel", label: "Đã hủy", color: "text-gray-600" },
   ];
@@ -681,7 +683,7 @@ const confirmDeleteComment = async () => {
                   { value: "pending_acceptance", label: `Chờ (${countByStatus("pending_acceptance")})` },
                   { value: "accepted", label: `Đã nhận (${countByStatus("accepted")})` },
                   { value: "rejected", label: `Từ chối (${countByStatus("rejected")})` },
-                  { value: "done", label: `Hoàn thành (${countByStatus("done")})` },
+                  { value: "done", label: `Xong (${countByStatus("done") + countByStatus("done_late")})` },
                 ];
 
                 const activeFilterLabel = filterOpts.find(o => o.value === assigneeFilterStatus)?.label ?? "Tất cả";

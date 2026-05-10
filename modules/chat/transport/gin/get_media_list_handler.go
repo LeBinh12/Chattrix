@@ -64,11 +64,6 @@ func GetMediaList(db *mongo.Database) gin.HandlerFunc {
 		mediaTypeStr := ctx.DefaultQuery("media_type", "")
 		mediaType := models.MediaType(mediaTypeStr)
 
-		if mediaType == "" {
-			ctx.JSON(http.StatusBadRequest, gin.H{"error": "media_type là bắt buộc"})
-			return
-		}
-
 		/** ----------------------
 		 *  Parse page & limit
 		 * ---------------------- **/

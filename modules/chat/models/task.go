@@ -21,7 +21,9 @@ const (
 	TaskStatusTodo              TaskStatus = "todo"
 	TaskStatusInProgress        TaskStatus = "in_progress"
 	TaskStatusDone              TaskStatus = "done"
-	TaskStatusRejected          TaskStatus = "rejected" // Bị từ chối
+	TaskStatusDoneLate          TaskStatus = "done_late" // Hoàn thành nhưng trễ hạn
+	TaskStatusOverdue           TaskStatus = "overdue"   // Quá hạn (chưa hoàn thành)
+	TaskStatusRejected          TaskStatus = "rejected"  // Bị từ chối
 	TaskStatusCancel            TaskStatus = "cancel"
 )
 

@@ -224,6 +224,7 @@ function MessageItemComponent({
               reply={msg.reply}
               onClickReply={(id) => setMessageID(id)}
               getTextContent={getTextContent}
+              currentUserId={currentUserId}
             />
           )}
 

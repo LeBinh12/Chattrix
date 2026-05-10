@@ -22,6 +22,7 @@ import { BUTTON_HOVER } from "../../utils/className";
 import AddMemberModal from "../group/AddMemberModal";
 import { socketManager } from "../../api/socket";
 import { toast } from "react-toastify";
+import { deduplicateMembers } from "../../utils/groupUtils";
 
 export default function GroupMembersPanel() {
   const selectedChat = useRecoilValue(selectedChatState);
@@ -51,28 +52,6 @@ export default function GroupMembersPanel() {
   const [showPromoteConfirm, setShowPromoteConfirm] = useState(false);
   const [showTransferConfirm, setShowTransferConfirm] = useState(false);
   const [showAddMemberModal, setShowAddMemberModal] = useState(false);
-  // Helper function to deduplicate members with role priority
-  const deduplicateMembers = useCallback((members: GroupMember[]) => {
-    const roleWeight = { owner: 3, admin: 2, member: 1, number: 4 };
-    const emailMap = new Map<string, GroupMember>();
-
-    members.forEach((member) => {
-      if (!member.email) {
-        // If no email, add with user_id as key
-        emailMap.set(`no-email-${member.user_id}`, member);
-        return;
-      }
-
-      const existing = emailMap.get(member.email);
-      
-      // If not exists or new member has higher role
-      if (!existing || roleWeight[member.role] > roleWeight[existing.role]) {
-        emailMap.set(member.email, member);
-      }
-    });
-
-    return Array.from(emailMap.values());
-  }, []);
 
   const loadMembers = useCallback(
     async (pageToLoad: number, isInitial = false, limit = 20) => {
@@ -120,7 +99,7 @@ export default function GroupMembersPanel() {
         }
       }
     },
-    [groupId, loadingMore, setGroupMembersMap, deduplicateMembers]
+    [groupId, loadingMore, setGroupMembersMap]
   );
 
   // Effect when switching panel/group
@@ -188,7 +167,7 @@ export default function GroupMembersPanel() {
 
     const debounceTimer = setTimeout(fetchSearchResults, 300);
     return () => clearTimeout(debounceTimer);
-  }, [searchQuery, groupId, setGroupMembersMap, deduplicateMembers]);
+  }, [searchQuery, groupId, setGroupMembersMap]);
 
   // Get members from cache (NO more deduplication as it's filtered in loadMembers)
   const members = useMemo(() => {
@@ -251,6 +230,7 @@ export default function GroupMembersPanel() {
       setCanPromote(false);
     }
   }, [members, currentUser]);
+
 
   // No longer filtering out self, so everyone appears in the list
   const displayMembers = filteredMembers;
@@ -360,25 +340,6 @@ export default function GroupMembersPanel() {
     
     try {
       await groupApi.removeMember(groupId, selectedMember.user_id);
-      
-      // Update Recoil state for immediate UI feedback
-      setGroupMembersMap((prev) => {
-        const currentMembers = prev[groupId] || [];
-        const updatedMembers = currentMembers.filter(
-          (m) => m.user_id !== selectedMember.user_id
-        );
-        
-        return {
-          ...prev,
-          [groupId]: updatedMembers,
-        };
-      });
-
-      setGroupTotalMembers((prev) => ({
-        ...prev,
-        [groupId]: Math.max(0, (prev[groupId] || 0) - 1),
-      }));
-
       console.log("Removed member successfully:", selectedMember.display_name);
     } catch (error) {
       console.error("Failed to remove member:", error);

@@ -3,6 +3,9 @@ import type { Task } from "../../../api/taskApi";
 import TaskDetailModal from "../../home/chat_window/TaskDetailModal";
 import { Calendar, Paperclip, Download } from "lucide-react";
 import { API_ENDPOINTS } from "../../../config/api";
+import { socketManager } from "../../../api/socket";
+import { useRecoilValue } from "recoil";
+import { userAtom } from "../../../recoil/atoms/userAtom";
 
 interface TaskCardProps {
   task: Task;
@@ -22,12 +25,48 @@ export default function TaskCard({
   const [showDetails, setShowDetails] = useState(false);
   const [localTask, setLocalTask] = useState(task);
   const [isLoading, setIsLoading] = useState(false);
+  const user = useRecoilValue(userAtom);
 
   useEffect(() => {
     setLocalTask(task);
   }, [task]);
 
-  const isPendingAcceptance = localTask.status === "pending_acceptance";
+  // Listen for real-time task updates from socket
+  useEffect(() => {
+    const handleSocketEvent = (data: any) => {
+      if (data.type !== "rep-task" || !data.message?.task) return;
+      const updatedTask: Task = data.message.task;
+      if (updatedTask.id !== localTask.id) return;
+
+      setLocalTask(prev => {
+        // For group tasks: merge assignees array selectively
+        if (updatedTask.assignees && prev.assignees) {
+          return {
+            ...prev,
+            ...updatedTask,
+            assignees: prev.assignees.map(a => {
+              const updated = updatedTask.assignees?.find(u => u.assignee_id === a.assignee_id);
+              return updated ? { ...a, ...updated } : a;
+            }),
+          };
+        }
+        return { ...prev, ...updatedTask };
+      });
+    };
+
+    socketManager.addListener(handleSocketEvent);
+    return () => socketManager.removeListener(handleSocketEvent);
+  }, [localTask.id]);
+
+  const isGroupTask = (localTask.assignees?.length ?? 0) > 0;
+  const myAssigneeEntry = isGroupTask
+    ? localTask.assignees?.find(a => a.assignee_id === user?.data?.id)
+    : null;
+  const myEffectiveStatus = (isGroupTask && myAssigneeEntry)
+    ? myAssigneeEntry.status
+    : localTask.status;
+
+  const isPendingAcceptance = myEffectiveStatus === "pending_acceptance";
   const showAcceptanceButtons = isMine && isPendingAcceptance;
 
   const handleAccept = async () => {
@@ -35,7 +74,18 @@ export default function TaskCard({
     setIsLoading(true);
     try {
       await onAccept();
-      setLocalTask({ ...localTask, status: "accepted" as any });
+      // Update only our own entry in assignees[] for group tasks
+      setLocalTask(prev => {
+        if (isGroupTask && user?.data?.id) {
+          return {
+            ...prev,
+            assignees: prev.assignees?.map(a =>
+              a.assignee_id === user.data.id ? { ...a, status: "accepted" as any } : a
+            ),
+          };
+        }
+        return { ...prev, status: "accepted" as any };
+      });
     } catch (err) {
       console.error("Accept failed:", err);
     } finally {
@@ -48,7 +98,18 @@ export default function TaskCard({
     setIsLoading(true);
     try {
       await onReject();
-      setLocalTask({ ...localTask, status: "rejected" as any });
+      // Update only our own entry in assignees[] for group tasks
+      setLocalTask(prev => {
+        if (isGroupTask && user?.data?.id) {
+          return {
+            ...prev,
+            assignees: prev.assignees?.map(a =>
+              a.assignee_id === user.data.id ? { ...a, status: "rejected" as any } : a
+            ),
+          };
+        }
+        return { ...prev, status: "rejected" as any };
+      });
     } catch (err) {
       console.error("Reject failed:", err);
     } finally {
@@ -100,6 +161,25 @@ export default function TaskCard({
               Giao việc
             </p>
           </div>
+          {/* Status Badge */}
+          <div className="flex-1 flex justify-end">
+             <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${
+               localTask.status === 'done' || localTask.status === 'done_late' ? 'bg-green-100 text-green-700' :
+               localTask.status === 'rejected' || localTask.status === 'cancel' || localTask.status === 'overdue' ? 'bg-red-100 text-red-700' :
+               localTask.status === 'in_progress' ? 'bg-blue-100 text-blue-700' :
+               'bg-yellow-100 text-yellow-700'
+             }`}>
+               {localTask.status === 'done_late' ? 'Trễ hạn' : 
+                localTask.status === 'overdue' ? 'Quá hạn' : 
+                localTask.status === 'pending_acceptance' ? 'Chờ nhận' :
+                localTask.status === 'accepted' ? 'Đã nhận' :
+                localTask.status === 'todo' ? 'Sắp làm' :
+                localTask.status === 'in_progress' ? 'Đang làm' :
+                localTask.status === 'done' ? 'Hoàn thành' :
+                localTask.status === 'rejected' ? 'Từ chối' :
+                localTask.status === 'cancel' ? 'Đã hủy' : localTask.status}
+             </span>
+          </div>
         </div>
         {/* Nội dung chính - căn TRÁI */}
         <div className="px-3 pb-2 space-y-2">
@@ -129,8 +209,12 @@ export default function TaskCard({
                 </div>
                 <div>
                   <label className="text-xs text-gray-500 font-bold block mb-2">Hạn hoàn thành</label>
-                  <div className="flex items-center gap-3 text-sm font-medium text-gray-900">
-                    <Calendar size={18} className="text-blue-600" />
+                  <div className={`flex items-center gap-3 text-sm font-medium ${
+                    localTask.status !== 'done' && localTask.status !== 'done_late' && localTask.status !== 'cancel' && localTask.end_time && new Date(localTask.end_time) < new Date() 
+                    ? 'text-red-600' 
+                    : 'text-gray-900'
+                  }`}>
+                    <Calendar size={18} className={localTask.status !== 'done' && localTask.status !== 'done_late' && localTask.status !== 'cancel' && localTask.end_time && new Date(localTask.end_time) < new Date() ? 'text-red-600' : 'text-blue-600'} />
                     {formatTime(task.end_time || task.deadline)}
                   </div>
                 </div>

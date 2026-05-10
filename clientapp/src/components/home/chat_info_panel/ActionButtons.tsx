@@ -95,16 +95,7 @@ export default function ActionButtons({
       // 2. Remove self from group
       await groupApi.removeMember(groupId, userId);
 
-      // 3. Notify via socket
-      if (socketManager.getSocket()) {
-        socketManager.sendMemberLeft(
-          userId,
-          groupId,
-          user?.data.display_name,
-        );
-      }
-
-      // 4. Update group list and UI
+      // 3. Update group list and UI
       const res = await groupApi.getGroup();
       setGroups(res.data);
       

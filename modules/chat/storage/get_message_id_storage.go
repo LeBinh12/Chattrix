@@ -45,14 +45,8 @@ func (s *MongoChatStore) GetMessageByID(
 			return nil, fmt.Errorf("tin nhắn không thuộc nhóm này")
 		}
 
-		// Kiểm tra tin nhắn có được tạo sau khi user join không
-		if targetMessage.CreatedAt.Before(member.CreatedAt) {
-			return nil, fmt.Errorf("tin nhắn được tạo trước khi bạn tham gia nhóm")
-		}
-
 		baseFilter = bson.M{
 			"group_id":    groupID,
-			"created_at":  bson.M{"$gte": member.CreatedAt},
 			"deleted_for": bson.M{"$ne": senderID},
 		}
 	} else {

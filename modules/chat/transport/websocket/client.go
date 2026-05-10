@@ -519,6 +519,21 @@ func (c *Client) handleUpdateSeen(msg *models.MessageStatusRequest) {
 		return
 	}
 
+	// Lấy thông tin người xem để các client khác cập nhật UI real-time
+	ctx := context.Background()
+	store := storage.NewMongoChatStore(c.Hub.DB)
+	senderOID, err := primitive.ObjectIDFromHex(msg.SenderID)
+	if err == nil {
+		user, err := store.GetUserById(ctx, senderOID)
+		if err == nil {
+			msg.SeenByUser = &models.SeenUserInfo{
+				ID:          user.ID,
+				DisplayName: user.DisplayName,
+				Avatar:      user.Avatar,
+			}
+		}
+	}
+
 	msgCopy := *msg
 	go c.sendToKafkaWithRetry("update-status-message", msgCopy.SenderID, msgCopy)
 

@@ -16,27 +16,22 @@ func (s *MongoChatStore) GetMessage(ctx context.Context, SenderID, ReceiverID, G
 
 	// Lọc theo group hoặc chat riêng
 	if GroupID != primitive.NilObjectID {
-		var member struct {
-			UpdatedAt time.Time `bson:"updated_at"`
-		}
+		// Kiểm tra quyền thành viên (phải là thành viên hiện tại)
 		err := s.db.Collection("group_user_roles").FindOne(ctx, bson.M{
 			"group_id":   GroupID.Hex(),
 			"user_id":    SenderID.Hex(),
 			"is_deleted": bson.M{"$ne": true},
 			"role_id":    bson.M{"$ne": ""},
-		}).Decode(&member)
+		}).Err()
+
+		if err != nil {
+			// Nếu không tìm thấy hoặc không phải thành viên, không cho xem tin nhắn
+			return []models.MessageResponse{}, nil
+		}
 
 		filter = bson.M{
 			"group_id":    GroupID,
 			"deleted_for": bson.M{"$ne": SenderID},
-		}
-
-		if err == nil && !member.UpdatedAt.IsZero() {
-			// Chỉ xem được từ thời gian updated_at trở về sau
-			filter["created_at"] = bson.M{"$gte": member.UpdatedAt}
-		} else if err != nil {
-			// Nếu không tìm thấy hoặc đã bị xóa, không cho xem tin nhắn
-			return []models.MessageResponse{}, nil
 		}
 	} else {
 		filter = bson.M{
@@ -171,6 +166,86 @@ func (s *MongoChatStore) GetMessage(ctx context.Context, SenderID, ReceiverID, G
 		}
 	}
 
+	// 🔽 LẤY DỮ LIỆU SEEN
+	seenByMap := make(map[primitive.ObjectID][]models.SeenUserInfo)
+	seenByCountMap := make(map[primitive.ObjectID]int)
+	var conversationID primitive.ObjectID
+	if GroupID != primitive.NilObjectID {
+		conversationID = GroupID
+	} else {
+		conversationID = GetConversationID(SenderID, ReceiverID)
+	}
+
+	seenCursor, err := s.db.Collection("chat_seen_status").Find(ctx, bson.M{"conversation_id": conversationID}, options.Find().SetSort(bson.M{"updated_at": -1}))
+	if err == nil {
+		var seenStatuses []models.ChatSeenStatus
+		if err := seenCursor.All(ctx, &seenStatuses); err == nil {
+			// Thu thập tất cả user IDs đã seen
+			seenUserIDsMap := make(map[primitive.ObjectID]struct{})
+			for _, status := range seenStatuses {
+				seenUserIDsMap[status.UserID] = struct{}{}
+			}
+
+			// Fetch user info cho những người đã seen (có thể dùng userMap nếu đã có)
+			for uID := range seenUserIDsMap {
+				if _, ok := userMap[uID]; !ok {
+					// Nếu chưa có trong userMap (sender map), thì fetch thêm
+					var u ModelUser.User
+					if err := s.db.Collection("users").FindOne(ctx, bson.M{"_id": uID}).Decode(&u); err == nil {
+						userMap[uID] = u
+					}
+				}
+			}
+			// Find requester's last seen ID
+			var requesterLastSeenID primitive.ObjectID
+			for _, status := range seenStatuses {
+				if status.UserID == SenderID {
+					requesterLastSeenID = status.LastSeenMessageID
+					break
+				}
+			}
+
+			// Map seen users vào từng message
+			for i := range messages {
+				msg := &messages[i]
+				var messageSeenBy []models.SeenUserInfo
+				count := 0
+				for _, status := range seenStatuses {
+					// Nếu last_seen_message_id của user >= ID của message này (hoặc cùng ID)
+					if status.UserID != msg.SenderID && (status.LastSeenMessageID == msg.ID || status.LastSeenMessageID.Timestamp().After(msg.ID.Timestamp()) || status.LastSeenMessageID.Hex() == msg.ID.Hex()) {
+						count++
+						// Chỉ lấy tối đa 6 người để hiển thị ban đầu
+						if len(messageSeenBy) < 6 {
+							if u, ok := userMap[status.UserID]; ok {
+								messageSeenBy = append(messageSeenBy, models.SeenUserInfo{
+									ID:          u.ID,
+									DisplayName: u.DisplayName,
+									Avatar:      u.Avatar,
+								})
+							}
+						}
+					}
+				}
+				seenByMap[msg.ID] = messageSeenBy
+				seenByCountMap[msg.ID] = count
+
+				// 🔹 Determine IsRead for the requester
+				if msg.SenderID == SenderID {
+					msg.IsRead = true
+				} else if !requesterLastSeenID.IsZero() {
+					if requesterLastSeenID == msg.ID || requesterLastSeenID.Timestamp().After(msg.ID.Timestamp()) || requesterLastSeenID.Hex() == msg.ID.Hex() {
+						msg.IsRead = true
+					} else {
+						msg.IsRead = false
+					}
+				} else {
+					msg.IsRead = false
+				}
+			}
+		}
+		seenCursor.Close(ctx)
+	}
+
 	//  Ghép dữ liệu thành MessageResponse
 	var messageResponses []models.MessageResponse
 	for _, msg := range messages {
@@ -190,6 +265,8 @@ func (s *MongoChatStore) GetMessage(ctx context.Context, SenderID, ReceiverID, G
 			Reactions:    msg.Reactions,
 			EditedAt:     msg.EditedAt,
 			CommentCount: commentCounts[msg.ID],
+			SeenBy:       seenByMap[msg.ID],
+			SeenByCount:  seenByCountMap[msg.ID],
 		}
 
 		if msg.ParentMessageID != nil {

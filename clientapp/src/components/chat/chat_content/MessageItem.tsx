@@ -10,10 +10,12 @@ import {
   Smile,
   Plus,
   Heart,
-  MessageSquare
+  MessageSquare,
+  Info,
 } from "lucide-react";
 import EmojiPicker, { Theme, type EmojiClickData } from "emoji-picker-react";
-import type { Messages } from "../../../types/Message";
+import type { Messages, SeenUserInfo } from "../../../types/Message";
+import { messageAPI } from "../../../api/messageApi";
 import MessageMenu from "./MessageMenu";
 import { motion, AnimatePresence } from "framer-motion";
 import { useEditor } from "@tiptap/react";
@@ -31,9 +33,10 @@ import LongMessageContent from "./LongMessageContent";
 import TaskCard from "./TaskCard"; // Import TaskCard
 import { BUTTON_HOVER } from "../../../utils/className";
 import UserAvatar from "../../UserAvatar";
-import { taskApi, type TaskStatus } from "../../../api/taskApi";
+import { taskApi, type Task, type TaskStatus } from "../../../api/taskApi";
 import { selectedChatState } from "../../../recoil/atoms/chatAtom";
 import { forceDownload } from "../../../utils/downloadUtil";
+import SeenStatusModal from "./SeenStatusModal";
 
 type StatusConfig = {
   icon: typeof Check;
@@ -86,8 +89,30 @@ export default function MessageItem({
   const [isUpdating, setIsUpdating] = useState(false);
   const [showReactionPicker, setShowReactionPicker] = useState(false);
   const [showFullPicker, setShowFullPicker] = useState(false);
-  const reactionPickerRef = useRef<HTMLDivElement>(null);
+  const [showSeenModal, setShowSeenModal] = useState(false);
+  const [seenByUsers, setSeenByUsers] = useState<SeenUserInfo[]>(msg.seen_by || []);
+  const [isLoadingSeen, setIsLoadingSeen] = useState(false);
+  const [seenPage, setSeenPage] = useState(1);
+  const [hasMoreSeen, setHasMoreSeen] = useState(true);
+
   const selectedChat = useRecoilValue(selectedChatState);
+  const filteredSeenBy = useMemo(() => {
+    if (!selectedChat?.group_id || !msg.seen_by || msg.seen_by.length === 0) return [];
+
+    // Lọc ra những người mà tin nhắn này là tin nhắn cuối cùng họ xem trong danh sách hiện tại
+    return msg.seen_by.filter(user => {
+      for (let i = index + 1; i < messages.length; i++) {
+        if (messages[i].seen_by?.some(u => u._id === user._id)) {
+          return false;
+        }
+      }
+      return true;
+    });
+  }, [msg.seen_by, messages, index, selectedChat?.group_id]);
+
+  const reactionPickerRef = useRef<HTMLDivElement>(null);
+
+  
   // Recoil state để set reply
   const setReplyTo = useSetRecoilState(replyMessageState);
   const setMessageID = useSetRecoilState(messageIDAtom);
@@ -101,6 +126,54 @@ export default function MessageItem({
     setThreadTargetType("message");
     setShowMenu(false);
   }, [msg, setActivePanel, setThreadTarget, setThreadTargetType]);
+
+  const fetchSeenBy = useCallback(async (page: number = 1) => {
+    if (isLoadingSeen) return;
+    setIsLoadingSeen(true);
+    
+    try {
+      const response = await messageAPI.getSeenBy(
+        msg.id,
+        msg.group_id,
+        !msg.group_id ? msg.receiver_id : undefined,
+        page,
+        15
+      );
+      if (response && response.data) {
+        const newData = response.data.data;
+        if (page === 1) {
+          setSeenByUsers(newData);
+        } else {
+          setSeenByUsers(prev => {
+            const existingIds = new Set(prev.map(u => u._id));
+            const uniqueNewData = newData.filter((u: SeenUserInfo) => !existingIds.has(u._id));
+            return [...prev, ...uniqueNewData];
+          });
+        }
+        setHasMoreSeen(newData.length === 15);
+        setSeenPage(page);
+      }
+    } catch (error) {
+      console.error("Failed to fetch seen by users:", error);
+    } finally {
+      setIsLoadingSeen(false);
+    }
+  }, [msg.id, msg.group_id, msg.receiver_id, isLoadingSeen]);
+
+  const handleShowSeenModal = () => {
+    setShowSeenModal(true);
+    setSeenByUsers(msg.seen_by || []);
+    setSeenPage(1);
+    setHasMoreSeen(true);
+    fetchSeenBy(1);
+  };
+
+  const handleSeenScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
+    if (scrollHeight - scrollTop <= clientHeight + 50 && !isLoadingSeen && hasMoreSeen) {
+      fetchSeenBy(seenPage + 1);
+    }
+  };
 
   // Mobile long press logic
   const [isMobile, setIsMobile] = useState(false);
@@ -140,16 +213,24 @@ export default function MessageItem({
     // Lấy URL đầu tiên nếu có media
     let mediaUrl: string | undefined = undefined;
     let type: string = "text"; // default là text
+    let content = msg.content;
 
     if (msg.media_ids && msg.media_ids.length > 0) {
-      mediaUrl = msg.media_ids[0].url;
-      type = msg.media_ids[0].type; // "image", "video", "file"
+      const firstMedia = msg.media_ids[0];
+      mediaUrl = firstMedia.url;
+      type = firstMedia.type; // "image", "video", "file"
+
+      // Nếu là file và nội dung text trống, lấy tên file làm content preview
+      if (type === "file" && !getTextContent(msg.content).trim()) {
+        content = firstMedia.filename;
+      }
     }
 
     setReplyTo({
       id: msg.id,
-      sender: isMine ? "Bạn" : display_name,
-      content: msg.content,
+      sender_id: msg.sender_id,
+      sender: msg.sender_name || (isMine ? "Bạn" : display_name),
+      content: content,
       type: type,
       media_url: mediaUrl ?? "",
     });
@@ -162,7 +243,7 @@ export default function MessageItem({
     const links = (msg.media_ids || []).map((m) =>
       m.type === "video"
         ? `${API_ENDPOINTS.STREAM_MEDIA}/${m.id}`
-        : `${API_ENDPOINTS.UPLOAD_MEDIA}/${m.url}`
+        : `${API_ENDPOINTS.UPLOAD_MEDIA}/${encodeURIComponent(m.url)}`
     );
     navigator.clipboard.writeText(links.join("\n"));
     toast.success("Đã copy link media!");
@@ -184,7 +265,7 @@ export default function MessageItem({
             const url =
               m.type === "video"
                 ? `${API_ENDPOINTS.STREAM_MEDIA}/${m.id}`
-                : `${API_ENDPOINTS.UPLOAD_MEDIA}/${m.url}`;
+                : `${API_ENDPOINTS.UPLOAD_MEDIA}/${encodeURIComponent(m.url)}`;
             
             await forceDownload(url, m.filename);
             
@@ -404,9 +485,11 @@ export default function MessageItem({
   };
 
   const getTextContent = (html: string) => {
+    if (!html) return "";
     const temp = document.createElement("div");
     temp.innerHTML = html;
-    return temp.textContent || temp.innerText || "";
+    const text = temp.textContent || temp.innerText || "";
+    return text.trim();
   };
 
   const handlePin = () => {
@@ -442,8 +525,7 @@ export default function MessageItem({
   };
 
   const handleViewDetail = () => {
-    console.log("Xem chi tiết tin nhắn:", msg.id);
-    toast.info("Tính năng đang phát triển");
+    handleShowSeenModal();
     setShowMenu(false);
   };
 
@@ -511,7 +593,7 @@ export default function MessageItem({
             <div className="flex-shrink-0">
               {msg.reply.type === "image" && (
                 <img
-                  src={`${API_ENDPOINTS.UPLOAD_MEDIA}/${msg.reply.media_url}`}
+                  src={`${API_ENDPOINTS.UPLOAD_MEDIA}/${encodeURIComponent(msg.reply.media_url || "")}`}
                   alt="reply"
                   className="w-12 h-12 object-cover rounded"
                 />
@@ -520,7 +602,7 @@ export default function MessageItem({
               {msg.reply.type === "video" && (
                 <div className="relative">
                   <video
-                    src={`${API_ENDPOINTS.UPLOAD_MEDIA}/${msg.reply.media_url}`}
+                    src={`${API_ENDPOINTS.UPLOAD_MEDIA}/${encodeURIComponent(msg.reply.media_url || "")}`}
                     className="w-12 h-12 object-cover rounded"
                     muted
                   />
@@ -547,7 +629,7 @@ export default function MessageItem({
           {/* Cột phải: thông tin reply */}
           <div className={`flex-1 min-w-0 ${hasReplyMedia ? "" : "ml-0"}`}>
             <div className="text-sm font-semibold text-gray-900 truncate">
-              {msg.reply.sender}
+              {msg.reply.sender_id === currentUserId ? "Bạn" : msg.reply.sender}
             </div>
 
             <div className="text-sm text-gray-900 line-clamp-2 break-words">
@@ -555,7 +637,7 @@ export default function MessageItem({
               {msg.reply.type === "video" && "[Video]"}
               {msg.reply.type === "file" && (
                 <span className="text-gray-900">
-                  [File] {msg.reply.content}
+                  [File] {getTextContent(msg.reply.content) || "Tập tin"}
                 </span>
               )}
               {(!msg.reply.media_url || msg.reply.type === "text") &&
@@ -608,6 +690,22 @@ export default function MessageItem({
       ? (myAssigneeEntry?.status === "pending_acceptance")
       : user?.data?.id === task.assignee_id;
 
+    // Build updated task object correctly for group tasks:
+    // Only update the specific assignee's status in assignees[], NOT the whole task.status
+    const buildUpdatedTask = (newStatus: TaskStatus): Task => {
+      if (isGroupTask && user?.data?.id) {
+        return {
+          ...task,
+          assignees: task.assignees?.map(a =>
+            a.assignee_id === user.data.id
+              ? { ...a, status: newStatus }
+              : a
+          ),
+        };
+      }
+      return { ...task, status: newStatus };
+    };
+
     const handleAccept = async () => {
       if (isUpdating) return;
 
@@ -618,11 +716,12 @@ export default function MessageItem({
 
         toast.success("✓ Bạn đã tiếp nhận công việc!");
 
+        const updatedTask = buildUpdatedTask("accepted" as TaskStatus);
         socketManager.sendRepTask(
           user?.data.id ?? "",
           selectedChat?.user_id ?? "",
           selectedChat?.group_id ?? "",
-          { ...task, status: "accepted" as TaskStatus },
+          updatedTask,
         );
       } catch (error) {
         console.error("Accept task failed:", error);
@@ -637,17 +736,17 @@ export default function MessageItem({
 
       setIsUpdating(true);
       try {
-        // Group task: truyền assignee_id để backend cập nhật đúng người
         const assigneeId = isGroupTask ? (user?.data?.id ?? undefined) : undefined;
         await taskApi.updateTaskStatus(task.id, "rejected", assigneeId);
 
         toast.info("✗ Bạn đã từ chối công việc");
 
+        const updatedTask = buildUpdatedTask("rejected" as TaskStatus);
         socketManager.sendRepTask(
           user?.data.id ?? "",
           selectedChat?.user_id ?? "",
           selectedChat?.group_id ?? "",
-          { ...task, status: "rejected" as TaskStatus }
+          updatedTask
         );
       } catch (error) {
         console.error("Reject task failed:", error);
@@ -684,7 +783,7 @@ export default function MessageItem({
     const urls = mediaItems.map(m =>
       m.type === "video"
         ? `${API_ENDPOINTS.STREAM_MEDIA}/${m.id}`
-        : `${API_ENDPOINTS.UPLOAD_MEDIA}/${m.url}`
+        : `${API_ENDPOINTS.UPLOAD_MEDIA}/${encodeURIComponent(m.url)}`
     );
 
     // 1 item — tall aspect
@@ -1037,6 +1136,17 @@ export default function MessageItem({
                   <MessageSquare className="w-3.5 h-3.5 text-gray-500" />
                 </button>
 
+                {/* Seen Detail button */}
+                {selectedChat?.group_id && (
+                   <button
+                    onClick={handleShowSeenModal}
+                    className="w-7 h-7 flex items-center justify-center !rounded-full bg-white border border-gray-200 shadow-sm hover:translate-y-[-2px] hover:shadow-md transition-all duration-200"
+                    title="Ai đã xem?"
+                  >
+                    <Eye className="w-3.5 h-3.5 text-gray-500" />
+                  </button>
+                )}
+
                 {/* Emoji Picker Popover */}
                 {showReactionPicker && (
                   <motion.div
@@ -1114,14 +1224,14 @@ export default function MessageItem({
 
             {/* Message bubble */}
             <div
-              className={`px-3 py-2 md:px-4 md:py-2.5 rounded-2xl border max-w-full leading-relaxed transition-all duration-300 break-words ${bubbleStyles} ${size === "small" || isMobile ? "text-sm" : "text-[15px]"
+              className={`px-2 py-1 md:px-3 md:py-1.5 rounded-sm border max-w-full leading-relaxed transition-all duration-300 break-words ${bubbleStyles} ${size === "small" || isMobile ? "text-sm" : "text-[15px]"
                 } ${isHighlighted
                   ? "ring-2 ring-blue-400 shadow-lg z-[10]"
                   : ""
                 } ${showMenu ? "opacity-50 md:opacity-100 z-[10]" : ""}`}
             >
               {shouldShowSenderName && (
-                <div className="text-[13px] font-semibold text-[#5c3d1e] mb-1">
+                <div className="text-[13px] font-semibold text-black mb-1">
                   {msg.sender_name || display_name}
                 </div>
               )}
@@ -1166,21 +1276,68 @@ export default function MessageItem({
             })()}
 
             {isLastInSequence && (
-              <div className="flex items-center gap-1.5 pl-1 pr-1 mt-0.5">
-                {isMine && isLastMineMessage && (
-                  <>
-                    <span className="text-[11px] text-gray-400">{formatTime(msg.created_at)}</span>
-                    <span className="flex items-center gap-0.5 text-gray-400">
-                      <statusInfo.icon className="w-2.5 h-2.5" />
-                      <span className="text-[11px]">{statusInfo.label}</span>
-                    </span>
-                  </>
+              <div className={`flex items-center gap-1.5 mt-0.5 px-1 ${isMine ? "justify-end" : "justify-start"}`}>
+                <span className="text-[11px] text-gray-400">{formatTime(msg.created_at)}</span>
+
+                {/* Group Seen Avatars - Hiển thị kế bên thời gian và chỉ ở tin nhắn cuối cùng */}
+                {selectedChat?.group_id && filteredSeenBy && filteredSeenBy.length > 0 && index === messages.length - 1 && (
+                  <div className="flex items-center gap-1 ml-1">
+                    <div
+                      className="flex items-center -space-x-1.5 cursor-pointer hover:opacity-80 transition-opacity"
+                      onClick={handleShowSeenModal}
+                      title="Người đã xem"
+                    >
+                      {filteredSeenBy.slice(0, 5).map((u) => (
+                        <div key={u._id} className="ring-1 ring-white rounded-full overflow-hidden">
+                          <UserAvatar
+                            avatar={u.avatar}
+                            display_name={u.display_name}
+                            size={14}
+                            showOnlineStatus={false}
+                          />
+                        </div>
+                      ))}
+                      {filteredSeenBy.length > 5 && (
+                        <div className="flex items-center justify-center w-[14px] h-[14px] rounded-full bg-gray-200 text-[8px] font-bold text-gray-600 ring-1 ring-white z-10">
+                          +{filteredSeenBy.length - 5}
+                        </div>
+                      )}
+                    </div>
+                    {/* View Detail Button */}
+                    <button
+                      onClick={handleShowSeenModal}
+                      className="p-1 rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors flex items-center justify-center"
+                      title="Xem chi tiết người đã xem"
+                    >
+                      <Info size={11} />
+                    </button>
+                  </div>
+                )}
+
+                {isMine && isLastMineMessage && !(selectedChat?.group_id && msg.seen_by && msg.seen_by.length > 0) && (
+                  <span className="flex items-center gap-0.5 text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
+                    <statusInfo.icon className="w-2.5 h-2.5" />
+                    <span className="text-[11px]">{statusInfo.label}</span>
+                  </span>
                 )}
               </div>
             )}
+
           </div>
         </motion.div>
       </AnimatePresence>
+
+      <SeenStatusModal
+        show={showSeenModal}
+        onClose={() => setShowSeenModal(false)}
+        msg={msg}
+        seenByUsers={seenByUsers}
+        isLoading={isLoadingSeen}
+        hasMore={hasMoreSeen}
+        onScroll={handleSeenScroll}
+        formatTimestamp={formatTimestamp}
+        isMobile={isMobile}
+      />
     </>
   );
 }

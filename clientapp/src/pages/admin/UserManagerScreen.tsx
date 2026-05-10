@@ -746,6 +746,7 @@ export default function UserManagerScreen() {
           data={users}
           columns={columns}
           total={totalUsers}
+          loading={isLoading}
           rowSelection={{ mode: "multiRow", enableClickSelection: false }}
           onSelectionChange={(rows) => setSelectedUsers(rows.map(r => String(r.user.id)))}
           rowKey="id"

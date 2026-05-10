@@ -21,6 +21,7 @@ export default function RoleManagerScreen() {
   const [totalRoles, setTotalRoles] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(15);
+  const [isLoading, setIsLoading] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedRole, setSelectedRole] = useState<Role | null>(null);
   const [confirmModal, setConfirmModal] = useState({
@@ -32,6 +33,7 @@ export default function RoleManagerScreen() {
 
   // ========== FETCH ==========
   const fetchRoles = useCallback(async () => {
+    setIsLoading(true);
     try {
       const response = await roleAdminApi.getList(currentPage, pageSize, searchQuery);
       if (response && response.data) {
@@ -42,6 +44,8 @@ export default function RoleManagerScreen() {
       if (error.response?.status !== 403) {
         toast.error("Không thể tải danh sách vai trò!");
       }
+    } finally {
+      setIsLoading(false);
     }
   }, [searchQuery]);
 
@@ -247,6 +251,7 @@ export default function RoleManagerScreen() {
           data={roles}
           columns={columns}
           total={totalRoles}
+          loading={isLoading}
           rowKey="id"
           serverSidePagination={true}
           enableNativePagination={false}

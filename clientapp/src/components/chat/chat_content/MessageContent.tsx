@@ -55,7 +55,7 @@ const MessageContent = ({
           const mediaUrl =
             media.type === "video"
               ? `${API_ENDPOINTS.STREAM_MEDIA}/${media.id}`
-              : `${API_ENDPOINTS.UPLOAD_MEDIA}/${media.url}`;
+              : `${API_ENDPOINTS.UPLOAD_MEDIA}/${encodeURIComponent(media.url)}`;
 
           // Special layout for 3-item: first item spans full width on top
           const spanClass = count === 3 && i === 0 ? "col-span-3" : "";
@@ -121,7 +121,7 @@ const MessageContent = ({
     return (
       <div className="mt-1 space-y-1">
         {fileItems.map((file) => {
-          const mediaUrl = `${API_ENDPOINTS.UPLOAD_MEDIA}/${file.url}`;
+          const mediaUrl = `${API_ENDPOINTS.UPLOAD_MEDIA}/${encodeURIComponent(file.url)}`;
           const colors = getFileColor(file.filename);
           const ext = file.filename.split(".").pop()?.toUpperCase() ?? "FILE";
 

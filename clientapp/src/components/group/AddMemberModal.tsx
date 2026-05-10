@@ -105,6 +105,7 @@ export default function AddMemberModal({
         user_name: user?.display_name || "",
         display_name: user?.display_name || "",
         role: "number",
+        avatar: user?.avatar || "",
       };
     });
 

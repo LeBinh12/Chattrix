@@ -3,7 +3,6 @@ package websocket
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"log"
 	"my-app/common/kafka"
 	"my-app/modules/chat/models"
@@ -98,9 +97,30 @@ func (h *Hub) Run() {
 					"type":    "update_seen",
 					"message": msg,
 				})
-				// Chỉ gửi cho receiver
+				// Nếu là tin nhắn nhóm (ReceiverID là GroupID)
+				groupOID, err := primitive.ObjectIDFromHex(msg.ReceiverID)
+				if err == nil {
+					// Thử tìm xem đây có phải GroupID không
+					members, err := storage.NewMongoChatStore(h.DB).GetGroupMembers(context.Background(), groupOID)
+					if err == nil && len(members) > 0 {
+						// Là tin nhắn nhóm -> gửi cho tất cả thành viên trong nhóm
+						for _, memberID := range members {
+							if sessions, ok := h.Clients[memberID.Hex()]; ok {
+								for _, c := range sessions {
+									select {
+									case c.Send <- data:
+									default:
+										log.Printf("Buffer full — dropping update_seen for %s\n", c.UserID)
+									}
+								}
+							}
+						}
+						break
+					}
+				}
+
+				// Nếu không phải nhóm (1-1) -> gửi cho receiver và sender như cũ
 				if sessions, ok := h.Clients[msg.ReceiverID]; ok {
-					fmt.Println("data_Rêciver", msg)
 					for _, c := range sessions {
 						select {
 						case c.Send <- data:
@@ -111,7 +131,6 @@ func (h *Hub) Run() {
 				}
 
 				if sessions, ok := h.Clients[msg.SenderID]; ok {
-					fmt.Println("SenderID", msg)
 					for _, c := range sessions {
 						select {
 						case c.Send <- data:
@@ -461,39 +480,28 @@ func (h *Hub) Run() {
 				log.Printf("[chat-notification] Successfully broadcast to %d online users (from channel %s)", broadcastCount, resSocket.SenderID.Hex())
 			case "group_member_added":
 				payload := event.Payload.(map[string]interface{})
-				members := payload["members"].([]models.Member)
+				groupIDStr := payload["group_id"].(string)
+				groupID, _ := primitive.ObjectIDFromHex(groupIDStr)
+
+				// Authority: Always calculate actual total members from DB before broadcast
+				groupMembers, err := storage.NewMongoChatStore(h.DB).GetGroupMembers(context.Background(), groupID)
+				if err == nil {
+					payload["total_members"] = len(groupMembers)
+				}
+
 				data, _ := json.Marshal(map[string]interface{}{
 					"type":    "group_member_added",
 					"message": payload,
 				})
 
-				senderID := ""
-				if sid, ok := payload["sender_id"].(string); ok {
-					senderID = sid
-				}
-
-				if sessions, ok := h.Clients[senderID]; ok {
-					fmt.Println("uid", senderID)
-
-					for _, c := range sessions {
-						select {
-						case c.Send <- data:
-						default:
-							log.Println("buffer full, dropping message for", senderID)
-						}
-					}
-				}
-
-				for _, mem := range members {
-					uid := mem.UserID.Hex()
-					// Nếu user đang online → gửi realtime
+				for _, mID := range groupMembers {
+					uid := mID.Hex()
 					if sessions, ok := h.Clients[uid]; ok {
-
 						for _, c := range sessions {
 							select {
 							case c.Send <- data:
 							default:
-								log.Println("buffer full, dropping message for", uid)
+								log.Println("buffer full, dropping group_member_added for", uid)
 							}
 						}
 					}
@@ -513,6 +521,13 @@ func (h *Hub) Run() {
 						log.Println("Lỗi GetGroupMembers:", err)
 						break
 					}
+
+					resSocket.TotalMembers = len(members)
+					// Re-marshal with updated TotalMembers
+					dataRecall, _ = json.Marshal(map[string]interface{}{
+						"type":    "member_left",
+						"message": resSocket,
+					})
 
 					for _, memberID := range members {
 
@@ -748,12 +763,36 @@ func (h *Hub) Run() {
 
 			case "group_member_removed":
 				payload := event.Payload.(map[string]interface{})
+				groupIDStr := payload["group_id"].(string)
+				groupID, _ := primitive.ObjectIDFromHex(groupIDStr)
 				targetUserID := payload["user_id"].(string)
+
+				// Authority: Always calculate actual total members from DB before broadcast
+				groupMembers, err := storage.NewMongoChatStore(h.DB).GetGroupMembers(context.Background(), groupID)
+				if err == nil {
+					payload["total_members"] = len(groupMembers)
+				}
+
 				data, _ := json.Marshal(map[string]interface{}{
 					"type":    "group_member_removed",
 					"message": payload,
 				})
 
+				// Send to remaining members
+				for _, mID := range groupMembers {
+					uid := mID.Hex()
+					if sessions, ok := h.Clients[uid]; ok {
+						for _, c := range sessions {
+							select {
+							case c.Send <- data:
+							default:
+								log.Printf("Buffer full — dropping group_member_removed for %s", uid)
+							}
+						}
+					}
+				}
+
+				// Also specifically ensure the removed user gets it (as they are no longer in GetGroupMembers)
 				if sessions, ok := h.Clients[targetUserID]; ok {
 					for _, c := range sessions {
 						select {
@@ -852,9 +891,10 @@ func (h *Hub) broadcastChatMessage(msg *models.MessageResponse) {
 		if msg.GroupID != primitive.NilObjectID && (msg.DisplayName == "" || msg.Avatar == "") {
 			gCacheKey := "group:" + msg.GroupID.Hex()
 			if cached, ok := h.Cache.Load(gCacheKey); ok {
+				// Use the same struct definition with tags for type assertion
 				group := cached.(struct {
-					Name  string
-					Image string
+					Name  string `bson:"name"`
+					Image string `bson:"image"`
 				})
 				msg.DisplayName = group.Name
 				msg.Avatar = group.Image

@@ -1,5 +1,6 @@
 export interface MediaItem {
     id: string;
+    message_id?: string;
     type: "image" | "video";
     url: string;
     filename: string;
@@ -7,6 +8,8 @@ export interface MediaItem {
 }
 
 export interface FileItem {
+    id: string;
+    message_id?: string;
     name: string;
     size: string;
     url: string;

@@ -857,25 +857,50 @@ export default function ChatWindow({ onBack }: ChatWindowProps) {
     ]
   );
 
+  // Reset unread_count locally when entering a chat
+  useEffect(() => {
+    if (!selectedChat) return;
+
+    setConversation((prev) =>
+      prev.map((conv) => {
+        const isMatch =
+          (selectedChat.group_id && selectedChat.group_id !== "000000000000000000000000" && conv.group_id === selectedChat.group_id) ||
+          (!selectedChat.group_id && conv.user_id === selectedChat.user_id);
+
+        if (isMatch && conv.unread_count > 0) {
+          return { ...conv, unread_count: 0 };
+        }
+        return conv;
+      })
+    );
+  }, [selectedChat, setConversation]);
+
   const handleUpdateSeen = useCallback(
     (seenData: {
       last_seen_message_id?: string;
       receiver_id?: string;
       sender_id?: string;
+      seen_by_user?: {
+        _id: string;
+        display_name: string;
+        avatar: string;
+      };
     }) => {
-      const { last_seen_message_id, receiver_id, sender_id } = seenData;
-      // Reset unread_count
-      setConversation((prevConversations) =>
-        prevConversations.map((conv: Conversation) => {
-          if (
-            (conv.user_id && conv.user_id === receiver_id) ||
-            (conv.group_id && conv.group_id === receiver_id)
-          ) {
-            return { ...conv, unread_count: 0 };
-          }
-          return conv;
-        })
-      );
+      const { last_seen_message_id, receiver_id, sender_id, seen_by_user } = seenData;
+      // Reset unread_count ONLY if it was me who saw it
+      if (seen_by_user?._id === user?.data.id) {
+        setConversation((prevConversations) =>
+          prevConversations.map((conv: Conversation) => {
+            if (
+              (conv.user_id && conv.user_id === receiver_id) ||
+              (conv.group_id && conv.group_id === receiver_id)
+            ) {
+              return { ...conv, unread_count: 0 };
+            }
+            return conv;
+          })
+        );
+      }
 
       // Không có last_seen_message_id thì bỏ qua
       if (!last_seen_message_id) return;
@@ -886,13 +911,30 @@ export default function ChatWindow({ onBack }: ChatWindowProps) {
           : `group_${receiver_id}`;
 
       // Status update function
+      const isGroupSeen = seenConversationKey.startsWith("group_");
       const updateStatus = (msgs: Messages[]) =>
-        msgs.map((msg) =>
-          msg.sender_id === user?.data.id &&
-            isObjectIdLE(msg.id, last_seen_message_id)
-            ? { ...msg, status: "seen", is_read: true }
-            : msg
-        );
+        msgs.map((msg) => {
+          // Update status 'seen' for my messages
+          let newMsg = msg;
+          if (msg.sender_id === user?.data.id && isObjectIdLE(msg.id, last_seen_message_id)) {
+            newMsg = { ...newMsg, status: "seen", is_read: true };
+          }
+
+          // Update 'seen_by' list for group messages
+          if (isGroupSeen && seen_by_user && isObjectIdLE(msg.id, last_seen_message_id)) {
+            // Only add if not already in seen_by
+            const alreadySeen = newMsg.seen_by?.some(u => u._id === seen_by_user._id);
+            if (!alreadySeen) {
+              newMsg = {
+                ...newMsg,
+                seen_by: [...(newMsg.seen_by || []), seen_by_user],
+                seen_by_count: (newMsg.seen_by_count || 0) + 1
+              };
+            }
+          }
+
+          return newMsg;
+        });
 
       // Update cache
       setMessagesCache((prev) => {
@@ -1345,22 +1387,10 @@ export default function ChatWindow({ onBack }: ChatWindowProps) {
         }
         case "group_member_removed": {
           if (data.message) {
-            const payload = data.message as { group_id: string; user_id: string };
+            const payload = data.message as { group_id: string; user_id: string; total_members?: number };
             
-            // Sync group members list and total
-            setGroupMembersMap((prev) => {
-              const currentMembers = prev[payload.group_id] || [];
-              return {
-                ...prev,
-                [payload.group_id]: currentMembers.filter(m => m.user_id !== payload.user_id)
-              };
-            });
-            
-            setGroupTotalMembers((prev) => ({
-              ...prev,
-              [payload.group_id]: Math.max(0, (prev[payload.group_id] || 0) - 1)
-            }));
-
+            // NOTE: Member list sync is handled centrally in useAppSocket.ts.
+            // Only handle UI-specific concerns here (hasLeftGroup toast).
             if (payload.user_id === user?.data.id && payload.group_id === selectedChat?.group_id) {
               setHasLeftGroup(true);
               toast.info("Bạn đã bị xóa khỏi nhóm");

@@ -91,10 +91,10 @@ export default function MediaPreview({
   // Xử lý URL cho video stream và image
   const fileUrl = isVideo
     ? `${API_ENDPOINTS.STREAM_MEDIA}/${currentMedia.id || currentMedia.url}`
-    : `${API_ENDPOINTS.UPLOAD_MEDIA}/${currentMedia.url}`;
+    : `${API_ENDPOINTS.UPLOAD_MEDIA}/${encodeURIComponent(currentMedia.url || "")}`;
 
   // URL download - dùng url thông thường
-  const downloadUrl = `${API_ENDPOINTS.UPLOAD_MEDIA}/${currentMedia.url}`;
+  const downloadUrl = `${API_ENDPOINTS.UPLOAD_MEDIA}/${encodeURIComponent(currentMedia.url || "")}`;
 
   return (
     <AnimatePresence>
