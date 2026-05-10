@@ -82,12 +82,8 @@ export default function CreateGroupModal({
   // Fetch users on open or search
   useEffect(() => {
     if (!isOpen) return;
-
-    // Only fetch if we don't have users or if searching
-    if (users.length === 0 || searchQuery !== "") {
-      fetchUsers(1, searchQuery);
-    }
-  }, [isOpen, searchQuery, fetchUsers, users.length]);
+    fetchUsers(1, searchQuery);
+  }, [isOpen, searchQuery, fetchUsers]);
 
   const handleLoadMore = useCallback(() => {
     if (!loading && !loadingMore && hasMore) {
