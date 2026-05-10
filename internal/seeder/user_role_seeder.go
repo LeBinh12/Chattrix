@@ -42,7 +42,7 @@ func SeedUserRoles(db *mongo.Database) {
 	}
 
 	// 2. Lấy danh sách users (ngoại trừ superadmin và các admin khác)
-	excludedUsers := []string{"superadmin", "steven", "ithelpdesk1", "ithelpdesk2", "ithelpdesk3", "ithelpdesk4", "ithelpdesk5"}
+	excludedUsers := []string{"superadmin", "ithelpdesk1", "ithelpdesk2", "ithelpdesk3", "ithelpdesk4", "ithelpdesk5"}
 	userCursor, err := userColl.Find(ctx, bson.M{"username": bson.M{"$nin": excludedUsers}})
 	if err != nil {
 		return

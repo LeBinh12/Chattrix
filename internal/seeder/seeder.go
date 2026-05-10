@@ -51,15 +51,6 @@ func Execute(db *mongo.Database) {
 			Birthday:    time.Date(1990, time.January, 1, 0, 0, 0, 0, time.UTC),
 		},
 		{
-			Username:    "steven",
-			Email:       "steven@gmail.com",
-			DisplayName: "Steven",
-			Avatar:      "https://api.dicebear.com/7.x/avataaars/svg?seed=superadmin",
-			Phone:       "0901000001",
-			Gender:      "other",
-			Birthday:    time.Date(1990, time.January, 1, 0, 0, 0, 0, time.UTC),
-		},
-		{
 			Username:    "ithelpdesk1",
 			Email:       "ithelpdesk1@example.com",
 			DisplayName: "IT helpdesk 1",

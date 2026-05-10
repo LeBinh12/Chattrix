@@ -128,7 +128,7 @@ func SeedRoles(db *mongo.Database) {
 
 		// Gán Role 'System Admin' cho user 'superadmin' và các user khác
 		if existingRole.Code == "system_admin" {
-			targetUsers := []string{"superadmin", "steven", "ithelpdesk1", "ithelpdesk2", "ithelpdesk3", "ithelpdesk4", "ithelpdesk5"}
+			targetUsers := []string{"superadmin", "ithelpdesk1", "ithelpdesk2", "ithelpdesk3", "ithelpdesk4", "ithelpdesk5"}
 
 			for _, username := range targetUsers {
 				var user struct {
